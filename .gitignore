@@ -1,0 +1,5 @@
+skills/*/local.md
+.claude/worktrees/
+dist/
+evals/results/
+writeups/

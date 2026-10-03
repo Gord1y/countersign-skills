@@ -1,0 +1,79 @@
+#!/bin/sh
+set -eu
+
+usage() {
+  echo "usage: statusline [--wrap <command>]"
+  echo "A Claude Code status line: reads the status line JSON on stdin and prints the model, the context"
+  echo "used and the 5-hour and 7-day limits left. When the input has rate_limits, it also records them in"
+  echo "\${XDG_CONFIG_HOME:-\$HOME/.config}/countersign/rate-limits/<config dir>.json for Countersign."
+  echo "--wrap <command> records the same way, then prints what <command> prints for the same input."
+}
+
+wrap=
+case ${1:-} in
+  "") ;;
+  --wrap)
+    if [ $# -ne 2 ] || [ -z "$2" ]; then
+      usage >&2
+      exit 2
+    fi
+    wrap=$2
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac
+
+input=$(cat)
+config_dir=${CLAUDE_CONFIG_DIR:-$HOME/.claude}
+
+record() {
+  limits=$(printf '%s' "$input" | jq -c '.rate_limits // empty')
+  [ -n "$limits" ] || return 0
+  dir="${XDG_CONFIG_HOME:-$HOME/.config}/countersign/rate-limits"
+  key=$(printf '%s' "$config_dir" | tr -c 'A-Za-z0-9' '-')
+  mkdir -p "$dir"
+  tmp=$(mktemp "$dir/.$key.XXXXXX")
+  jq -n --argjson limits "$limits" --arg dir "$config_dir" --argjson now "$(date +%s)" \
+    '{schemaVersion: 1, configDir: $dir, updatedAt: $now, rateLimits: $limits}' >"$tmp"
+  mv "$tmp" "$dir/$key.json"
+}
+
+line() {
+  printf '%s' "$input" | jq -r \
+    --arg amber "$(printf '\033[33m')" --arg red "$(printf '\033[31m')" --arg reset "$(printf '\033[0m')" '
+    def left:
+      (100 - . | floor | if . < 0 then 0 else . end) as $n
+      | if $n < 20 then "\($red)\($n)% left\($reset)"
+        elif $n < 30 then "\($amber)\($n)% left\($reset)"
+        else "\($n)% left" end;
+    [
+      (.model.display_name // empty),
+      (.context_window.used_percentage // empty | "ctx \(floor)%"),
+      (.rate_limits.five_hour.used_percentage // empty | "5h \(left)"),
+      (.rate_limits.seven_day.used_percentage // empty | "7d \(left)")
+    ] | join(" · ")'
+}
+
+has_jq=yes
+command -v jq >/dev/null 2>&1 || has_jq=no
+
+if [ "$has_jq" = yes ]; then
+  record 2>/dev/null || true
+fi
+
+if [ -n "$wrap" ]; then
+  printf '%s\n' "$input" | sh -c "$wrap"
+  exit
+fi
+
+if [ "$has_jq" = no ]; then
+  echo "statusline needs jq"
+  exit 0
+fi
+line 2>/dev/null || true

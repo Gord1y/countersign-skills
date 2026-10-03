@@ -1,0 +1,33 @@
+name: Feature request
+description: Suggest an improvement to a skill, a rule or the installer
+labels:
+  - enhancement
+body:
+  - type: input
+    id: component
+    attributes:
+      label: Skill, rule or script
+      description: The one this is about, or "new" for something that does not exist yet.
+      placeholder: e.g. skill qa-tester, new skill, update.sh
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do, and what gets in the way today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: The proposal
+      description: What would you like it to do instead?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false

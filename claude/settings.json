@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "attribution": { "commit": "", "pr": "" },
+  "skillOverrides": {
+    "code-review": "user-invocable-only",
+    "simplify": "user-invocable-only",
+    "security-review": "user-invocable-only",
+    "init": "user-invocable-only",
+    "fewer-permission-prompts": "user-invocable-only",
+    "keybindings-help": "user-invocable-only",
+    "loop": "user-invocable-only",
+    "schedule": "user-invocable-only",
+    "run": "user-invocable-only"
+  },
+  "permissions": {
+    "defaultMode": "auto",
+    "allow": [
+      "mcp__context7",
+      "mcp__playwright",
+      "Read(~/.claude/plans/**)",
+      "Edit(~/.claude/plans/**)",
+      "Edit(~/.claude/projects/**)",
+      "Edit(//private/tmp/claude-*/**)"
+    ],
+    "ask": [
+      "Bash(git reset --hard*)",
+      "Bash(git -C * reset --hard*)",
+      "Bash(git clean*)",
+      "Bash(git -C * clean*)",
+      "Bash(git branch -D*)",
+      "Bash(git -C * branch -D*)",
+      "Bash(gh pr merge*)",
+      "Bash(gh repo delete*)"
+    ],
+    "deny": [
+      "Bash(git push)",
+      "Bash(git push *)",
+      "Bash(git -C * push)",
+      "Bash(git -C * push *)",
+      "Read(**/.env)",
+      "Read(**/.env.local)",
+      "Read(**/.env.*.local)",
+      "Read(**/.env.development)",
+      "Read(**/.env.production)",
+      "Read(**/.env.staging)",
+      "Read(**/.env.test)"
+    ]
+  },
+  "worktree": { "baseRef": "head" },
+  "skillListingBudgetFraction": 0.02,
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true,
+    "excludedCommands": ["gh *", "docker *"],
+    "filesystem": {
+      "allowWrite": [
+        "~/Library/pnpm",
+        "~/.npm",
+        "~/.cache",
+        "~/Library/Caches",
+        "~/Library/Developer/Xcode/DerivedData"
+      ]
+    },
+    "network": {
+      "allowedDomains": [
+        "localhost",
+        "127.0.0.1",
+        "registry.npmjs.org",
+        "*.npmjs.org",
+        "github.com",
+        "*.github.com",
+        "*.githubusercontent.com",
+        "pypi.org",
+        "files.pythonhosted.org"
+      ],
+      "allowLocalBinding": true
+    }
+  },
+  "autoMode": {
+    "environment": ["$defaults"],
+    "allow": [
+      "$defaults",
+      "A subagent working inside its own git worktree (a path under <repo>/.claude/worktrees/agent-*) may create, edit, move and delete files there and run the project's install and gates: the worktree is disposable, the subagent does not commit, and the orchestrator reviews the diff before anything reaches a shared branch",
+      "The orchestrating session may land a builder worktree under <repo>/.claude/worktrees/agent-* with the orchestrate skill's `scripts/land-worktree <path>` (copies its uncommitted changes into the main checkout and stages them), commit them on the working branch, and then run `git worktree remove --force <path>` on that worktree: its changes are already committed, so nothing is lost",
+      "Against the local dev stack only (localhost URLs, or a database on localhost): creating, reading and deleting individual records whose name or email starts with qa-, and creating or signing in as the project standing QA account (qa-agent@<repo>.example), is routine verification. It never covers bulk deletes, TRUNCATE or DROP, records of real users, or any non-local host such as a staging or production domain"
+    ]
+  }
+}

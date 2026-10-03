@@ -1,0 +1,11 @@
+responses	claude,codex,antigravity
+code	claude,codex,antigravity
+issues-found	claude,codex,antigravity
+tooling	claude,codex,antigravity
+orchestration	claude
+context-transfer	claude,codex,antigravity
+memory	claude
+research	claude,codex,antigravity
+commits	claude,codex,antigravity
+safety	claude,codex,antigravity
+trust	claude,codex,antigravity
