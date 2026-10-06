@@ -90,10 +90,11 @@ Under `## Before and after merging`, only the parts that hold, each a short list
 - **How it was checked:** the gates run at the branch head and what they cover. Verification
   belongs here and never in the note.
 
-The tail is for developers, so it may name files, commands and settings. It still describes only
-this repo: no other repository by name or path, no machine path, no developer name. Anything another
-repository needs goes to the maintainer as a private brief, `briefs/<date>-<topic>.md` in the
-drafts location, never into the PR.
+The tail is for developers, so it may name files, commands and settings. It says what holds and
+what to do, never the story behind the work: not what prompted the release, nor what went wrong or
+needed a second try while it was built. It still describes only this repo: no other repository by
+name or path, no machine path, no developer name. Anything another repository needs goes to the
+maintainer as a private brief, `briefs/<date>-<topic>.md` in the drafts location, never into the PR.
 
 ## 5. `staging` → `main`
 
