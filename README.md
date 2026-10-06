@@ -85,7 +85,7 @@ has, so those two rules stay out of both.
 | `qa-tester` | Tests a change in the running product on every surface it touched (web, API, CLI, native or mobile app, game, library), saves the evidence under `writeups/`, and reports pass or fail. Runs forked under Claude Code. | Claude Code, Codex |
 | `impact-check` | Finds what a change could break outside its diff, and backs its verdict with a script that runs the real code. | Claude Code, Codex, Antigravity |
 | `how-it-works` | Explains how a part of the codebase works, for the person about to change it: its moving parts, the flow with a diagram, where to start reading. | Claude Code, Codex, Antigravity |
-| `pr-review-triage` | Verifies a PR's review findings at the PR head and writes a fix plan; starts on a bare PR link. | Claude Code, Codex |
+| `pr-review-triage` | Verifies a PR's AI findings, failed checks and open threads at the PR head, and writes a fix plan that proves each fix safe; starts on a bare PR link. | Claude Code, Codex |
 | `walkthrough` | Walks you through any change with its QA evidence (screenshots, request and response pairs, transcripts), or builds a customer-facing HTML walkthrough of a UI release. | Claude Code, Codex, Antigravity |
 | `writeups-cleanup` | Proposes what in `writeups/` has done its job, with the evidence, and deletes only what you approve. Manual: `/writeups-cleanup`. | Claude Code, Codex, Antigravity |
 

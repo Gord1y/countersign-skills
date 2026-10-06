@@ -165,13 +165,13 @@
     },
     {
       "name": "pr-review-triage",
-      "version": "1.0.0",
+      "version": "2.0.0",
       "agents": [
         "claude",
         "codex"
       ],
-      "description": "Triage a PR's review: fetch the Claude review, human comments and open threads, verify each finding at the PR head, find what it missed, write a fix plan.",
-      "whenToUse": "Use when the message is a bare PR link, or when asked to triage or answer a PR's review.",
+      "description": "Triage a PR: collect AI review findings, failed CI checks and open human threads, verify each at the PR head, and write a fix plan that proves every fix safe.",
+      "whenToUse": "Use when the message is a bare PR link, or when asked to triage a PR's review findings or failing checks.",
       "invocation": "model",
       "path": "skills/pr-review-triage"
     },
@@ -190,7 +190,7 @@
     },
     {
       "name": "writeups-cleanup",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "agents": [
         "claude",
         "codex",

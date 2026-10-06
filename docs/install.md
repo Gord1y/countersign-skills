@@ -212,7 +212,6 @@ writeups/
   changes/<date>-<branch-or-run>/   pr.md, walkthrough.md, shots/, qa/
   releases/<version>/               promotion-staging.md, promotion-main.md, walkthrough.html, shots/
   briefs/<date>-<topic>.md          asks for other repos or teams
-  reviews/pr-<n>/                   triage.md, qa/
   scratch/                          delete any time
 ```
 
