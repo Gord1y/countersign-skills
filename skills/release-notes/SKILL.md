@@ -1,7 +1,7 @@
 ---
 name: release-notes
 description: "Write or update a release note: entry format, required sections, the Fixed rule, and regenerating the release index."
-disable-model-invocation: true
+when_to_use: "Use when asked to write or update a release note or changelog entry, and before reporting work on a release branch as done, so its open note covers every commit."
 effort: medium
 ---
 
@@ -31,6 +31,7 @@ that records it.
 | Commit type for release notes | `docs(release): …`, with `release:` reserved for promotion merges |
 | Version bump convention | the `package.json` bump as its own `chore:` commit |
 | Does the repo tag releases? | no: the version lives in `package.json`, the filename and the branch name |
+| Which note a hotfix's entry goes in | the fixed version's own note, or a new patch version's |
 
 What CI generates on its own is not written into the note. If this skill, the releases README and
 the validator disagree, the validator wins.
@@ -49,16 +50,21 @@ from a forgotten one. So **a commit that changes behaviour, tooling, configurati
 document updates the note, in the same commit or the next one.** Reconstructing entries from a
 diff later is how invented ones get in.
 
-**Before reporting work on a release branch as done,** list every commit since the note was last
-touched, and give each one an entry or a reason it has none. Check the list, don't recall it:
+**Before reporting work on a release branch as done,** list every commit the branch holds that its
+target lacks, and give each one an entry or a reason it has none. Check the list, don't recall it:
 
 ```bash
-NOTE=<notes folder>/release-<semver>.md
-git log --oneline "$(git log -1 --format=%H -- $NOTE)..HEAD"
+git fetch origin
+git log --oneline origin/<target>..HEAD
 ```
 
+`<target>` is the branch this one merges into, from the branch flow. Never start the list at the
+note's last commit: a commit that touches the note without adding an entry hides every commit
+before it.
+
 A new file or capability is `Added`, a change to something shipped is `Changed`, and `Fixed` only
-if it was broken in the previous released version. Only two kinds of commit need no entry: test
+if it was broken in the previous released version. A hotfix's entry goes in the note Repo facts
+names for it, and is `Fixed` only when the bug reached a released version. Only two kinds of commit need no entry: test
 infrastructure, stories and CI-only changes (the "never get an entry" row; specs that pin what the
 release is about still earn an `Added` entry), and commits that only edit the note or its index.
 

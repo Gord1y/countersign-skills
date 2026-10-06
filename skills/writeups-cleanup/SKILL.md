@@ -7,7 +7,7 @@ disable-model-invocation: true
 # Writeups cleanup
 
 `writeups/` collects every draft the skills write: PR bodies, QA evidence, walkthroughs, release
-drafts, briefs, review triage. It is gitignored, so nothing removes it, and a deletion cannot be
+drafts and briefs. It is gitignored, so nothing removes it, and a deletion cannot be
 undone. This skill finds what has done its job, proposes it with the evidence, and deletes only
 the paths the user approves.
 
@@ -30,7 +30,6 @@ writeups/
   changes/<date>-<branch-or-run>/   pr.md, walkthrough.md, shots/, qa/
   releases/<version>/               promotion-staging.md, promotion-main.md, walkthrough.html, shots/
   briefs/<date>-<topic>.md          asks for other repos or teams
-  reviews/pr-<n>/                   triage.md, qa/
   scratch/                          delete any time
 ```
 
@@ -38,7 +37,6 @@ writeups/
 | --- | --- |
 | `changes/<x>/` | its PR is merged and the merge commit is in the released ref |
 | `releases/<version>/` | a later version has shipped |
-| `reviews/pr-<n>/` | the PR is merged or closed |
 | `scratch/` | always |
 | `briefs/<file>` | never by rule: listed with its age, for the user to judge |
 | anything outside the layout | never by rule: listed as "outside the layout", with the place it would move to when its name makes that clear |

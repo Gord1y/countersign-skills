@@ -60,8 +60,8 @@ when that is set, as Countersign does):
 - **`profile/`**, your layer, usually a link into a private repo. Every part is optional:
   - `CLAUDE.md`: "Who I am" and the list of rule imports, used instead of
     `claude/CLAUDE.template.md`. Drop an import line to switch that rule off.
-  - `settings.json`: merged over `claude/settings.json`, so your keys win and permission lists
-    add up.
+  - `settings.json`: merged over `claude/settings.json`, so your keys win, and the permission,
+    sandbox and auto-mode lists add up (see [Settings merge](#settings-merge)).
   - `bin/`: linked into `~/.local/bin` next to this repo's `bin/`.
 - **Additions**: `install.sh --addition <folder>` records a folder in this repo's layout
   (`skills.tsv` and `skills/`, `rules.tsv` and `rules/`, `agents/`) and installs it alongside on
@@ -82,24 +82,34 @@ when that is set, as Countersign does):
 `install.sh` merges `claude/settings.json`, then your profile's `settings.json`, into
 `~/.claude/settings.json` (it needs `jq`):
 
-- Every key the repo file sets wins, including whole arrays such as the sandbox's domain list.
-- Keys it doesn't set stay as they are: hooks another tool installed (Countersign's), and anything
+- Every key the repo file sets wins, and a key your profile sets wins over the repo's. An array
+  outside the lists below is replaced whole.
+- Keys neither sets stay as they are: hooks another tool installed (Countersign's), and anything
   Claude Code writes for this machine.
-- `permissions.allow`, `permissions.ask` and `permissions.deny` are merged, so rules Claude Code
-  saved from a "don't ask again" answer survive.
+- These lists are joined, not replaced, so an entry from any layer survives:
+  `permissions.allow`, `ask` and `deny`; the sandbox's `excludedCommands`,
+  `filesystem.allowRead`, `denyRead`, `allowWrite` and `denyWrite`, and
+  `network.allowedDomains`; and `autoMode.environment` and `allow`. So rules Claude Code saved
+  from a "don't ask again" answer survive, and a profile adds to a list without hiding the repo's
+  entries. No layer can take out another layer's entry: to narrow a joined list, edit the file
+  that adds the entry.
 - Before merging, each value the last run merged (`settings-layer.json`) comes out again, the way
   `uninstall.sh` takes it out. So a key or rule that the repo or your profile drops is removed
   on the next run, and so is a path-bound rule after the repo moves. A value you changed since,
   and one you had before the first install, stay.
-- `ask` makes `git reset --hard`, `git clean`, `git branch -D`, `gh pr merge` and `gh repo delete`
-  prompt even in auto mode, with the `git -C <dir>` forms covered too. `deny` blocks `git push` and
-  reading `.env`, `.env.local`, `.env.*.local`, `.env.development`, `.env.production`,
+- There is no `ask` list: inside the sandbox nothing prompts, and outside it the auto-mode
+  classifier decides. `deny` blocks `git push` and reading `.env`, `.env.local`, `.env.*.local`, `.env.development`, `.env.production`,
   `.env.staging` and `.env.test` at any depth, for the Read tool and sandboxed commands alike.
   `.env.example` and other templates stay readable and editable. The files are named because a
   deny always beats an allow: `Read(.env.*)` would also hide `.env.example`, and no `allowRead`
   re-opens it for the Read tool. Each rule starts with `**/` because a relative rule such as
   `Read(.env)` reaches sandboxed commands only at the top of the working folder, so a nested or
   worktree `.env` stayed readable.
+- `deny` and `sandbox.filesystem.denyRead` both list the credential stores: `~/.ssh`, `~/.aws`,
+  `~/.gnupg`, `~/.kube`, `~/Library/Keychains` and the shell histories. Each covers what the other
+  misses: a `denyRead` entry doesn't stop the Read tool, and a `Read(...)` deny doesn't stop a
+  script that opens the file itself. Every remote these repos use is https, so git needs none of
+  them. `~/.npmrc` and `~/.netrc` stay readable, because pnpm and curl read them.
 - `skillListingBudgetFraction` is `0.02`: the skill listing (each model-invocable skill's name
   and description) may use 2% of the context window instead of the default 1%. In a 200K window,
   1% holds Claude Code's built-in skills and only some of these: measured with Opus 5.5 in Claude
@@ -107,8 +117,11 @@ when that is set, as Countersign does):
   own. At 2% all 12 keep them, for about 0.6K more tokens. In a 1M window 1% is already enough, so
   the setting changes nothing there. Claude Code doesn't document it yet; it drops the descriptions
   of the least-used skills first.
-- On macOS the per-user temp folder (`getconf DARWIN_USER_TEMP_DIR`) is added to the sandbox's
-  writable paths, because Apple's `git` and `xcrun` write caches there.
+- `sandbox.filesystem.allowWrite` lists the cache folders sandboxed builds write: pnpm's
+  `~/Library/pnpm`, `~/.npm`, `~/.cache`, `~/Library/Caches`, Xcode's
+  `~/Library/Developer/Xcode/DerivedData` and Godot's `~/Library/Application Support/Godot`. On
+  macOS the per-user temp folder (`getconf DARWIN_USER_TEMP_DIR`) is added to them, because Apple's
+  `git` and `xcrun` write caches there.
 - `permissions.allow` gets `Read(/<folder>/**)` for `~/.claude/skills` and for each source's
   `skills/`, under its path as given and its real path. So a skill reading its own reference
   files never prompts, in any project. Both sides are needed: Claude Code applies an allow rule
@@ -185,8 +198,7 @@ questions.
     Code creates them outside the sandbox. The orchestrator leaves a failed removal to you. A repo
     hit by the install failure lets its exact install command out, such as
     `pnpm install --frozen-lockfile`, with an `excludedCommands` entry and a matching allow rule.
-    Narrow any broader ask rule on the same command to the bare form, because an ask beats an
-    allow. Builders then run that command on a line of its own.
+    Builders then run that command on a line of its own.
   - **Auto mode's trust entries** (`autoMode.environment` and `autoMode.allow`). They tell the
     classifier which organizations, hosts and data are yours. They also say that a subagent may
     edit, delete and run gates inside its own worktree, that the orchestrator may land, commit and
@@ -194,7 +206,30 @@ questions.
     routine.
   - **Builder worktrees start from your current `HEAD`** (`worktree.baseRef: "head"`), not from
     the remote default branch, so a builder sees the commits already on the working branch.
-- **What still stops a run:** `git push` (denied), the `ask` rules above, anything the classifier
+- **Project settings and hooks never ask.** A project `ask` rule prompts for sandboxed commands
+  too, and a PreToolUse hook's `ask` forces a prompt even in auto mode: the classifier can deny it
+  but never approve it. So a repo's layer denies what must never happen, such as a secret path,
+  and returns nothing for the rest, leaving it to the sandbox and the classifier. A hook that
+  can't resolve a path stays silent rather than asking: a `$(mktemp …)` log or a `$p` in a URL is
+  not an access. Dropping a repo's asks takes three more changes, because the asks did other jobs:
+  - **Drop the Bash allow rules the sandbox makes redundant.** A sandboxed command already runs
+    without a prompt, so an allow rule only matters once the sandbox is off, and there it approves
+    the call with no review. `Bash(find *)` then lets `find -exec`, `-fls` and `-fprint` run or
+    write anything, as `sort -o`, `rg --pre` and `prettier --write` do for theirs, and no deny list
+    keeps up with every flag. Keep an allow only for a command in `excludedCommands`, and deny
+    its forms that run another program or write outside the repo.
+  - **Keep the CI bounds.** Where a workflow runs Claude with the repo's settings, nothing can
+    answer a prompt, so every ask was a deny. A runner has no sandbox, so a hook that went silent
+    locally still denies when `GITHUB_ACTIONS` is `true`, and a workflow's `--allowedTools` gives
+    `Read`, `Grep` and `Glob` rather than `Bash(find *)`, `Bash(rg *)` or `Bash(sort *)`.
+  - **Mirror the change in Codex's rules,** `.codex/rules/*.rules`: a `prompt` rule there is an ask
+    by another name.
+- **Writing a permission rule:** for files only `Edit(path)` and `Read(path)` are consulted.
+  `Edit` also covers Write, NotebookEdit and shell redirects, and a `Write(path)` rule is silently
+  ignored. Precedence is deny, then ask, then allow. Never allow an interpreter or a shell by rule
+  (`python3`, `node`, `sh -c`, `pnpm exec`) or "anything not denied"; make the narrow safe action
+  free instead.
+- **What still stops a run:** `git push` (denied), anything the classifier
   judges destructive or outside the trust boundary, and a Bash command that can't run in the
   sandbox. A builder that hits one reports it, and the orchestrator parks that unit and finishes
   the rest.
@@ -212,7 +247,6 @@ writeups/
   changes/<date>-<branch-or-run>/   pr.md, walkthrough.md, shots/, qa/
   releases/<version>/               promotion-staging.md, promotion-main.md, walkthrough.html, shots/
   briefs/<date>-<topic>.md          asks for other repos or teams
-  reviews/pr-<n>/                   triage.md, qa/
   scratch/                          delete any time
 ```
 

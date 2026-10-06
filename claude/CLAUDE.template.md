@@ -12,7 +12,6 @@ rule off.
 @{ROOT}/rules/issues-found.md
 @{ROOT}/rules/tooling.md
 @{ROOT}/rules/orchestration.md
-@{ROOT}/rules/context-transfer.md
 @{ROOT}/rules/memory.md
 @{ROOT}/rules/research.md
 @{ROOT}/rules/commits.md
