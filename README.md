@@ -102,12 +102,11 @@ a gitignored `writeups/` folder (layout in [docs/install.md](docs/install.md#wri
 
 One module per topic in `rules/`, imported into your `CLAUDE.md`.
 
-- **Responses**: how to answer, what to lead with, and how to mark a summary.
+- **Responses**: how to answer, what to lead with, and how to mark a summary (✅ asked work, 🔧 found and fixed, ❌ still broken).
 - **Code**: house style for code, such as no comments and strict types.
 - **Issues you find along the way**: fix what you find in the same session, don't park it.
 - **Tooling**: the package manager to use and the gates that count as done.
-- **Planning and orchestration**: ask every load-bearing question up front, and split big work into units.
-- **Context transfer**: use the handoff skill for a handoff, nothing else.
+- **Planning and orchestration**: ask every load-bearing question up front, split big work into units, and hand off only through the `context-transfer` skill.
 - **Memory**: what belongs in auto memory and what belongs in the repo.
 - **Research and external information**: trust your own knowledge first, confirm anything from the web.
 - **Commits**: one task per conventional commit, and never push unprompted.

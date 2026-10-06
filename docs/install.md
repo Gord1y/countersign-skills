@@ -203,6 +203,11 @@ questions.
   and returns nothing for the rest, leaving it to the sandbox and the classifier. A hook that
   can't resolve a path stays silent rather than asking: a `$(mktemp …)` log or a `$p` in a URL is
   not an access.
+- **Writing a permission rule:** for files only `Edit(path)` and `Read(path)` are consulted.
+  `Edit` also covers Write, NotebookEdit and shell redirects, and a `Write(path)` rule is silently
+  ignored. Precedence is deny, then ask, then allow. Never allow an interpreter or a shell by rule
+  (`python3`, `node`, `sh -c`, `pnpm exec`) or "anything not denied"; make the narrow safe action
+  free instead.
 - **What still stops a run:** `git push` (denied), anything the classifier
   judges destructive or outside the trust boundary, and a Bash command that can't run in the
   sandbox. A builder that hits one reports it, and the orchestrator parks that unit and finishes

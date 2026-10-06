@@ -225,7 +225,7 @@
     },
     {
       "name": "issues-found",
-      "title": "Issues you find along the way",
+      "title": "Issues found along the way",
       "agents": [
         "claude",
         "codex",
@@ -252,16 +252,6 @@
       "path": "rules/orchestration.md"
     },
     {
-      "name": "context-transfer",
-      "title": "Context transfer",
-      "agents": [
-        "claude",
-        "codex",
-        "antigravity"
-      ],
-      "path": "rules/context-transfer.md"
-    },
-    {
       "name": "memory",
       "title": "Memory",
       "agents": [
@@ -271,7 +261,7 @@
     },
     {
       "name": "research",
-      "title": "Research and external information",
+      "title": "Research",
       "agents": [
         "claude",
         "codex",
@@ -301,7 +291,7 @@
     },
     {
       "name": "trust",
-      "title": "Instruction sources and trust",
+      "title": "Trust",
       "agents": [
         "claude",
         "codex",
