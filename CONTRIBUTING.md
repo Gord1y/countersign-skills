@@ -88,7 +88,9 @@ A release is cut by the maintainer:
 2. Review the whole release locally against [docs/review-checklist.md](docs/review-checklist.md):
    every file of `git diff origin/main...origin/staging`, after `git fetch origin`. Fix what it
    finds through pull requests into `staging` first.
-3. Merge `staging` into `main` with a merge commit, through a pull request.
+3. Merge `staging` into `main` with a merge commit, through a pull request titled
+   `chore(release): v<x.y.z>`. GitHub takes the merge commit's subject from that title and leaves
+   its body empty.
 4. Tag the merge commit on `main` as `v<x.y.z>`.
 
 The tag starts the release workflow. It checks that the note exists and that its `version` matches
