@@ -60,8 +60,8 @@ when that is set, as Countersign does):
 - **`profile/`**, your layer, usually a link into a private repo. Every part is optional:
   - `CLAUDE.md`: "Who I am" and the list of rule imports, used instead of
     `claude/CLAUDE.template.md`. Drop an import line to switch that rule off.
-  - `settings.json`: merged over `claude/settings.json`, so your keys win and permission lists
-    add up.
+  - `settings.json`: merged over `claude/settings.json`, so your keys win, and the permission,
+    sandbox and auto-mode lists add up (see [Settings merge](#settings-merge)).
   - `bin/`: linked into `~/.local/bin` next to this repo's `bin/`.
 - **Additions**: `install.sh --addition <folder>` records a folder in this repo's layout
   (`skills.tsv` and `skills/`, `rules.tsv` and `rules/`, `agents/`) and installs it alongside on
@@ -82,14 +82,17 @@ when that is set, as Countersign does):
 `install.sh` merges `claude/settings.json`, then your profile's `settings.json`, into
 `~/.claude/settings.json` (it needs `jq`):
 
-- Every key the repo file sets wins, including whole arrays such as the sandbox's domain list.
-  Your profile's `settings.json` is layered over the repo file the same way: an array it sets
-  replaces the repo's whole array, so a profile `sandbox.filesystem.allowWrite` would hide every
-  path the repo lists. Leave the sandbox lists to `claude/settings.json`.
-- Keys it doesn't set stay as they are: hooks another tool installed (Countersign's), and anything
+- Every key the repo file sets wins, and a key your profile sets wins over the repo's. An array
+  outside the lists below is replaced whole.
+- Keys neither sets stay as they are: hooks another tool installed (Countersign's), and anything
   Claude Code writes for this machine.
-- `permissions.allow`, `permissions.ask` and `permissions.deny` are merged, so rules Claude Code
-  saved from a "don't ask again" answer survive.
+- These lists are joined, not replaced, so an entry from any layer survives:
+  `permissions.allow`, `ask` and `deny`; the sandbox's `excludedCommands`,
+  `filesystem.allowRead`, `denyRead`, `allowWrite` and `denyWrite`, and
+  `network.allowedDomains`; and `autoMode.environment` and `allow`. So rules Claude Code saved
+  from a "don't ask again" answer survive, and a profile adds to a list without hiding the repo's
+  entries. No layer can take out another layer's entry: to narrow a joined list, edit the file
+  that adds the entry.
 - Before merging, each value the last run merged (`settings-layer.json`) comes out again, the way
   `uninstall.sh` takes it out. So a key or rule that the repo or your profile drops is removed
   on the next run, and so is a path-bound rule after the repo moves. A value you changed since,

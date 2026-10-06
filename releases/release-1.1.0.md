@@ -41,12 +41,15 @@ testedWith:
   at 12 lines before the TL;DR.
 - The gate recipe is `set -o pipefail; <cmd> 2>&1 | tail -n 60`, with no temp log.
 - `writeups-cleanup` 1.0.1: the drafts layout has no `reviews/` folder any more.
-- Sandboxed commands may also write Godot's `~/Library/Application Support/Godot`, so every cache
-  folder the sandbox opens is listed in `claude/settings.json` and a profile needs no sandbox
-  block.
+- Sandboxed commands may also write Godot's `~/Library/Application Support/Godot`.
 
 ## Fixed
 
+- A sandbox or auto-mode list in your profile replaced the repo's whole list, so the repo's entries,
+  including any it added later, never reached you. `install.sh` now joins the sandbox's
+  `excludedCommands`, filesystem read and write lists and `network.allowedDomains`, and
+  `autoMode.environment` and `allow`, across the repo file, your profile and
+  `~/.claude/settings.json`, as it already joined the permission lists.
 - The tooling rule said a failing command's output keeps only its start. It keeps the start and the
   end, so the gate recipe no longer writes a `$(mktemp …)` log, a path project hooks could not
   resolve and prompted on.
@@ -69,9 +72,8 @@ testedWith:
   credential-store denies, and rewrites the Claude Code, Codex and Antigravity instructions from
   the shorter rules.
 - If your profile's `CLAUDE.md` imports `rules/context-transfer.md`, delete that line.
-- If your profile's `settings.json` sets `sandbox.filesystem.allowWrite` or another sandbox list,
-  delete it: a profile's array replaces the repo's whole array, so it hides every path the repo
-  lists, including ones added later.
+- If your profile's `settings.json` repeats the repo's sandbox paths, you can delete them: the
+  lists are joined now, so the repo's entries reach you either way.
 - If a repo of yours has its own `ask` rules, a hook that asks, or Bash allow rules, read "Project
   settings and hooks never ask" in `docs/install.md` before dropping them: the allow rules go with
   the asks, CI keeps its bounds, and Codex's rules follow.

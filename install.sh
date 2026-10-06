@@ -244,10 +244,17 @@ else
 fi
 
 merge_settings='
+  def joined:
+    ["permissions", "allow"], ["permissions", "ask"], ["permissions", "deny"],
+    ["sandbox", "excludedCommands"],
+    ["sandbox", "filesystem", "allowRead"], ["sandbox", "filesystem", "denyRead"],
+    ["sandbox", "filesystem", "allowWrite"], ["sandbox", "filesystem", "denyWrite"],
+    ["sandbox", "network", "allowedDomains"],
+    ["autoMode", "environment"], ["autoMode", "allow"];
   def lists($a; $b):
-    reduce ("allow", "ask", "deny") as $key (.;
-      ((($a.permissions[$key] // []) + ($b.permissions[$key] // [])) | unique) as $merged
-      | if $merged == [] then . else .permissions[$key] = $merged end);
+    reduce joined as $path (.;
+      ([$a, $b] | map((try getpath($path) catch null) // []) | add | unique) as $merged
+      | if $merged == [] then . else setpath($path; $merged) end);
   .[0] as $a | .[1] as $b | ($a * $b) | lists($a; $b)
 '
 
