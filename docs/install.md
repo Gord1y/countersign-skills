@@ -203,14 +203,16 @@ questions.
   and returns nothing for the rest, leaving it to the sandbox and the classifier. A hook that
   can't resolve a path stays silent rather than asking: a `$(mktemp …)` log or a `$p` in a URL is
   not an access. Dropping a repo's asks takes three more changes, because the asks did other jobs:
-  - **Deny the forms of an allowed command that run another program or delete,** such as
-    `find -exec`, `-ok`, `-fprint` and `-delete`, `rg --pre` and `--hostname-bin`,
-    `sort --compress-program`, `git add -f`, `git commit --no-verify` and `git fetch a:b`. An allow
-    rule like `Bash(find *)` approves a call even with the sandbox off, so the ask was the only
-    review those forms got.
+  - **Drop the Bash allow rules the sandbox makes redundant.** A sandboxed command already runs
+    without a prompt, so an allow rule only matters once the sandbox is off, and there it approves
+    the call with no review. `Bash(find *)` then lets `find -exec`, `-fls` and `-fprint` run or
+    write anything, as `sort -o`, `rg --pre` and `prettier --write` do for theirs, and no deny list
+    keeps up with every flag. Keep an allow only for a command in `excludedCommands`, and deny
+    its forms that run another program or write outside the repo.
   - **Keep the CI bounds.** Where a workflow runs Claude with the repo's settings, nothing can
-    answer a prompt, so every ask was a deny. The deny rules above cover CI as well, and a hook
-    that went silent locally still denies when `GITHUB_ACTIONS` is `true`: a runner has no sandbox.
+    answer a prompt, so every ask was a deny. A runner has no sandbox, so a hook that went silent
+    locally still denies when `GITHUB_ACTIONS` is `true`, and a workflow's `--allowedTools` gives
+    `Read`, `Grep` and `Glob` rather than `Bash(find *)`, `Bash(rg *)` or `Bash(sort *)`.
   - **Mirror the change in Codex's rules,** `.codex/rules/*.rules`: a `prompt` rule there is an ask
     by another name.
 - **Writing a permission rule:** for files only `Edit(path)` and `Read(path)` are consulted.
