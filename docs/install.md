@@ -202,7 +202,17 @@ questions.
   but never approve it. So a repo's layer denies what must never happen, such as a secret path,
   and returns nothing for the rest, leaving it to the sandbox and the classifier. A hook that
   can't resolve a path stays silent rather than asking: a `$(mktemp …)` log or a `$p` in a URL is
-  not an access.
+  not an access. Dropping a repo's asks takes three more changes, because the asks did other jobs:
+  - **Deny the forms of an allowed command that run another program or delete,** such as
+    `find -exec`, `-ok`, `-fprint` and `-delete`, `rg --pre` and `--hostname-bin`,
+    `sort --compress-program`, `git add -f`, `git commit --no-verify` and `git fetch a:b`. An allow
+    rule like `Bash(find *)` approves a call even with the sandbox off, so the ask was the only
+    review those forms got.
+  - **Keep the CI bounds.** Where a workflow runs Claude with the repo's settings, nothing can
+    answer a prompt, so every ask was a deny. The deny rules above cover CI as well, and a hook
+    that went silent locally still denies when `GITHUB_ACTIONS` is `true`: a runner has no sandbox.
+  - **Mirror the change in Codex's rules,** `.codex/rules/*.rules`: a `prompt` rule there is an ask
+    by another name.
 - **Writing a permission rule:** for files only `Edit(path)` and `Read(path)` are consulted.
   `Edit` also covers Write, NotebookEdit and shell redirects, and a `Write(path)` rule is silently
   ignored. Precedence is deny, then ask, then allow. Never allow an interpreter or a shell by rule
