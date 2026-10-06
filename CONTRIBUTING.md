@@ -39,10 +39,14 @@ Open every pull request against `staging`; `main` only moves when a release is c
 - One task per pull request. It is squash-merged into `staging` as a single commit whose subject
   is the pull request's title followed by ` (#<number>)`, and whose body is empty, so write the
   title as a Conventional Commit (`<type>[(scope)][!]: <subject>`). The `title` check enforces it.
-- A pull request merges once `gates`, `commits`, `lint` and `title` pass, an approving review is
-  in, and the branch is up to date with `staging` ("Update branch" on the pull request brings it up
-  to date). The maintainer's own pull requests are approved by the Claude review; everyone else's
-  by the maintainer, whose review is requested automatically.
+- A pull request merges once `gates`, `commits`, `lint` and `title` pass and the branch is up to
+  date with `staging` ("Update branch" on the pull request brings it up to date). The maintainer
+  reviews every pull request someone else opens before merging it (their review is requested
+  automatically), and reviews their own work locally before each release, against
+  [docs/review-checklist.md](docs/review-checklist.md).
+- No ruleset requires an approving review. Nobody can approve their own pull request and only the
+  maintainer merges, so a required approval would only block the maintainer's own work. An
+  automated Claude review supplied it until 1.0.0 and was removed, as in Countersign.
 - For a pull request from a fork, the workflows wait until the maintainer approves them to run.
 - Nobody pushes to `staging` or `main` directly, the maintainer included.
 
@@ -52,8 +56,11 @@ A release is cut by the maintainer:
 
 1. Add the release note under `releases/` in a `docs(release): add <x.y.z> notes` commit, in the
    format described in [releases/README.md](releases/README.md). It comes first.
-2. Merge `staging` into `main` with a merge commit, through a pull request.
-3. Tag the merge commit on `main` as `v<x.y.z>`.
+2. Review the whole release locally against [docs/review-checklist.md](docs/review-checklist.md):
+   every file of `git diff origin/main...origin/staging`, after `git fetch origin`. Fix what it
+   finds through pull requests into `staging` first.
+3. Merge `staging` into `main` with a merge commit, through a pull request.
+4. Tag the merge commit on `main` as `v<x.y.z>`.
 
 The tag starts the release workflow. It checks that the note exists and that its `version` matches
 the tag, then publishes `countersign-skills-<v>.tar.gz`, its `.sha256` and `catalog.json`.

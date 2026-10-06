@@ -34,4 +34,5 @@ It must pass before a change is done. It runs `./test.sh`, every `scripts/test-*
 | --- | --- |
 | The surfaces, and how to reach each | `cli`: run `install.sh`, `update.sh` and `uninstall.sh` against a scratch home, `HOME="$(mktemp -d)" CLAUDE_CONFIG_DIR= ./install.sh`, never the real one. `bin/statusline`: reads Claude Code's status line JSON on stdin. |
 | Branches | Pull requests go into `staging`; `main` moves only at releases. |
+| Reviews | No automated review and no required approval; reviews follow `docs/review-checklist.md`. |
 | Licence | MIT, no CLA. |
