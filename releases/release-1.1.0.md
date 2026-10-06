@@ -66,6 +66,9 @@ testedWith:
   credential-store denies, and rewrites the Claude Code, Codex and Antigravity instructions from
   the shorter rules.
 - If your profile's `CLAUDE.md` imports `rules/context-transfer.md`, delete that line.
+- If a repo of yours has its own `ask` rules, a hook that asks, or Bash allow rules, read "Project
+  settings and hooks never ask" in `docs/install.md` before dropping them: the allow rules go with
+  the asks, CI keeps its bounds, and Codex's rules follow.
 
 ## Notes
 
