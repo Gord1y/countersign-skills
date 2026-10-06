@@ -79,7 +79,7 @@ has, so those two rules stay out of both.
 | `codebase-research` | Picks the cheapest way to research code, with an explicit model on any spawn. | Claude Code, Codex |
 | `release-notes` | Writes release note entries, keeps an open note in step with its branch, and keeps the release index current. | Claude Code, Codex, Antigravity |
 | `feature-pr-description` | Writes the body of a feature or fix PR to the repo's description contract. | Claude Code, Codex, Antigravity |
-| `promotion-pr-description` | Writes a release PR's body from its release note (release into staging, staging into main), plus what developers need before and after the merge. | Claude Code, Codex, Antigravity |
+| `promotion-pr-description` | Writes a release or hotfix PR's body from its release note (release into staging, staging into main, a hotfix into either), plus what developers need before and after the merge. | Claude Code, Codex, Antigravity |
 | `thorough-diff-review` | Runs a full local review of a diff before you push. | Claude Code, Codex, Antigravity |
 | `i18n-translate` | Translates new English message keys into the other locales, one subagent each. | Claude Code, Codex |
 | `qa-tester` | Tests a change in the running product on every surface it touched (web, API, CLI, native or mobile app, game, library), saves the evidence under `writeups/`, and reports pass or fail. Runs forked under Claude Code. | Claude Code, Codex |

@@ -1,7 +1,7 @@
 ---
 name: promotion-pr-description
-description: "Write a release PR body (a release branch into staging, or staging into main) from its release note, plus what developers need before and after the merge."
-when_to_use: "Use when asked to write, draft or update the description of a release or promotion PR: a release branch into staging, or staging into main."
+description: "Write a release or hotfix PR body (into staging or main) from its release note, plus what developers need before and after the merge."
+when_to_use: "Use when asked to write, draft or update the description of a release, promotion or hotfix PR: a release branch into staging, staging into main, or a hotfix branch into either."
 effort: medium
 ---
 
@@ -26,6 +26,7 @@ the user once, then suggest the one line to add to CLAUDE.md so the next run fin
 | CI checks that run only on release PRs | an e2e suite and a coverage run on PRs into `staging` and `main` |
 | Branch protection and merge method on the target branch | `staging` squash only, `main` merge commits only |
 | Where uncommitted drafts go | a gitignored `writeups/` folder in the main checkout |
+| Hotfix flow: branch, target, title, and which note gets the entry | before promotion `release-<semver>-hotfix` into `staging`, titled `release: <semver> hotfix`; after it `release-<semver>-hotfix-<n>` into `main`, then a PR from `main` into `staging`; the entry goes in that version's note |
 
 ## The two release PRs
 
@@ -105,16 +106,34 @@ not say: the renamed constant, the CI job removed, the guard that was tripped. P
 a contract, write a table of the release PRs being promoted, then one section per version, then the
 developer tail.
 
-## 6. Where it goes
+## 6. A hotfix PR
 
-Write the body to `releases/<version>/promotion-staging.md` (a release into `staging`) or
-`releases/<version>/promotion-main.md` (`staging` into `main`) in the drafts location; a batch uses
-its newest version's folder. Resolve it in the main checkout, never in a worktree, whose copy is
-deleted with it:
+A hotfix fixes a version that has already left its release branch: before promotion it goes into
+`staging`, after promotion into `main`. Repo facts says how it branches, where it goes and how it
+is titled. The body is built the same way for both:
+
+- **Range:** only the hotfix branch's commits, `git log --oneline origin/<target>..HEAD`. The rest
+  of the version shipped in an earlier PR.
+- **Note first:** the fix gets its entry in the note Repo facts names before the body is written.
+  It is `Fixed` only when the bug reached a released version. A bug that never left `staging`
+  changes the entry of the work it broke, or gets none.
+- **Body:** `## <title>`, then one paragraph: what was broken and for whom, and what the fix
+  changes. Then the note entries this hotfix added or changed, word for word, and nothing else
+  from the note.
+- **Tail:** as in step 4. A hotfix into `main` adds under After merging what brings the other
+  branches level, such as a PR from `main` into `staging`, and the tag if the repo tags releases.
+
+## 7. Where it goes
+
+Write the body to `releases/<version>/promotion-staging.md` (a release into `staging`),
+`releases/<version>/promotion-main.md` (`staging` into `main`) or
+`releases/<version>/<hotfix branch>.md` (a hotfix) in the drafts location; a batch uses its newest
+version's folder. Resolve it in the main checkout, never in a worktree, whose copy is deleted with
+it:
 
 ```bash
 WRITEUPS="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/writeups"
-PR_BODY="$WRITEUPS/releases/<version>/promotion-<staging or main>.md"
+PR_BODY="$WRITEUPS/releases/<version>/<promotion-staging, promotion-main or the hotfix branch>.md"
 ```
 
 Opening or editing the PR is a separate, visible action that needs the user's go-ahead each time:
@@ -129,8 +148,9 @@ record of the release's commits on that branch: say so in the tail.
 
 ## Before handing it over
 
-- The body opens with the note's title and summary, not YAML.
-- Each rendered section matches the note's word for word.
+- The body opens with the note's title and summary, not YAML; a hotfix body opens with what was
+  broken.
+- Each rendered section or entry matches the note's word for word.
 - The title follows the title convention, and the tail holds only what is true and still useful.
 
 ## Related

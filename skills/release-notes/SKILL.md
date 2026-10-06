@@ -31,6 +31,7 @@ that records it.
 | Commit type for release notes | `docs(release): …`, with `release:` reserved for promotion merges |
 | Version bump convention | the `package.json` bump as its own `chore:` commit |
 | Does the repo tag releases? | no: the version lives in `package.json`, the filename and the branch name |
+| Which note a hotfix's entry goes in | the fixed version's own note, or a new patch version's |
 
 What CI generates on its own is not written into the note. If this skill, the releases README and
 the validator disagree, the validator wins.
@@ -62,7 +63,8 @@ note's last commit: a commit that touches the note without adding an entry hides
 before it.
 
 A new file or capability is `Added`, a change to something shipped is `Changed`, and `Fixed` only
-if it was broken in the previous released version. Only two kinds of commit need no entry: test
+if it was broken in the previous released version. A hotfix's entry goes in the note Repo facts
+names for it, and is `Fixed` only when the bug reached a released version. Only two kinds of commit need no entry: test
 infrastructure, stories and CI-only changes (the "never get an entry" row; specs that pin what the
 release is about still earn an `Added` entry), and commits that only edit the note or its index.
 

@@ -83,7 +83,7 @@
         "antigravity"
       ],
       "description": "Write the body of a feature or fix PR from the branch's real diff, following the repo's PR contract.",
-      "whenToUse": "Use when asked to write, draft or update a PR description for a feature or fix branch. A release or promotion PR goes to promotion-pr-description.",
+      "whenToUse": "Use when asked to write, draft or update a PR description for a feature or fix branch. A release, promotion or hotfix PR goes to promotion-pr-description.",
       "invocation": "model",
       "path": "skills/feature-pr-description"
     },
@@ -95,8 +95,8 @@
         "codex",
         "antigravity"
       ],
-      "description": "Write a release PR body (a release branch into staging, or staging into main) from its release note, plus what developers need before and after the merge.",
-      "whenToUse": "Use when asked to write, draft or update the description of a release or promotion PR: a release branch into staging, or staging into main.",
+      "description": "Write a release or hotfix PR body (into staging or main) from its release note, plus what developers need before and after the merge.",
+      "whenToUse": "Use when asked to write, draft or update the description of a release, promotion or hotfix PR: a release branch into staging, staging into main, or a hotfix branch into either.",
       "invocation": "model",
       "path": "skills/promotion-pr-description"
     },

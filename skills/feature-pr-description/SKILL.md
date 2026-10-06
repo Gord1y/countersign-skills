@@ -1,7 +1,7 @@
 ---
 name: feature-pr-description
 description: "Write the body of a feature or fix PR from the branch's real diff, following the repo's PR contract."
-when_to_use: "Use when asked to write, draft or update a PR description for a feature or fix branch. A release or promotion PR goes to promotion-pr-description."
+when_to_use: "Use when asked to write, draft or update a PR description for a feature or fix branch. A release, promotion or hotfix PR goes to promotion-pr-description."
 effort: medium
 ---
 
