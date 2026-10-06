@@ -50,6 +50,11 @@ second `--case` replaces the first, so run two skills as two commands. It exits 
 not on PATH. `claude plugin eval` exits 0 when every case passes, 1 when a case is below the
 threshold or errors, and 2 when the cost ceiling is hit.
 
+The first run on a machine must be yours, in a terminal: `claude plugin eval` asks once to trust
+this folder, since the cases' scaffold scripts run as you. Until then a run with no terminal, an
+agent's included, exits 1 with "not a trusted plugin directory". The script never passes
+`--trust-plugin`, so trusting the folder stays a person's call.
+
 Results land in `evals/results/<timestamp>/`, which is gitignored.
 
 `claude plugin validate .` checks the manifest and the `SKILL.md` frontmatter without a model call.
