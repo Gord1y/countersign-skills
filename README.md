@@ -162,19 +162,20 @@ your profile. Everything it replaces is backed up first. Details in
 
 ## Startup cost
 
-Rules and skill listings sit in every session's context. Measured with `/context` in Claude Code
-2.1.278 with Opus 5.5, with every rule on:
+Rules and skill listings sit in every session's context. Measured with `/context` for 1.0.0 in
+Claude Code 2.1.278 with Opus 5.5, with every rule on, then scaled by size for 1.1.0:
 
 | Part | Tokens |
 | --- | --- |
-| 11 rules | about 4.9K |
-| 12 model-invocable skills (listing) | about 1.1K |
+| 10 rules | about 2.3K |
+| 14 model-invocable skills (listing) | about 1.3K |
 | 4 subagents | about 0.3K |
-| Total | about 6.3K |
+| Total | about 3.9K |
 
-The rules dominate: `safety` (919), `responses` (916) and `orchestration` (604) are the biggest, and
-the smallest, `context-transfer`, is 122. A skill's listing costs 60 to 130 tokens. The 4 manual
-skills cost nothing until you type them. Dropping a rule's import line saves its share.
+The rules still dominate: `responses` (about 510), `safety` (about 450) and `orchestration`
+(about 350) are the biggest, and the smallest, `commits`, is about 90. A skill's listing costs 70
+to 130 tokens. The 2 manual skills cost nothing until you type them. Dropping a rule's import line
+saves its share.
 
 In a 200K context window, Claude Code's default budget for the skill listing is too small for its
 own skills and these together, so some descriptions are dropped and those skills stop starting on
