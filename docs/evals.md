@@ -26,7 +26,9 @@ stands alone and carries inline whatever it needs.
 A case that needs files or git history seeds its workspace with a `scaffold.sh` in its folder,
 named in its `case.yaml` as `context.scaffold_script`. `walkthrough-fires` builds a repo whose last
 commit is a finished change, with QA evidence in a gitignored `writeups/`: in an empty folder the
-skill had nothing to walk through and fired in only one or two runs of three. The scripts run as
+skill had nothing to walk through and fired in only one or two runs of three. `release-notes-fires`
+builds a repo on `release-2.3.0` with the open note its request names: in an empty folder the model
+spent its turns looking for that note and fired in two runs of three. The scripts run as
 you, outside the sandbox, so `claude plugin eval` runs them only with `--scaffold`, which the
 script passes because every case here is this repo's own. `scripts/lint.sh` checks them.
 
