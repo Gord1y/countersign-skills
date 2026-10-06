@@ -59,6 +59,9 @@ testedWith:
 - The tooling rule said a failing command's output keeps only its start. It keeps the start and the
   end, so the gate recipe no longer writes a `$(mktemp …)` log, a path project hooks could not
   resolve and prompted on.
+- `release-notes` checked only the commits since its note last changed, so a commit that touched
+  the note without an entry hid every commit before it. It now lists every commit on the release
+  branch that its target branch lacks.
 
 ## Removed
 

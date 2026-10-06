@@ -52,11 +52,11 @@ says the version lives, not a tag.
 ## 2. Bring the note up to date first
 
 The body copies the note, so a stale note makes a stale PR. Run the `release-notes` check: every
-commit since the note last changed has an entry or a reason it has none.
+commit the branch holds that the PR's target lacks has an entry or a reason it has none.
 
 ```bash
-NOTE=<notes folder>/release-<semver>.md
-git log --oneline "$(git log -1 --format=%H -- "$NOTE")..HEAD"
+git fetch origin
+git log --oneline origin/<target>..HEAD
 ```
 
 Fix the note in its own commit before writing the body. An entry that reads wrong in the PR is wrong

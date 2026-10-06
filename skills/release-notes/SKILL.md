@@ -49,13 +49,17 @@ from a forgotten one. So **a commit that changes behaviour, tooling, configurati
 document updates the note, in the same commit or the next one.** Reconstructing entries from a
 diff later is how invented ones get in.
 
-**Before reporting work on a release branch as done,** list every commit since the note was last
-touched, and give each one an entry or a reason it has none. Check the list, don't recall it:
+**Before reporting work on a release branch as done,** list every commit the branch holds that its
+target lacks, and give each one an entry or a reason it has none. Check the list, don't recall it:
 
 ```bash
-NOTE=<notes folder>/release-<semver>.md
-git log --oneline "$(git log -1 --format=%H -- $NOTE)..HEAD"
+git fetch origin
+git log --oneline origin/<target>..HEAD
 ```
+
+`<target>` is the branch this one merges into, from the branch flow. Never start the list at the
+note's last commit: a commit that touches the note without adding an entry hides every commit
+before it.
 
 A new file or capability is `Added`, a change to something shipped is `Changed`, and `Fixed` only
 if it was broken in the previous released version. Only two kinds of commit need no entry: test
