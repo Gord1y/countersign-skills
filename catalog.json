@@ -76,28 +76,28 @@
     },
     {
       "name": "feature-pr-description",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "agents": [
         "claude",
         "codex",
         "antigravity"
       ],
       "description": "Write the body of a feature or fix PR from the branch's real diff, following the repo's PR contract.",
-      "whenToUse": "Use when asked to write, draft or update a PR description.",
+      "whenToUse": "Use when asked to write, draft or update a PR description for a feature or fix branch. A release or promotion PR goes to promotion-pr-description.",
       "invocation": "model",
       "path": "skills/feature-pr-description"
     },
     {
       "name": "promotion-pr-description",
-      "version": "1.0.0",
+      "version": "2.0.0",
       "agents": [
         "claude",
         "codex",
         "antigravity"
       ],
-      "description": "Write the body of a promotion PR (a release branch into staging, or staging into main) following the repo's promotion contract.",
-      "whenToUse": null,
-      "invocation": "manual",
+      "description": "Write a release PR body (a release branch into staging, or staging into main) from its release note, plus what developers need before and after the merge.",
+      "whenToUse": "Use when asked to write, draft or update the description of a release or promotion PR: a release branch into staging, or staging into main.",
+      "invocation": "model",
       "path": "skills/promotion-pr-description"
     },
     {

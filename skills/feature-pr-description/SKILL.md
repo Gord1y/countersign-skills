@@ -1,7 +1,7 @@
 ---
 name: feature-pr-description
 description: "Write the body of a feature or fix PR from the branch's real diff, following the repo's PR contract."
-when_to_use: "Use when asked to write, draft or update a PR description."
+when_to_use: "Use when asked to write, draft or update a PR description for a feature or fix branch. A release or promotion PR goes to promotion-pr-description."
 effort: medium
 ---
 
@@ -117,7 +117,7 @@ started yet.
 ## Related
 
 - [`promotion-pr-description`](../promotion-pr-description/SKILL.md): release branch → staging and
-  staging → main PRs
+  staging → main PRs, built from the release note
 - [`release-notes`](../release-notes/SKILL.md): the release record a release branch carries, and
   the release index command from Repo facts that regenerates its index
 - [`thorough-diff-review`](../thorough-diff-review/SKILL.md): review the diff before describing it

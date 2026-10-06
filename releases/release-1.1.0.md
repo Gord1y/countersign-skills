@@ -42,6 +42,10 @@ testedWith:
 - The gate recipe is `set -o pipefail; <cmd> 2>&1 | tail -n 60`, with no temp log.
 - `writeups-cleanup` 1.0.1: the drafts layout has no `reviews/` folder any more.
 - Sandboxed commands may also write Godot's `~/Library/Application Support/Godot`.
+- `promotion-pr-description` 2.0.0 builds a release PR from its release note: the note's title,
+  summary, highlights and entries, then what developers need before and after the merge. It starts
+  when you ask for a release PR description, and `feature-pr-description` 1.0.1 leaves release PRs
+  to it.
 
 ## Fixed
 
