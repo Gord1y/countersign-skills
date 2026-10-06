@@ -73,6 +73,12 @@ remove it in GitHub's settings and delete its file in the same pull request.
 `scripts/test-rulesets.sh` covers the script offline, against a fake `gh` that serves the committed
 files.
 
+Auto-merge is on. With no approval required, "Enable auto-merge" on a pull request merges it by
+itself once the required checks pass, and for `staging` once the branch is up to date. GitHub
+Actions may run only GitHub's own actions, each pinned to a full commit SHA. The workflows' default
+token is read-only and may not create or approve pull requests, and the repository has no Actions
+secrets: no workflow reads one.
+
 ## Releases
 
 A release is cut by the maintainer:
