@@ -22,16 +22,6 @@
       "Edit(~/.claude/projects/**)",
       "Edit(//private/tmp/claude-*/**)"
     ],
-    "ask": [
-      "Bash(git reset --hard*)",
-      "Bash(git -C * reset --hard*)",
-      "Bash(git clean*)",
-      "Bash(git -C * clean*)",
-      "Bash(git branch -D*)",
-      "Bash(git -C * branch -D*)",
-      "Bash(gh pr merge*)",
-      "Bash(gh repo delete*)"
-    ],
     "deny": [
       "Bash(git push)",
       "Bash(git push *)",
@@ -43,7 +33,14 @@
       "Read(**/.env.development)",
       "Read(**/.env.production)",
       "Read(**/.env.staging)",
-      "Read(**/.env.test)"
+      "Read(**/.env.test)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)",
+      "Read(~/.gnupg/**)",
+      "Read(~/.kube/**)",
+      "Read(~/Library/Keychains/**)",
+      "Read(~/.zsh_history)",
+      "Read(~/.bash_history)"
     ]
   },
   "worktree": { "baseRef": "head" },
@@ -59,6 +56,15 @@
         "~/.cache",
         "~/Library/Caches",
         "~/Library/Developer/Xcode/DerivedData"
+      ],
+      "denyRead": [
+        "~/.ssh",
+        "~/.aws",
+        "~/.gnupg",
+        "~/.kube",
+        "~/Library/Keychains",
+        "~/.zsh_history",
+        "~/.bash_history"
       ]
     },
     "network": {

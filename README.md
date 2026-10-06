@@ -192,19 +192,12 @@ permission lists this repo ships:
 {
   "sandbox": {
     "enabled": true,
-    "autoAllowBashIfSandboxed": true
+    "autoAllowBashIfSandboxed": true,
+    "filesystem": {
+      "denyRead": ["~/.ssh", "~/.aws", "~/.gnupg", "~/.kube", "~/Library/Keychains", "~/.zsh_history", "~/.bash_history"]
+    }
   },
   "permissions": {
-    "ask": [
-      "Bash(git reset --hard*)",
-      "Bash(git -C * reset --hard*)",
-      "Bash(git clean*)",
-      "Bash(git -C * clean*)",
-      "Bash(git branch -D*)",
-      "Bash(git -C * branch -D*)",
-      "Bash(gh pr merge*)",
-      "Bash(gh repo delete*)"
-    ],
     "deny": [
       "Bash(git push)",
       "Bash(git push *)",
@@ -216,7 +209,14 @@ permission lists this repo ships:
       "Read(**/.env.development)",
       "Read(**/.env.production)",
       "Read(**/.env.staging)",
-      "Read(**/.env.test)"
+      "Read(**/.env.test)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)",
+      "Read(~/.gnupg/**)",
+      "Read(~/.kube/**)",
+      "Read(~/Library/Keychains/**)",
+      "Read(~/.zsh_history)",
+      "Read(~/.bash_history)"
     ]
   }
 }
@@ -227,8 +227,7 @@ The file goes at `/Library/Application Support/ClaudeCode/managed-settings.json`
 `C:\Program Files\ClaudeCode\managed-settings.json` on Windows
 ([managed settings docs](https://code.claude.com/docs/en/managed-settings)). `/status` shows
 `Enterprise managed settings (file)` once it applies. It runs every Bash command in the sandbox
-without a prompt, makes destructive git and `gh` commands ask even in auto mode, and blocks
-`git push` and reading `.env` files outright. It allows no network hosts, so a sandboxed command
+without a prompt and blocks `git push` and reading `.env` files and credential stores outright. It allows no network hosts, so a sandboxed command
 that needs one is blocked until the host is allowed: add the hosts your builds use under `sandbox.network.allowedDomains`,
 starting from the list in [claude/settings.json](claude/settings.json).
 
