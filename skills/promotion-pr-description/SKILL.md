@@ -1,11 +1,14 @@
 ---
 name: promotion-pr-description
-description: Write the body of a promotion PR (a release branch into staging, or staging into main) following the repo's promotion contract.
-disable-model-invocation: true
+description: "Write a release or hotfix PR body (into staging or main) from its release note, plus what developers need before and after the merge."
+when_to_use: "Use when asked to write, draft or update the description of a release, promotion or hotfix PR: a release branch into staging, staging into main, or a hotfix branch into either."
 effort: medium
 ---
 
-# Promotion PR description
+# Release PR description
+
+A release PR's body is the release note, made readable on GitHub, followed by what only developers
+need. The note is the one record of what ships, so the body never rewrites it.
 
 ## Repo facts
 
@@ -15,98 +18,145 @@ the user once, then suggest the one line to add to CLAUDE.md so the next run fin
 
 | Fact | Example |
 | --- | --- |
-| Promotion PR contract (a doc the description must follow, if any) | `docs/promotion-prs.md` |
+| Promotion contract for `staging` into `main` (a doc the body must follow, if any) | `releases/PROMOTION.MD` |
 | Branch flow | feature → `release-x.y.z` → `staging` → `main` |
-| Title convention for promotion PRs | `release: <semver>`, or `release: <v1>, <v2>` for a batch |
+| Title convention for release PRs | `release: <semver>`, or `release: <v1>, <v2>` for a batch |
+| Where release notes live | `releases/release-<semver>.md`, contract in `releases/README.md` |
 | Does the repo tag releases? | no tags; the version lives in `package.json` and the branch name |
-| CI checks that run only on promotion PRs | an e2e suite and a coverage run on PRs into `staging` and `main` |
-| Branch protection on the target branch | `staging` and `main` are protected |
+| CI checks that run only on release PRs | an e2e suite and a coverage run on PRs into `staging` and `main` |
+| Branch protection and merge method on the target branch | `staging` squash only, `main` merge commits only |
 | Where uncommitted drafts go | a gitignored `writeups/` folder in the main checkout |
+| Hotfix flow: branch, target, title, and which note gets the entry | before promotion `release-<semver>-hotfix` into `staging`, titled `release: <semver> hotfix`; after it `release-<semver>-hotfix-<n>` into `main`, then a PR from `main` into `staging`; the entry goes in that version's note |
 
-## Read the contract first
+## The two release PRs
 
-If the repo has a promotion PR contract, read it before anything else: it holds the gathering
-recipe, the exact structure and the style rules. This skill adds what a contract usually leaves
-open: which promotion you are describing, how to bound it, and where the draft goes. If the two
-disagree, the contract wins. Follow its sections as written; a common shape is a table of the PRs
-being promoted, then the items grouped by release.
+|                 | release branch → `staging`                       | `staging` → `main`                                       |
+| --------------- | ------------------------------------------------ | -------------------------------------------------------- |
+| Ships           | one version                                      | every version sitting in `staging`                       |
+| Body            | that version's note, rendered, then the tail     | the promotion contract, or one section per version       |
+| Reader wants    | what this release contains and what is still open | what reaches production since the last promotion        |
 
-## The two promotions are not the same document
+## 1. Bound the range
 
-|                 | release branch → `staging`                        | `staging` → `main`                                                 |
-| --------------- | ------------------------------------------------- | ------------------------------------------------------------------ |
-| Ships           | one version being assembled                       | every version sitting in staging                                   |
-| Reader wants    | what this release contains and what is still open | what reaches production, and how it compares to the last promotion |
-| Constituents    | feature PRs merged into the release branch        | release PRs merged into staging                                    |
-| Reviewed before | mostly yes, on each feature PR                    | yes, twice                                                         |
-
-A contract is usually written for the `staging` → `main` case. For a release branch → `staging`,
-keep its structure but read one level down: the constituent PRs are the feature and fix branches
-merged into the release branch, and the previous boundary is the last PR from that same release
-branch, if it had one. Use the title convention from Repo facts; if it reserves a title type for
-promotion merges, nothing else in the repo may use that type.
-
-## Bound the range before summarising anything
-
-The single most common error is describing work that already shipped. Find the previous promotion's
-merge timestamp and let it cut the list:
+The most common error is describing work that already shipped. Find the previous promotion's
+merge time and let it cut the list:
 
 ```bash
 gh pr list --state all --base main --limit 10 --json number,title,headRefName,mergedAt,url
 gh pr list --state all --base staging --limit 20 --json number,title,headRefName,mergedAt,url
 ```
 
-A branch merged into `staging` **before** the previous promotion is already in production; say so
-explicitly if it is still visibly sitting there, for example a hotfix promoted on its own. Take
-stats from
-`gh pr view <N> --json baseRefOid,headRefOid,additions,deletions,changedFiles,commits` rather than
-computing them locally, and quote the previous promotion's size next to this one so the number
-means something. If the repo does not tag releases, do not go looking for a tag to bound the range
-with: use the place Repo facts says the version lives.
+A branch merged into `staging` before the previous promotion is already in production; say so when
+it still shows there. If the repo does not tag releases, bound the range with the place Repo facts
+says the version lives, not a tag.
 
-## Go deeper than the release notes
+## 2. Bring the note up to date first
 
-This document is developer-only. Cross-check it against the repo's release record (see
-[`release-notes`](../release-notes/SKILL.md)) so the two do not contradict each other, then say the
-things a release note may not: the constant that was renamed, the guard that was tripped, the CI
-job that was removed, the bug that existed since inception and was never exercised.
+The body copies the note, so a stale note makes a stale PR. Run the `release-notes` check: every
+commit the branch holds that the PR's target lacks has an entry or a reason it has none.
 
-Pull the real diff (`git show --stat <sha>`, then `git show <sha>`) for any bullet that names
-something specific. Do not paraphrase a commit message that claims a rename or a new file without
-opening it.
+```bash
+git fetch origin
+git log --oneline origin/<target>..HEAD
+```
 
-## Operational notes earn their section
+Fix the note in its own commit before writing the body. An entry that reads wrong in the PR is wrong
+in the note: change the note, never only the PR.
 
-The last section of the structure is where a promotion pays for itself. Put in it what the next
-person needs and would otherwise rediscover: a gate that must pass before merging, a generated
-artifact nothing consumes yet, a repo setting a human must change after the merge, a follow-up
-deliberately left.
+## 3. Render the note (release branch → `staging`)
 
-The title and body describe only this repo: no other repository by name or path, no defect or ask
-for another service, no edge configuration, no developer name or machine path. Anything another
-repository needs goes to the maintainer as a private brief, `briefs/<date>-<topic>.md` in the
-place Repo facts gives for uncommitted drafts, never into the PR.
+- The note's `title` as the first heading, `## <title>`.
+- Its `summary` as the first paragraph, and its `highlights`, if any, as a list under it.
+- Then its body sections, word for word, in the note's order. Leave out a section whose only entry
+  is `- None.`.
+- Leave out the fields only tooling reads: `version`, `date`, `type`, `tags`, visibility flags,
+  compatibility lists. A `breaking: true` goes into the tail as its first line, with what breaks.
+- Never paste the frontmatter itself. In a PR body GitHub reads the YAML lines and the closing
+  `---` as one setext heading, so the top of the PR becomes a wall of bold YAML.
 
-## Where it goes
+## 4. Add the developer tail
 
-Write the body to `releases/<version>/promotion-staging.md` (a release into `staging`) or
-`releases/<version>/promotion-main.md` (`staging` into `main`), in the place Repo facts gives for
-uncommitted drafts; a batch uses its newest version's folder. Resolve it in the main checkout,
-never in a worktree: with a gitignored `writeups/` folder it never lands in a commit, and a copy
-inside `.claude/worktrees/<name>/writeups/` is deleted with the worktree. From the main checkout or
-any worktree:
+Under `## Before and after merging`, only the parts that hold, each a short list:
+
+- **Before merging:** the gates still to pass, such as the release-only CI checks from Repo facts,
+  trigger evals after a skill's description changed, or the local review the repo asks for. Write
+  them as `- [ ]` items.
+- **After merging:** what a person must do: a setting, a secret or an environment variable to set,
+  a tag to push, a follow-up left on purpose.
+- **Already live:** what changed outside the diff while the branch was built, such as repository
+  settings, rulesets or secrets, so a reviewer doesn't look for it in the files.
+- **Size:** commits, changed files, additions and deletions from
+  `gh pr view <N> --json additions,deletions,changedFiles,commits`, next to the previous
+  promotion's, so the number means something.
+- **How it was checked:** the gates run at the branch head and what they cover. Verification
+  belongs here and never in the note.
+
+The tail is for developers, so it may name files, commands and settings. It says what holds and
+what to do, never the story behind the work: not what prompted the release, nor what went wrong or
+needed a second try while it was built. It still describes only this repo: no other repository by
+name or path, no machine path, no developer name. Anything another repository needs goes to the
+maintainer as a private brief, `briefs/<date>-<topic>.md` in the drafts location, never into the PR.
+
+## 5. `staging` → `main`
+
+Read the promotion contract first: its structure and style win over this section. Lead each
+version's part with that version's note `summary`, link to the note, and add only what the note may
+not say: the renamed constant, the CI job removed, the guard that was tripped. Pull the real diff
+(`git show --stat <sha>`, then `git show <sha>`) for any line that names something specific. Without
+a contract, write a table of the release PRs being promoted, then one section per version, then the
+developer tail.
+
+## 6. A hotfix PR
+
+A hotfix fixes a version that has already left its release branch: before promotion it goes into
+`staging`, after promotion into `main`. Repo facts says how it branches, where it goes and how it
+is titled. The body is built the same way for both:
+
+- **Range:** only the hotfix branch's commits, `git log --oneline origin/<target>..HEAD`. The rest
+  of the version shipped in an earlier PR.
+- **Note first:** the fix gets its entry in the note Repo facts names before the body is written.
+  It is `Fixed` only when the bug reached a released version. A bug that never left `staging`
+  changes the entry of the work it broke, or gets none.
+- **Body:** `## <title>`, then one paragraph: what was broken and for whom, and what the fix
+  changes. Then the note entries this hotfix added or changed, word for word, and nothing else
+  from the note.
+- **Tail:** as in step 4. A hotfix into `main` adds under After merging what brings the other
+  branches level, such as a PR from `main` into `staging`, and the tag if the repo tags releases.
+
+## 7. Where it goes
+
+Write the body to `releases/<version>/promotion-staging.md` (a release into `staging`),
+`releases/<version>/promotion-main.md` (`staging` into `main`) or
+`releases/<version>/<hotfix branch>.md` (a hotfix) in the drafts location; a batch uses its newest
+version's folder. Resolve it in the main checkout, never in a worktree, whose copy is deleted with
+it:
 
 ```bash
 WRITEUPS="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/writeups"
-PR_BODY="$WRITEUPS/releases/<version>/promotion-<staging or main>.md"
+PR_BODY="$WRITEUPS/releases/<version>/<promotion-staging, promotion-main or the hotfix branch>.md"
 ```
 
-Creating or editing the PR is a separate, visible action that needs the user's explicit go-ahead
-(`gh pr edit <N> --body-file "$PR_BODY"`).
+Opening or editing the PR is a separate, visible action that needs the user's go-ahead each time:
 
-Confirm before opening a promotion PR that does not exist yet, and never push to the target branch
-directly; its protection is whatever Repo facts says, no more. A promotion PR is where the heavier
-CI can land: say which of the promotion-only checks from Repo facts ran and their result, and
-expect a longer, noisier check list than on a feature PR.
+```bash
+gh pr create --base <target> --head <branch> --title "<title convention>" --body-file "$PR_BODY"
+gh pr edit <N> --body-file "$PR_BODY"
+```
+
+Never push to the target branch directly. When the target squash-merges, the PR body is the only
+record of the release's commits on that branch: say so in the tail.
+
+## Before handing it over
+
+- The body opens with the note's title and summary, not YAML; a hotfix body opens with what was
+  broken.
+- Each rendered section or entry matches the note's word for word.
+- The title follows the title convention, and the tail holds only what is true and still useful.
+
+## Related
+
+- [`release-notes`](../release-notes/SKILL.md): writes and checks the note this body renders
+- [`feature-pr-description`](../feature-pr-description/SKILL.md): a feature or fix PR into a
+  release branch
 
 If `local.md` exists next to this file, read it; where it disagrees with this file, it wins.

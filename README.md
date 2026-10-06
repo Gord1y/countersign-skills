@@ -77,15 +77,15 @@ has, so those two rules stay out of both.
 | `human-voice-writing` | Drafts and revises longer text so it reads as human, not AI-generated. | Claude Code, Codex, Antigravity |
 | `memory-review` | Sorts Claude Code's auto memory by the memory rule: preferences into rules, project knowledge into repo docs. Manual: `/memory-review`. | Claude Code |
 | `codebase-research` | Picks the cheapest way to research code, with an explicit model on any spawn. | Claude Code, Codex |
-| `release-notes` | Writes release note entries and keeps the release index current. Manual: `/release-notes`. | Claude Code, Codex, Antigravity |
+| `release-notes` | Writes release note entries, keeps an open note in step with its branch, and keeps the release index current. | Claude Code, Codex, Antigravity |
 | `feature-pr-description` | Writes the body of a feature or fix PR to the repo's description contract. | Claude Code, Codex, Antigravity |
-| `promotion-pr-description` | Writes the body of a promotion PR (release into staging, staging into main). Manual: `/promotion-pr-description`. | Claude Code, Codex, Antigravity |
+| `promotion-pr-description` | Writes a release or hotfix PR's body from its release note (release into staging, staging into main, a hotfix into either), plus what developers need before and after the merge. | Claude Code, Codex, Antigravity |
 | `thorough-diff-review` | Runs a full local review of a diff before you push. | Claude Code, Codex, Antigravity |
 | `i18n-translate` | Translates new English message keys into the other locales, one subagent each. | Claude Code, Codex |
 | `qa-tester` | Tests a change in the running product on every surface it touched (web, API, CLI, native or mobile app, game, library), saves the evidence under `writeups/`, and reports pass or fail. Runs forked under Claude Code. | Claude Code, Codex |
 | `impact-check` | Finds what a change could break outside its diff, and backs its verdict with a script that runs the real code. | Claude Code, Codex, Antigravity |
 | `how-it-works` | Explains how a part of the codebase works, for the person about to change it: its moving parts, the flow with a diagram, where to start reading. | Claude Code, Codex, Antigravity |
-| `pr-review-triage` | Verifies a PR's review findings at the PR head and writes a fix plan; starts on a bare PR link. | Claude Code, Codex |
+| `pr-review-triage` | Verifies a PR's AI findings, failed checks and open threads at the PR head, and writes a fix plan that proves each fix safe; starts on a bare PR link. | Claude Code, Codex |
 | `walkthrough` | Walks you through any change with its QA evidence (screenshots, request and response pairs, transcripts), or builds a customer-facing HTML walkthrough of a UI release. | Claude Code, Codex, Antigravity |
 | `writeups-cleanup` | Proposes what in `writeups/` has done its job, with the evidence, and deletes only what you approve. Manual: `/writeups-cleanup`. | Claude Code, Codex, Antigravity |
 
@@ -102,12 +102,11 @@ a gitignored `writeups/` folder (layout in [docs/install.md](docs/install.md#wri
 
 One module per topic in `rules/`, imported into your `CLAUDE.md`.
 
-- **Responses**: how to answer, what to lead with, and how to mark a summary.
+- **Responses**: how to answer, what to lead with, and how to mark a summary (✅ asked work, 🔧 found and fixed, ❌ still broken).
 - **Code**: house style for code, such as no comments and strict types.
 - **Issues you find along the way**: fix what you find in the same session, don't park it.
 - **Tooling**: the package manager to use and the gates that count as done.
-- **Planning and orchestration**: ask every load-bearing question up front, and split big work into units.
-- **Context transfer**: use the handoff skill for a handoff, nothing else.
+- **Planning and orchestration**: ask every load-bearing question up front, split big work into units, and hand off only through the `context-transfer` skill.
 - **Memory**: what belongs in auto memory and what belongs in the repo.
 - **Research and external information**: trust your own knowledge first, confirm anything from the web.
 - **Commits**: one task per conventional commit, and never push unprompted.
@@ -163,19 +162,20 @@ your profile. Everything it replaces is backed up first. Details in
 
 ## Startup cost
 
-Rules and skill listings sit in every session's context. Measured with `/context` in Claude Code
-2.1.278 with Opus 5.5, with every rule on:
+Rules and skill listings sit in every session's context. Measured with `/context` for 1.0.0 in
+Claude Code 2.1.278 with Opus 5.5, with every rule on, then scaled by size for 1.1.0:
 
 | Part | Tokens |
 | --- | --- |
-| 11 rules | about 4.9K |
-| 12 model-invocable skills (listing) | about 1.1K |
+| 10 rules | about 2.3K |
+| 14 model-invocable skills (listing) | about 1.3K |
 | 4 subagents | about 0.3K |
-| Total | about 6.3K |
+| Total | about 3.9K |
 
-The rules dominate: `safety` (919), `responses` (916) and `orchestration` (604) are the biggest, and
-the smallest, `context-transfer`, is 122. A skill's listing costs 60 to 130 tokens. The 4 manual
-skills cost nothing until you type them. Dropping a rule's import line saves its share.
+The rules still dominate: `responses` (about 510), `safety` (about 450) and `orchestration`
+(about 350) are the biggest, and the smallest, `commits`, is about 90. A skill's listing costs 70
+to 130 tokens. The 2 manual skills cost nothing until you type them. Dropping a rule's import line
+saves its share.
 
 In a 200K context window, Claude Code's default budget for the skill listing is too small for its
 own skills and these together, so some descriptions are dropped and those skills stop starting on
@@ -192,19 +192,12 @@ permission lists this repo ships:
 {
   "sandbox": {
     "enabled": true,
-    "autoAllowBashIfSandboxed": true
+    "autoAllowBashIfSandboxed": true,
+    "filesystem": {
+      "denyRead": ["~/.ssh", "~/.aws", "~/.gnupg", "~/.kube", "~/Library/Keychains", "~/.zsh_history", "~/.bash_history"]
+    }
   },
   "permissions": {
-    "ask": [
-      "Bash(git reset --hard*)",
-      "Bash(git -C * reset --hard*)",
-      "Bash(git clean*)",
-      "Bash(git -C * clean*)",
-      "Bash(git branch -D*)",
-      "Bash(git -C * branch -D*)",
-      "Bash(gh pr merge*)",
-      "Bash(gh repo delete*)"
-    ],
     "deny": [
       "Bash(git push)",
       "Bash(git push *)",
@@ -216,7 +209,14 @@ permission lists this repo ships:
       "Read(**/.env.development)",
       "Read(**/.env.production)",
       "Read(**/.env.staging)",
-      "Read(**/.env.test)"
+      "Read(**/.env.test)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)",
+      "Read(~/.gnupg/**)",
+      "Read(~/.kube/**)",
+      "Read(~/Library/Keychains/**)",
+      "Read(~/.zsh_history)",
+      "Read(~/.bash_history)"
     ]
   }
 }
@@ -227,10 +227,12 @@ The file goes at `/Library/Application Support/ClaudeCode/managed-settings.json`
 `C:\Program Files\ClaudeCode\managed-settings.json` on Windows
 ([managed settings docs](https://code.claude.com/docs/en/managed-settings)). `/status` shows
 `Enterprise managed settings (file)` once it applies. It runs every Bash command in the sandbox
-without a prompt, makes destructive git and `gh` commands ask even in auto mode, and blocks
-`git push` and reading `.env` files outright. It allows no network hosts, so a sandboxed command
-that needs one is blocked until the host is allowed: add the hosts your builds use under `sandbox.network.allowedDomains`,
-starting from the list in [claude/settings.json](claude/settings.json).
+without a prompt and blocks `git push` and reading `.env` files and credential stores outright. It
+allows no network hosts, and no writes outside the working folder and a per-user temp folder, so
+a sandboxed command that needs either is blocked until it is allowed: add the hosts your builds use under
+`sandbox.network.allowedDomains` and the cache folders they write under
+`sandbox.filesystem.allowWrite`, starting from the lists in
+[claude/settings.json](claude/settings.json).
 
 ## Contributing
 
