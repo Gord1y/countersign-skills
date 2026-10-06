@@ -50,6 +50,29 @@ Open every pull request against `staging`; `main` only moves when a release is c
 - For a pull request from a fork, the workflows wait until the maintainer approves them to run.
 - Nobody pushes to `staging` or `main` directly, the maintainer included.
 
+## Rulesets
+
+Three rulesets enforce this, and none has a bypass actor, so they bind the maintainer too:
+
+- `main`: no deletion, no force push, changes only through a pull request merged with a merge
+  commit, and the required checks `gates`, `commits`, `lint` and `title`, each expected from the
+  GitHub Actions app. No up-to-date requirement.
+- `staging`: the same, but squash only and up to date.
+- `release tags`: a `v*` tag can never be moved or deleted.
+
+Each is committed as `.github/rulesets/<name>.json` in GitHub's own ruleset format, and the files
+are the source of truth. GitHub never reads them itself: `scripts/rulesets.sh --apply` writes each
+one to GitHub, updating the ruleset of the same name or creating it, then checks. Run it with `gh`
+signed in as the maintainer. `scripts/rulesets.sh --check` fails on any difference, on a file with
+no ruleset and on a ruleset with no file. The `lint` job runs it with its read-only token, which can
+read a public repository's rulesets, so a ruleset changed in GitHub's settings fails CI until its
+file follows. GitHub hides bypass actors from a token without admin rights; then the check compares
+everything else, and only `--check` run by the maintainer covers them. To change a ruleset, edit its
+file in a pull request and run `--apply` from that branch. The script never deletes a ruleset:
+remove it in GitHub's settings and delete its file in the same pull request.
+`scripts/test-rulesets.sh` covers the script offline, against a fake `gh` that serves the committed
+files.
+
 ## Releases
 
 A release is cut by the maintainer:
