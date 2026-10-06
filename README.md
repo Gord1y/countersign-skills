@@ -77,7 +77,7 @@ has, so those two rules stay out of both.
 | `human-voice-writing` | Drafts and revises longer text so it reads as human, not AI-generated. | Claude Code, Codex, Antigravity |
 | `memory-review` | Sorts Claude Code's auto memory by the memory rule: preferences into rules, project knowledge into repo docs. Manual: `/memory-review`. | Claude Code |
 | `codebase-research` | Picks the cheapest way to research code, with an explicit model on any spawn. | Claude Code, Codex |
-| `release-notes` | Writes release note entries and keeps the release index current. Manual: `/release-notes`. | Claude Code, Codex, Antigravity |
+| `release-notes` | Writes release note entries, keeps an open note in step with its branch, and keeps the release index current. | Claude Code, Codex, Antigravity |
 | `feature-pr-description` | Writes the body of a feature or fix PR to the repo's description contract. | Claude Code, Codex, Antigravity |
 | `promotion-pr-description` | Writes a release PR's body from its release note (release into staging, staging into main), plus what developers need before and after the merge. | Claude Code, Codex, Antigravity |
 | `thorough-diff-review` | Runs a full local review of a diff before you push. | Claude Code, Codex, Antigravity |

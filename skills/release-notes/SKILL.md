@@ -1,7 +1,7 @@
 ---
 name: release-notes
 description: "Write or update a release note: entry format, required sections, the Fixed rule, and regenerating the release index."
-disable-model-invocation: true
+when_to_use: "Use when asked to write or update a release note or changelog entry, and before reporting work on a release branch as done, so its open note covers every commit."
 effort: medium
 ---
 

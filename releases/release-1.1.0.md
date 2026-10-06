@@ -46,6 +46,8 @@ testedWith:
   summary, highlights and entries, then what developers need before and after the merge. It starts
   when you ask for a release PR description, and `feature-pr-description` 1.0.1 leaves release PRs
   to it.
+- `release-notes` 1.1.0 starts when you ask for a release note, and before work on a release branch
+  is reported done, so an open note keeps up with its commits.
 
 ## Fixed
 
