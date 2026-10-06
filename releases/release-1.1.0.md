@@ -41,6 +41,9 @@ testedWith:
   at 12 lines before the TL;DR.
 - The gate recipe is `set -o pipefail; <cmd> 2>&1 | tail -n 60`, with no temp log.
 - `writeups-cleanup` 1.0.1: the drafts layout has no `reviews/` folder any more.
+- Sandboxed commands may also write Godot's `~/Library/Application Support/Godot`, so every cache
+  folder the sandbox opens is listed in `claude/settings.json` and a profile needs no sandbox
+  block.
 
 ## Fixed
 
@@ -66,6 +69,9 @@ testedWith:
   credential-store denies, and rewrites the Claude Code, Codex and Antigravity instructions from
   the shorter rules.
 - If your profile's `CLAUDE.md` imports `rules/context-transfer.md`, delete that line.
+- If your profile's `settings.json` sets `sandbox.filesystem.allowWrite` or another sandbox list,
+  delete it: a profile's array replaces the repo's whole array, so it hides every path the repo
+  lists, including ones added later.
 - If a repo of yours has its own `ask` rules, a hook that asks, or Bash allow rules, read "Project
   settings and hooks never ask" in `docs/install.md` before dropping them: the allow rules go with
   the asks, CI keeps its bounds, and Codex's rules follow.

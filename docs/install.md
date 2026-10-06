@@ -83,6 +83,9 @@ when that is set, as Countersign does):
 `~/.claude/settings.json` (it needs `jq`):
 
 - Every key the repo file sets wins, including whole arrays such as the sandbox's domain list.
+  Your profile's `settings.json` is layered over the repo file the same way: an array it sets
+  replaces the repo's whole array, so a profile `sandbox.filesystem.allowWrite` would hide every
+  path the repo lists. Leave the sandbox lists to `claude/settings.json`.
 - Keys it doesn't set stay as they are: hooks another tool installed (Countersign's), and anything
   Claude Code writes for this machine.
 - `permissions.allow`, `permissions.ask` and `permissions.deny` are merged, so rules Claude Code
@@ -111,8 +114,11 @@ when that is set, as Countersign does):
   own. At 2% all 12 keep them, for about 0.6K more tokens. In a 1M window 1% is already enough, so
   the setting changes nothing there. Claude Code doesn't document it yet; it drops the descriptions
   of the least-used skills first.
-- On macOS the per-user temp folder (`getconf DARWIN_USER_TEMP_DIR`) is added to the sandbox's
-  writable paths, because Apple's `git` and `xcrun` write caches there.
+- `sandbox.filesystem.allowWrite` lists the cache folders sandboxed builds write: pnpm's
+  `~/Library/pnpm`, `~/.npm`, `~/.cache`, `~/Library/Caches`, Xcode's
+  `~/Library/Developer/Xcode/DerivedData` and Godot's `~/Library/Application Support/Godot`. On
+  macOS the per-user temp folder (`getconf DARWIN_USER_TEMP_DIR`) is added to them, because Apple's
+  `git` and `xcrun` write caches there.
 - `permissions.allow` gets `Read(/<folder>/**)` for `~/.claude/skills` and for each source's
   `skills/`, under its path as given and its real path. So a skill reading its own reference
   files never prompts, in any project. Both sides are needed: Claude Code applies an allow rule

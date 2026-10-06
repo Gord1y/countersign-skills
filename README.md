@@ -226,9 +226,12 @@ The file goes at `/Library/Application Support/ClaudeCode/managed-settings.json`
 `C:\Program Files\ClaudeCode\managed-settings.json` on Windows
 ([managed settings docs](https://code.claude.com/docs/en/managed-settings)). `/status` shows
 `Enterprise managed settings (file)` once it applies. It runs every Bash command in the sandbox
-without a prompt and blocks `git push` and reading `.env` files and credential stores outright. It allows no network hosts, so a sandboxed command
-that needs one is blocked until the host is allowed: add the hosts your builds use under `sandbox.network.allowedDomains`,
-starting from the list in [claude/settings.json](claude/settings.json).
+without a prompt and blocks `git push` and reading `.env` files and credential stores outright. It
+allows no network hosts, and no writes outside the working folder and a per-user temp folder, so
+a sandboxed command that needs either is blocked until it is allowed: add the hosts your builds use under
+`sandbox.network.allowedDomains` and the cache folders they write under
+`sandbox.filesystem.allowWrite`, starting from the lists in
+[claude/settings.json](claude/settings.json).
 
 ## Contributing
 

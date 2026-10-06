@@ -55,7 +55,8 @@
         "~/.npm",
         "~/.cache",
         "~/Library/Caches",
-        "~/Library/Developer/Xcode/DerivedData"
+        "~/Library/Developer/Xcode/DerivedData",
+        "~/Library/Application Support/Godot"
       ],
       "denyRead": [
         "~/.ssh",
