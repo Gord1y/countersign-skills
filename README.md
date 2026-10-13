@@ -140,6 +140,8 @@ and sets its own model.
   rules, agents) alongside, on every later run. Good for a private set you don't publish.
 - **The status line:** `bin/statusline` shows the model, the context used and the plan limits left.
   It is off until you turn it on; see [docs/statusline.md](docs/statusline.md).
+- **The gh wrapper:** `bin/gh` picks the GitHub account from the repo's remote owner, so parallel
+  sessions never need `gh auth switch`; see [docs/gh.md](docs/gh.md).
 
 Make your changes in your profile, not in `~/.claude/CLAUDE.md` or `~/.claude/settings.json`.
 The installer rewrites `CLAUDE.md` on every run, a settings key the repo or your profile sets wins
