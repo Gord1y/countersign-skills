@@ -23,8 +23,8 @@ testedWith:
 
 - `bin/gh` wraps `gh` and picks the account from the owner of the repo's `origin` remote, through
   `gh-accounts.tsv` in your profile. It never runs `gh auth switch`, so parallel sessions on
-  different accounts don't break each other. Without the map, `gh` runs unchanged. See
-  `docs/gh.md`.
+  different accounts don't break each other. As git's credential helper it gives `git push` and
+  `fetch` the same account. Without the map, `gh` runs unchanged. See `docs/gh.md`.
 - A `SessionEnd` hook removes the empty `.claude/.cc-writes` folders Claude Code leaves in
   subfolders, never the one at the project's top. `install.sh` now joins `hooks.SessionEnd`, so
   your own `SessionEnd` hooks stay.
@@ -62,4 +62,5 @@ testedWith:
   rewrites the Claude Code, Codex and Antigravity instructions from the changed rules.
 - To use the gh wrapper, keep `~/.local/bin` ahead of the real `gh` on `PATH`, and add
   `gh-accounts.tsv` to your profile, one `owner<TAB>account` line per GitHub owner. Every account
-  in it must be signed in to `gh`.
+  in it must be signed in to `gh`. For git, point its GitHub credential helper at the wrapper, as
+  `docs/gh.md` shows.
