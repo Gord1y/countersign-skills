@@ -252,7 +252,7 @@ writeups/
   changes/<date>-<branch-or-run>/   pr.md, walkthrough.md, shots/, qa/
   releases/<version>/               promotion-staging.md, promotion-main.md, walkthrough.html, shots/
   briefs/<date>-<topic>.md          asks for other repos or teams
-  scratch/                          delete any time
+  scratch/<date>-<topic>/           anything shown to the user that no skill places; delete any time
 ```
 
 A `changes/` folder can go once its PR is merged and released, a `releases/` folder once the next
