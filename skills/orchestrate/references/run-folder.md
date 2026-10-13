@@ -25,7 +25,7 @@ directory:
   | --- | --- |
   | unit | the commit message |
   | status | pending / running / handed back / landed / failed |
-  | model | the tier, and for the top tier its one-line reason |
+  | model | the tier and effort, and for the top tier its one-line reason |
   | worktree + base | the worktree path and the commit it was cut from, for landing and recovery |
   | verified | which gates ran green, on what |
   | gate runs | the full-gate count the builder reported; more than 1 is flagged |

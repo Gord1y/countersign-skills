@@ -2,6 +2,7 @@
 name: qa
 description: QAs a finished change in the running product on every surface it touched, then writes the walkthrough; writes only evidence and notes into writeups/. Spawned by orchestrate after the gate.
 model: sonnet
+effort: medium
 disallowedTools: AskUserQuestion, Agent, NotebookEdit
 skills:
   - qa-tester

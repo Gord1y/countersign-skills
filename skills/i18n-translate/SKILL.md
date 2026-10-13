@@ -53,7 +53,7 @@ output names.
 ## 2. Dispatch one subagent per locale THAT HAS WORK
 
 Spawn one subagent per locale with the `Agent` tool: `subagent_type: "general-purpose"`,
-`model: "haiku"`.
+`model: "haiku"`, `effort: "low"`.
 
 Dispatch ONLY the locales that actually need work, and say how many you dispatched and why. A key
 added or changed in English needs every target locale. But when the worklist is empty you are

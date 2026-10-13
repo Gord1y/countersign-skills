@@ -51,10 +51,10 @@ to add to CLAUDE.md.
 ## Step 1: gather facts, cheaply
 
 Fewer than about 3 lookups in files you know: read them yourself. Otherwise spawn `researcher`
-(`agents/researcher.md`, `haiku`) for search, or a read-only `general-purpose` agent with `sonnet`
-for judgement across many files. Always pass `model`, and ask for at most 30 lines back: paths with
-line ranges and the facts, never file contents. Where no `researcher` agent is installed, use
-`Explore` with `haiku`.
+(`agents/researcher.md`, `haiku`, effort `low`) for search, or a read-only `general-purpose` agent
+with `sonnet` and effort `medium` for judgement across many files. Always pass `model` and
+`effort`, and ask for at most 30 lines back: paths with line ranges and the facts, never file
+contents. Where no `researcher` agent is installed, use `Explore` with `haiku` and `low`.
 
 ## Step 2: one plan file, every question in it, then one approval
 
@@ -72,7 +72,7 @@ Write one plan file, `~/.claude/plans/<repo>-<run>.md`, holding:
 - each unit, as the commit message it will produce
 - what depends on what, so what is parallel and what is sequenced; units that touch the same file
   are sequenced
-- each unit's model, and why
+- each unit's model and effort, and why
 - the pilot unit (Step 6), when there are 4 or more
 - the facts you are handing down
 - the surfaces Step 9 will QA, or why the run skips QA and which check replaces it
@@ -94,18 +94,21 @@ options and recommendation; only the units it touches park (see "When a builder 
 
 Resuming an approved plan or a handoff needs no re-approval. Splitting new work does.
 
-## Step 3: decisions first, then the model
+## Step 3: decisions first, then the model and effort
 
 **An open decision is a question for the user, not a model tier.** If you catch yourself writing
 "figure out the best way to" in a brief, the brief is not finished and you owe a question.
 
-- **`sonnet`, the default,** when the brief names the exact changes: files, shapes, decisions.
-- **`opus`** only when the implementation itself is intricate with every decision made: a
-  cross-cutting refactor, a subtle concurrency or cache interaction, anything where a plausible
-  wrong answer still compiles and passes. Not "edge-case heavy": list the cases (Step 5) and use
-  `sonnet`. Its one-line reason goes into the split and the unit table.
+- **`sonnet` with effort `medium`, the default,** when the brief names the exact changes: files,
+  shapes, decisions.
+- **`opus` with effort `high`** only when the implementation itself is intricate with every
+  decision made: a cross-cutting refactor, a subtle concurrency or cache interaction, anything where
+  a plausible wrong answer still compiles and passes. Not "edge-case heavy": list the cases (Step 5)
+  and use `sonnet`. Its one-line reason goes into the split and the unit table.
 - **`haiku`** only where a known fan-out skill pins it, such as one translator per locale.
-- **Never omit `model`**: an unnamed spawn inherits the main session's tier.
+- **Never omit `model` or `effort`**: an unnamed spawn inherits the main session's tier and
+  effort. The `Agent` tool's `effort` beats the agent's frontmatter, so pass both even to agents
+  that pin them.
 
 The main session plans. Never delegate the split, unless the user says the task is low priority.
 
@@ -197,11 +200,11 @@ before you hand back; past 20, cut the least useful until it fits.
 
 - **Check the agent types once, before the first spawn.** Read the list of agent types the Agent
   tool offers. When `builder` is on it, every unit spawns as `subagent_type: "builder"`
-  (`agents/builder.md`), which carries `isolation: worktree`, and always with `model`. Never cut
-  worktrees by hand with `git worktree add`, let builders commit, or cherry-pick their work: that
-  bypasses Step 8. Only when `builder` is missing (a skills-only install), spawn `general-purpose`
-  with `isolation: "worktree"` and the same `model`; the brief's standing rules already forbid
-  committing and asking. Note which path the run uses in the plan file. Check `reviewer` and `qa`
+  (`agents/builder.md`), which carries `isolation: worktree`, and always with `model` and
+  `effort`. Never cut worktrees by hand with `git worktree add`, let builders commit, or
+  cherry-pick their work: that bypasses Step 8. Only when `builder` is missing (a skills-only
+  install), spawn `general-purpose` with `isolation: "worktree"` and the same `model` and `effort`;
+  the brief's standing rules already forbid committing and asking. Note which path the run uses in the plan file. Check `reviewer` and `qa`
   the same way for Steps 7 and 9.
 - The worktree is cut from your `HEAD` only under `worktree.baseRef: "head"`, which the install
   sets; without it, worktrees start from the remote default branch. Check the worktree, not the
@@ -232,10 +235,11 @@ git -C <worktree> diff                # read it before landing, not after
 
 Every unit over about 300 changed lines, new files included, gets a `reviewer` before it lands;
 size it from `git -C <worktree> diff --stat` plus the `??` files. Spawn `reviewer`
-(`agents/reviewer.md`) with `model: "sonnet"`, the worktree path and the brief's path. Read its
-findings and `git -C <worktree> diff --stat` instead of the whole diff, and open only the files a
-finding names. Where no `reviewer` agent is installed, spawn `general-purpose` with `sonnet`, and
-tell it to change nothing and to review with the `thorough-diff-review` skill.
+(`agents/reviewer.md`) with `model: "sonnet"` and `effort: "high"`, the worktree path and the
+brief's path. Read its findings and `git -C <worktree> diff --stat` instead of the whole diff, and
+open only the files a finding names. Where no `reviewer` agent is installed, spawn
+`general-purpose` with `sonnet` and `high`, and tell it to change nothing and to review with the
+`thorough-diff-review` skill.
 
 ## Step 8: land, commit, then gate once
 
@@ -288,7 +292,8 @@ Once the gate is green, prove the run works in the running product, on every sur
 Its folder is `writeups/changes/<date>-<run>/`, resolved from the main checkout as `qa-tester`
 resolves it.
 
-1. **QA and the walkthrough, in one spawn.** Spawn `qa` (`agents/qa.md`) with `model: "sonnet"`.
+1. **QA and the walkthrough, in one spawn.** Spawn `qa` (`agents/qa.md`) with `model: "sonnet"` and
+   `effort: "medium"`.
    Its prompt gives what changed, unit by unit; the surfaces each touched; the run name; the
    folder; and whether to write the walkthrough, as the Repo fact says: `always`, `when UI changed`
    (a web, native, mobile or game surface changed), or `off`. It preloads `qa-tester` and
@@ -360,7 +365,7 @@ the check the user should do when QA was skipped. Never an artifact page, unless
 - Writing the code yourself because it is faster.
 - Deciding a load-bearing question quietly, or asking mid-run.
 - Builders sharing the main working tree, or committing in their worktrees.
-- Spawning without an approved split, or without `model`.
+- Spawning without an approved split, or without `model` and `effort`.
 - Trusting a builder's account of repo state instead of its base and diff.
 - Letting a builder measure what you already know.
 - Spawning a parallel batch one message at a time.

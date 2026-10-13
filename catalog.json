@@ -3,7 +3,7 @@
   "skills": [
     {
       "name": "orchestrate",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "agents": [
         "claude"
       ],
@@ -115,7 +115,7 @@
     },
     {
       "name": "i18n-translate",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "agents": [
         "claude",
         "codex"
@@ -139,7 +139,7 @@
     },
     {
       "name": "impact-check",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "agents": [
         "claude",
         "codex",
@@ -152,7 +152,7 @@
     },
     {
       "name": "how-it-works",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "agents": [
         "claude",
         "codex",
