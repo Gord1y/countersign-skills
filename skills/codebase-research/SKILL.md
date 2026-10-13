@@ -1,6 +1,6 @@
 ---
 name: codebase-research
-description: "Research code cheaply: skip agents when you know the file, pick researcher or general-purpose, always pass haiku or sonnet, cap reports at 30 lines."
+description: "Research code cheaply: skip agents when you know the file, pick researcher or general-purpose, always pass model and effort, cap reports at 30 lines."
 when_to_use: "Use before spawning any agent to read or search code, or when a question needs several exploratory reads."
 ---
 
@@ -59,22 +59,24 @@ own context with a lot of code you don't need to keep around after the answer is
 | "Explain how this whole system works end-to-end" / reconcile behavior across many files into one coherent mental model (e.g. "how does the invoices list's filtering actually work") | `general-purpose` | `Explore`'s own contract disclaims this: _"Do NOT use it for code review, design-doc auditing, cross-file consistency checks, or open-ended analysis - it reads excerpts rather than whole files and will miss content past its read window."_ Cross-file synthesis needs an agent that reads whole files, not excerpts. |
 | Anything that changes code, or needs a design/architecture judgment call | _(not this skill)_ | That's implementation, not research: use the parent's normal (full-capability) tier, or a specialized review/build agent. |
 
-## Step 3 - always pass an explicit `model` override
+## Step 3 - always pass `model` and `effort`
 
-Neither `Explore` nor `general-purpose` pins a model, so a spawn without `model` inherits the parent
-session's tier: in a session tuned for implementation, the most expensive one, with extended
-thinking on. **A research spawn always sets `model`, and only ever `"haiku"` or `"sonnet"`**: the
-parent plans and decides, the spawn reads and reports.
+Neither `Explore` nor `general-purpose` pins a model or an effort, so a spawn without them inherits
+the parent session's tier and effort: in a session tuned for implementation, the most expensive
+ones. **A research spawn always sets `model` and `effort`, and the model is only ever `"haiku"` or
+`"sonnet"`**: the parent plans and decides, the spawn reads and reports.
 
-- `"haiku"` by default, for fact-finding: locating code, summarizing what a function does, listing
-  fields, props or keys, answering "where, what, does X exist". With `researcher` or `Explore`.
-- `"sonnet"` only when the research itself needs reasoning: reconciling contradictory or
-  undocumented sources, inferring intent from ambiguous code, or synthesizing a large multi-file
-  flow into one accurate account. With `general-purpose`.
+- `"haiku"` with `effort: "low"` by default, for fact-finding: locating code, summarizing what a
+  function does, listing fields, props or keys, answering "where, what, does X exist". With
+  `researcher` or `Explore`.
+- `"sonnet"` with `effort: "medium"` only when the research itself needs reasoning: reconciling
+  contradictory or undocumented sources, inferring intent from ambiguous code, or synthesizing a
+  large multi-file flow into one accurate account. With `general-purpose`.
 - Never `"opus"`. A question that genuinely needs the parent's tier is not research, and this skill
   does not apply to it.
 
-`model` is the only lever: the `Agent` tool has no `effort` parameter.
+The `Agent` tool's `effort` beats the agent's frontmatter `effort`, so pass both even to
+`researcher`, which pins `low` itself. Never set `CLAUDE_CODE_EFFORT_LEVEL`: it overrides both.
 
 ## Step 4 - scope the prompt to the factual question
 
@@ -114,6 +116,7 @@ Agent({
   description: "Locate invoices list query",
   subagent_type: "researcher",
   model: "haiku",
+  effort: "low",
   prompt: "Find where the invoices list's query and its cache keys are defined."
 })
 ```
@@ -125,6 +128,7 @@ Agent({
   description: "Trace sign-up form submit flow",
   subagent_type: "general-purpose",
   model: "sonnet",
+  effort: "medium",
   run_in_background: false,
   prompt: "Read the sign-up form, its schema and its submit mutation. Explain exactly how "
     + "validation errors from the server reach the form fields, and what happens on success. "

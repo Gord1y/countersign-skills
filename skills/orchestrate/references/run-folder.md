@@ -25,16 +25,21 @@ directory:
   | --- | --- |
   | unit | the commit message |
   | status | pending / running / handed back / landed / failed |
-  | model | the tier, and for the top tier its one-line reason |
+  | model | the tier and effort, and for the top tier its one-line reason |
   | worktree + base | the worktree path and the commit it was cut from, for landing and recovery |
   | verified | which gates ran green, on what |
   | gate runs | the full-gate count the builder reported; more than 1 is flagged |
   | open | anything the builder flagged |
 
 - parked units with their questions, and the calls made
+- the count of units landed this session, against the limit of 20
 
 A finished unit stays one row. When the file nears its cap, move the detail of finished rounds to
 `log.md`.
+
+**It stays current after every landing**: update the unit's row and the session's count before
+the next spawn. A handoff at the 20-unit limit, or after an interruption, is then a short write
+that points at this file.
 
 **`units/NN-<slug>.md`** holds the whole brief, written once; the spawn prompt only points at it.
 A retry edits this file and respawns, so no brief is ever written twice. At hand-back, paste the
@@ -45,3 +50,17 @@ brief starts by pointing at `common.md`, so the shared rules are written once.
 `plan.md` only to add a question or to settle a decision `orchestrator.md` leaves in doubt, and a
 unit file only to re-brief or recover that unit. Never read `log.md` during a run. Never write any
 of these files, or a handoff, inside the repo.
+
+## Phases: one index plan, one run folder per phase
+
+Work bigger than one PR is split into phases, each one PR. The phases live under one folder:
+
+```
+~/.claude/plans/<repo>-<programme>/
+  index.md             the goal, each phase with its PR's branch and status, and what is next
+  <NN>-<phase>/        that phase's run folder, laid out as above
+```
+
+`index.md` stays under about 40 lines. A phase's decisions go into its own `plan.md`, asked in the
+planning session for that phase. When a phase's PR is merged, mark it done in `index.md`; the next
+phase starts in a fresh planning session from `index.md`.

@@ -41,7 +41,8 @@ yourself, no subagents. This is the default when unsure.
 Wide: several directories, services or layers, or the entry point is unknown. Split into 2-4
 slices that do not overlap, for example trigger and entry; core processing; storage and outbound
 effects; failure and retry. Spawn one `researcher` per slice, all in one message, with
-`model: "haiku"`, or `Explore` with `model: "haiku"` where `researcher` is not installed. Give
+`model: "haiku"` and `effort: "low"`, or `Explore` with the same where `researcher` is not
+installed. Give
 each `references/slice-brief.md` filled in. Agents without subagents (Codex, Antigravity) read
 the slices themselves, one after another.
 

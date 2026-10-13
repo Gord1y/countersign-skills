@@ -32,7 +32,7 @@ It must pass before a change is done. It runs `./test.sh`, every `scripts/test-*
 
 | Fact | Detail |
 | --- | --- |
-| The surfaces, and how to reach each | `cli`: run `install.sh`, `update.sh` and `uninstall.sh` against a scratch home, `HOME="$(mktemp -d)" CLAUDE_CONFIG_DIR= ./install.sh`, never the real one. `bin/statusline`: reads Claude Code's status line JSON on stdin. |
+| The surfaces, and how to reach each | `cli`: run `install.sh`, `update.sh` and `uninstall.sh` against a scratch home, `HOME="$(mktemp -d)" CLAUDE_CONFIG_DIR= ./install.sh`, never the real one. `bin/statusline`: reads Claude Code's status line JSON on stdin. `bin/gh`: wraps gh; run it with a stub gh first on PATH, as `scripts/test-gh.sh` does. |
 | Branches | Pull requests go into `staging`; `main` moves only at releases. |
 | Reviews | No automated review and no required approval; reviews follow `docs/review-checklist.md`. |
 | Release PRs | A `release-<semver>` branch is squash-merged into `staging` under a Conventional Commit title (`release` is not a type); `staging` goes into `main` as a merge commit titled `chore(release): v<semver>`, with no promotion contract; the note is `releases/release-<semver>.md` (contract in `releases/README.md`), and a `v*` tag on `main` starts the release workflow. No check runs only on release PRs. |
