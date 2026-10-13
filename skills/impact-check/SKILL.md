@@ -58,7 +58,7 @@ A verdict with an `assumed` premise says so in its first line.
    would catch it. List what was checked and found fine separately, one line of reason each. Cite
    only code seen in this run, report an empty search as such, never invent a caller or an API.
 6. **Second opinions, only on request and for a wide change.** Run 2-3 read-only
-   `general-purpose` subagents with `model: "sonnet"` on one question, merge and note where they
+   `general-purpose` subagents with `model: "sonnet"` and `effort: "medium"` on one question, merge and note where they
    disagree. Agents without subagents (Codex, Antigravity) skip this.
 
 ## Output

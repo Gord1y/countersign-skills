@@ -1,0 +1,83 @@
+#!/bin/sh
+set -eu
+
+find_real_gh() {
+  old_ifs=$IFS
+  IFS=:
+  for dir in $PATH; do
+    candidate="${dir:-.}/gh"
+    if [ -f "$candidate" ] && [ -x "$candidate" ] && ! cmp -s "$candidate" "$0"; then
+      IFS=$old_ifs
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  IFS=$old_ifs
+  return 1
+}
+
+lowercase() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
+real=$(find_real_gh) || {
+  echo "gh: no gh found on PATH besides this wrapper" >&2
+  exit 127
+}
+
+passthrough() {
+  exec "$real" "$@"
+}
+
+[ -z "${GH_TOKEN:-}" ] || passthrough "$@"
+[ "${1:-}" != auth ] || [ "${2:-}" = git-credential ] || passthrough "$@"
+
+map_file="${XDG_CONFIG_HOME:-$HOME/.config}/countersign/profile/gh-accounts.tsv"
+[ -f "$map_file" ] || passthrough "$@"
+git rev-parse --is-inside-work-tree >/dev/null 2>&1 || passthrough "$@"
+url=$(git remote get-url origin 2>/dev/null) || passthrough "$@"
+
+case $url in
+  *://*)
+    rest=${url#*://}
+    authority=${rest%%/*}
+    path=${rest#*/}
+    host=${authority#*@}
+    host=${host%%:*}
+    ;;
+  *@*:*)
+    rest=${url#*@}
+    host=${rest%%:*}
+    path=${rest#*:}
+    ;;
+  *)
+    passthrough "$@"
+    ;;
+esac
+
+[ "$(lowercase "$host")" = github.com ] || passthrough "$@"
+owner=${path%%/*}
+[ -n "$owner" ] || passthrough "$@"
+wanted=$(lowercase "$owner")
+
+tab=$(printf '\t')
+account=
+while IFS=$tab read -r map_owner map_account || [ -n "$map_owner" ]; do
+  [ -n "$map_owner" ] || continue
+  if [ "$(lowercase "$map_owner")" = "$wanted" ]; then
+    account=$map_account
+    break
+  fi
+done <"$map_file"
+
+[ -n "$account" ] || passthrough "$@"
+
+token=$("$real" auth token -u "$account" 2>/dev/null) || token=
+if [ -z "$token" ]; then
+  echo "gh: no token for account $account, mapped from $owner in $map_file; run gh where it can read its keyring, or sign the account in with: gh auth login" >&2
+  exit 1
+fi
+
+GH_TOKEN=$token
+export GH_TOKEN
+exec "$real" "$@"

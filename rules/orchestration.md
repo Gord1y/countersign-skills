@@ -8,7 +8,8 @@
 - Once I approve, don't ask again in that task: a surprise parks only its piece and comes back as ❓.
 - 3 or more independently verifiable commits: invoke `orchestrate`. Units of a few dozen lines skip
   the builders: write them yourself, one commit each.
-- Every Agent spawn names `model`: `haiku` to search and read, `sonnet` to build and judge, `opus`
-  only with the reason in the prompt.
+- Every Agent spawn names `model` and `effort`: `haiku` with `low` to search and read, `sonnet`
+  with `medium` to build and QA and `high` to review, `opus` with `high` only with the reason in the
+  prompt.
 - Handoffs go through the `context-transfer` skill only. If it isn't offered, the install is
   broken: say so and ask me to re-run `install.sh`.

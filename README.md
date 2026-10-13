@@ -122,10 +122,10 @@ and add your own version as a rule in an addition, so `git pull` never fights yo
 Claude Code only, linked into `~/.claude/agents`. Each is split by what it may do, never by domain,
 and sets its own model.
 
-- `builder` (`sonnet`): implements one orchestrated unit in its own worktree, never committing.
-- `researcher` (`haiku`): read-only lookups, without CLAUDE.md, at most 30 lines back.
-- `reviewer` (`sonnet`): read-only review of a unit's worktree against its brief, with `thorough-diff-review` preloaded.
-- `qa` (`sonnet`): QA on every surface a run touched, then the walkthrough, with `qa-tester` and `walkthrough` preloaded; it writes only into `writeups/`.
+- `builder` (`sonnet`, effort `medium`): implements one orchestrated unit in its own worktree, never committing.
+- `researcher` (`haiku`, effort `low`): read-only lookups, without CLAUDE.md, at most 30 lines back.
+- `reviewer` (`sonnet`, effort `high`): read-only review of a unit's worktree against its brief, with `thorough-diff-review` preloaded.
+- `qa` (`sonnet`, effort `medium`): QA after each landed batch and at the end of a run, on every surface it touched, then the walkthrough, with `qa-tester` and `walkthrough` preloaded; it writes only into `writeups/`.
 
 ## Customise
 
@@ -140,6 +140,8 @@ and sets its own model.
   rules, agents) alongside, on every later run. Good for a private set you don't publish.
 - **The status line:** `bin/statusline` shows the model, the context used and the plan limits left.
   It is off until you turn it on; see [docs/statusline.md](docs/statusline.md).
+- **The gh wrapper:** `bin/gh` picks the GitHub account from the repo's remote owner, so parallel
+  sessions never need `gh auth switch`; see [docs/gh.md](docs/gh.md).
 
 Make your changes in your profile, not in `~/.claude/CLAUDE.md` or `~/.claude/settings.json`.
 The installer rewrites `CLAUDE.md` on every run, a settings key the repo or your profile sets wins

@@ -2,6 +2,7 @@
 name: reviewer
 description: Read-only review of one orchestrated unit's worktree against its brief, with the thorough-diff-review checklist; reports at most 20 lines. Spawned by orchestrate for large units.
 model: sonnet
+effort: high
 tools: Read, Grep, Glob, Bash
 skills:
   - thorough-diff-review

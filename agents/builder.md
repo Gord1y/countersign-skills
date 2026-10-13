@@ -2,6 +2,7 @@
 name: builder
 description: Implements one unit of an orchestrated run in its own git worktree, gated but never committed; the orchestrator lands and commits it. Spawned by the orchestrate skill with a pointer to the unit's brief.
 model: sonnet
+effort: medium
 isolation: worktree
 disallowedTools: AskUserQuestion, Agent
 maxTurns: 150

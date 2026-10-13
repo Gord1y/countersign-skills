@@ -3,7 +3,7 @@
   "skills": [
     {
       "name": "orchestrate",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "agents": [
         "claude"
       ],
@@ -51,12 +51,12 @@
     },
     {
       "name": "codebase-research",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "agents": [
         "claude",
         "codex"
       ],
-      "description": "Research code cheaply: skip agents when you know the file, pick researcher or general-purpose, always pass haiku or sonnet, cap reports at 30 lines.",
+      "description": "Research code cheaply: skip agents when you know the file, pick researcher or general-purpose, always pass model and effort, cap reports at 30 lines.",
       "whenToUse": "Use before spawning any agent to read or search code, or when a question needs several exploratory reads.",
       "invocation": "model",
       "path": "skills/codebase-research"
@@ -115,7 +115,7 @@
     },
     {
       "name": "i18n-translate",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "agents": [
         "claude",
         "codex"
@@ -139,7 +139,7 @@
     },
     {
       "name": "impact-check",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "agents": [
         "claude",
         "codex",
@@ -152,7 +152,7 @@
     },
     {
       "name": "how-it-works",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "agents": [
         "claude",
         "codex",
@@ -309,7 +309,7 @@
     },
     {
       "name": "qa",
-      "description": "QAs a finished change in the running product on every surface it touched, then writes the walkthrough; writes only evidence and notes into writeups/. Spawned by orchestrate after the gate.",
+      "description": "QAs a finished change in the running product on every surface it touched, then writes the walkthrough; writes only evidence and notes into writeups/. Spawned by orchestrate after each landed batch that touches a surface, and after the gate.",
       "model": "sonnet",
       "path": "agents/qa.md"
     },

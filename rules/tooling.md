@@ -7,3 +7,7 @@
   by range.
 - Run `gh` as a command of its own and filter with `--jq`: piped or chained, it runs sandboxed and
   looks logged out.
+- A file you show me or point me at (an option sheet, a screenshot, evidence, a draft) goes into
+  the project's `writeups/`, in `writeups/scratch/<date>-<topic>/` when no skill names a folder.
+  Plans and handoffs go into `~/.claude/plans`. The session scratchpad holds only throwaway files
+  I never see.
