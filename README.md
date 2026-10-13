@@ -125,7 +125,7 @@ and sets its own model.
 - `builder` (`sonnet`, effort `medium`): implements one orchestrated unit in its own worktree, never committing.
 - `researcher` (`haiku`, effort `low`): read-only lookups, without CLAUDE.md, at most 30 lines back.
 - `reviewer` (`sonnet`, effort `high`): read-only review of a unit's worktree against its brief, with `thorough-diff-review` preloaded.
-- `qa` (`sonnet`, effort `medium`): QA on every surface a run touched, then the walkthrough, with `qa-tester` and `walkthrough` preloaded; it writes only into `writeups/`.
+- `qa` (`sonnet`, effort `medium`): QA after each landed batch and at the end of a run, on every surface it touched, then the walkthrough, with `qa-tester` and `walkthrough` preloaded; it writes only into `writeups/`.
 
 ## Customise
 

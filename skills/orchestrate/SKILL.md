@@ -75,7 +75,8 @@ Write one plan file, `~/.claude/plans/<repo>-<run>.md`, holding:
 - each unit's model and effort, and why
 - the pilot unit (Step 6), when there are 4 or more
 - the facts you are handing down
-- the surfaces Step 9 will QA, or why the run skips QA and which check replaces it
+- the surfaces the batch checks (Step 8) and Step 9 will QA, or why the run skips QA and which
+  check replaces it
 - every reversible call, with its default
 - what the run pre-authorizes: dependencies to add, files to delete, any command the user would
   otherwise be asked about
@@ -292,25 +293,32 @@ The commit runs the repo's hooks in the main checkout. If a hook fails, fix the 
 again; never `--no-verify`. Remove a worktree only after its commit exists, and never one whose
 landing failed: it is the only copy.
 
-**When a dev server serves this checkout** (Repo facts: which port serves which checkout), each
-commit is live on screen as soon as it lands. Then check every landed batch that changes UI or data
-loading in the browser before the next batch spawns: a `qa` spawn scoped to those units' cases.
-Unit tests mock the network, so a backend limit or an error only the running app raises passes
-every gate, and an unchecked batch is already in front of the user. A FAIL becomes a fix unit
-before the run moves on.
+**QA every landed batch that touches a surface**, with or without a dev server, before the next
+batch spawns. Spawn `qa` with `model: "sonnet"` and `effort: "medium"`, scoped to that batch: its
+units, the surfaces they touched, their cases, and `writeups/changes/<date>-<run>/qa/<NN>-batch/`
+as the evidence folder, with no walkthrough. Unit tests mock the network, so a backend limit or an
+error only the running app raises passes every gate; when a dev server serves this checkout, an
+unchecked batch is already in front of the user. A FAIL becomes a fix unit before the next batch.
+A case that needs a server nobody runs is BLOCKED, never passed. A batch no surface can observe
+(docs, CI, a refactor with no behaviour change) skips QA, and its row says so.
+
+Write each verdict where a compaction can't lose it: PASS, FAIL or BLOCKED per case, with the
+`results.md` path, under `## QA` in each unit's file and in its row in `orchestrator.md`. Without a
+run folder, put them in the plan file.
 
 After every unit is landed, run the full gate **once** on the composed branch. Anything needing a
-running app is verified in Step 9, never in a builder's worktree.
+running app is verified by the batch checks and Step 9, never in a builder's worktree.
 
 ## Step 9: QA the run, then leave a walkthrough
 
-Once the gate is green, prove the run works in the running product, on every surface it touched.
-Its folder is `writeups/changes/<date>-<run>/`, resolved from the main checkout as `qa-tester`
-resolves it.
+Once the gate is green, prove the composed run works in the running product. The batches were
+checked one by one in Step 8; this pass covers what they could not. Its folder is
+`writeups/changes/<date>-<run>/`, resolved from the main checkout as `qa-tester` resolves it.
 
-1. **QA and the walkthrough, in one spawn.** Spawn `qa` (`agents/qa.md`) with `model: "sonnet"` and
-   `effort: "medium"`.
-   Its prompt gives what changed, unit by unit; the surfaces each touched; the run name; the
+1. **QA and the walkthrough, in one spawn.** Spawn `qa` (`agents/qa.md`) with `model: "sonnet"`
+   and `effort: "medium"`. Its prompt gives what changed, unit by unit; the surfaces each touched;
+   the batch verdicts and their `results.md` paths; the cases to run now (those that cross
+   batches, every case still BLOCKED, and one smoke pass per touched surface); the run name; the
    folder; and whether to write the walkthrough, as the Repo fact says: `always`, `when UI changed`
    (a web, native, mobile or game surface changed), or `off`. It preloads `qa-tester` and
    `walkthrough`, so screenshots and logs stay in its context and only its report reaches yours. It
@@ -321,6 +329,7 @@ resolves it.
    (brief, builder, land, commit, gate). Then a second `qa` spawn re-runs those cases and updates
    the walkthrough. A case that still fails goes to the closing summary as ❌. A BLOCKED case (a
    server down, a missing tool) is never a pass: it goes to the summary with what unblocks it.
+   Record these verdicts as Step 8 does.
 
 Where no `qa` agent is installed, invoke `qa-tester` with the same scope (it runs forked), then
 `walkthrough`.
@@ -331,8 +340,8 @@ lists the exact checks for the user, each with what to look for, and its cases c
 never passed.
 
 **The one skip.** A small fix the user can check at a glance (a copy change, a one-line config)
-skips both. The closing summary then names the exact check: the page, request or command, and what
-to look for. A run no surface can observe (a refactor with no behaviour change, CI, docs) has
+skips the batch checks and this step. The closing summary then names the exact check: the page,
+request or command, and what to look for. A run no surface can observe (a refactor with no behaviour change, CI, docs) has
 nothing to QA; the summary says so.
 
 ## Step 10: close the run

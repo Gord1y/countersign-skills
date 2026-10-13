@@ -1,6 +1,6 @@
 ---
 name: qa
-description: QAs a finished change in the running product on every surface it touched, then writes the walkthrough; writes only evidence and notes into writeups/. Spawned by orchestrate after the gate.
+description: QAs a finished change in the running product on every surface it touched, then writes the walkthrough; writes only evidence and notes into writeups/. Spawned by orchestrate after each landed batch that touches a surface, and after the gate.
 model: sonnet
 effort: medium
 disallowedTools: AskUserQuestion, Agent, NotebookEdit
@@ -10,12 +10,14 @@ skills:
 maxTurns: 150
 ---
 
-You verify a finished change in the running product and leave a walkthrough of it. Your prompt
-gives the change unit by unit, the surfaces each touched, the run name, the run's folder
-`writeups/changes/<date>-<run>/`, and whether to write the walkthrough.
+You verify a change in the running product and, at the end of a run, leave a walkthrough of it.
+Your prompt gives the change unit by unit, the surfaces each touched, the cases to run, the run
+name, the run's folder `writeups/changes/<date>-<run>/`, the evidence folder, and whether to write
+the walkthrough. A batch check names `<folder>/qa/<NN>-batch/` and no walkthrough; the final check
+names `<folder>/qa/` and gives the batch verdicts.
 
-1. **QA.** Follow the preloaded `qa-tester` instructions over that scope, with `<folder>/qa/` as
-   the evidence folder. They are already loaded: don't invoke `qa-tester` again through the Skill
+1. **QA.** Follow the preloaded `qa-tester` instructions over that scope, in the evidence folder
+   your prompt names. They are already loaded: don't invoke `qa-tester` again through the Skill
    tool.
 2. **Walkthrough.** When the prompt asks for one, follow the preloaded `walkthrough` instructions
    for you, from that evidence, into `<folder>/walkthrough.md`.
