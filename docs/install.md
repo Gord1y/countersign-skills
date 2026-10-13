@@ -89,9 +89,9 @@ when that is set, as Countersign does):
 - These lists are joined, not replaced, so an entry from any layer survives:
   `permissions.allow`, `ask` and `deny`; the sandbox's `excludedCommands`,
   `filesystem.allowRead`, `denyRead`, `allowWrite` and `denyWrite`, and
-  `network.allowedDomains`; and `autoMode.environment` and `allow`. So rules Claude Code saved
-  from a "don't ask again" answer survive, and a profile adds to a list without hiding the repo's
-  entries. No layer can take out another layer's entry: to narrow a joined list, edit the file
+  `network.allowedDomains`; `autoMode.environment` and `allow`; and `hooks.SessionEnd`. So rules
+  Claude Code saved from a "don't ask again" answer survive, a hook you added stays next to the
+  repo's, and a profile adds to a list without hiding the repo's entries. No layer can take out another layer's entry: to narrow a joined list, edit the file
   that adds the entry.
 - Before merging, each value the last run merged (`settings-layer.json`) comes out again, the way
   `uninstall.sh` takes it out. So a key or rule that the repo or your profile drops is removed
@@ -129,6 +129,11 @@ when that is set, as Countersign does):
   These are `Read` rules on purpose: `permissions.additionalDirectories` would also allow edits,
   so any session could change the installed skills without asking. A `cd` into a skill folder
   from Bash can still prompt.
+- A `SessionEnd` hook removes empty `.claude/.cc-writes` folders below the project folder, and a
+  `.claude/` folder they leave empty. Claude Code creates one wherever a session's shell worked, so
+  they pile up in subfolders. It never touches the one at the project's top, which a parallel
+  session may be using, and it skips `node_modules` and `.git`. `rmdir` removes only empty
+  folders, so a folder that holds anything stays.
 
 The previous file goes to the backup folder first, and an unchanged file prints `ok`. Change
 settings in your profile's `settings.json` (or in `claude/settings.json`, for everyone), not in
