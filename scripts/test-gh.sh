@@ -71,6 +71,9 @@ mv "$map_file.off" "$map_file"
 run_gh "$work/mine" auth status || true
 [ "$(cat "$work/out")" = "token=none args=auth status" ] || fail "gh auth did not pass through untouched: $(cat "$work/out")"
 
+run_gh "$work/mine" auth git-credential get || true
+[ "$(cat "$work/out")" = "token=token-Gord1y args=auth git-credential get" ] || fail "gh auth git-credential did not get the mapped token: $(cat "$work/out")"
+
 run_gh "$work/plain" pr list || true
 [ "$(cat "$work/out")" = "token=none args=pr list" ] || fail "a directory outside git did not pass through: $(cat "$work/out")"
 

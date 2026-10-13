@@ -30,7 +30,7 @@ passthrough() {
 }
 
 [ -z "${GH_TOKEN:-}" ] || passthrough "$@"
-[ "${1:-}" != auth ] || passthrough "$@"
+[ "${1:-}" != auth ] || [ "${2:-}" = git-credential ] || passthrough "$@"
 
 map_file="${XDG_CONFIG_HOME:-$HOME/.config}/countersign/profile/gh-accounts.tsv"
 [ -f "$map_file" ] || passthrough "$@"
