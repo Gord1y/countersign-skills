@@ -85,14 +85,30 @@ Write one plan file, `~/.claude/plans/<repo>-<run>.md`, holding:
 
 Give the user the file's path, then ask the same questions through the forms (AskUserQuestion), at
 most four at a time and the highest-leverage first, and write each answer back to its `Answer:`
-line. After each batch, drop what the answers settled and ask the next. Past about twelve
-questions, split the task into phases. A run with a run folder (4 or more units) keeps this file
-as the folder's `plan.md`.
+line. After each batch, drop what the answers settled and ask the next. A run with a run folder
+(4 or more units) keeps this file as the folder's `plan.md`.
 
 During the run, a load-bearing question that turns up goes under `## Waiting for you`, with its
 options and recommendation; only the units it touches park (see "When a builder parks or fails").
 
 Resuming an approved plan or a handoff needs no re-approval. Splitting new work does.
+
+### Plan in one session, execute in others
+
+- **The planning session** does Step 1 and Step 2 at effort `high`, or `xhigh` for a hard design.
+  It ends when the plan is approved: hand off through `context-transfer`, pointing at the plan
+  file. A run of 3 units or fewer may go on in the same session.
+- **An execution session** starts from the plan file and only briefs, lands, commits and runs QA.
+  It never re-opens an answered question.
+- **At most 20 landed units per execution session.** Then update the run folder and hand off
+  through `context-transfer`. A PR ends when its work is done, not at a unit count: unfinished
+  work goes on in the same branch and PR in the next session.
+- **Work bigger than one PR**, or past about twelve questions, becomes phases: one index plan,
+  `~/.claude/plans/<repo>-<programme>/index.md`, lists them, and each phase is one PR with its own
+  run folder (`references/run-folder.md`).
+
+No decider subagent: a subagent can't hold a dialogue with the user, so every question would pass
+back through you, and the research would be paid twice.
 
 ## Step 3: decisions first, then the model and effort
 
@@ -350,7 +366,8 @@ blocked take different paths, and you never finish a unit's edits yourself.
 
 Runs of 4 or more units keep their state in a folder outside the repo, so a compaction or a
 resume costs one small file read. Read `references/run-folder.md` before the first spawn of such a
-run. Shorter runs live in context and need no folder.
+run. Shorter runs live in context and need no folder. Phased work keeps one run folder per phase
+under an index plan, described in the same file.
 
 ## Reporting
 

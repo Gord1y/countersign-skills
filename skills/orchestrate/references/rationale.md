@@ -55,3 +55,15 @@ landed commit had rewritten. That is why every hand-back still checks the base.
   used 80% of all builder tokens.
 - One builder ran for 692 minutes because nothing compared its elapsed time with its budget.
 - Uncapped research reports have reached 75,000 characters, all of it landing in the main context.
+
+## Sessions and phases
+
+- Across 116 sessions, cache reads came to about 7.6 billion tokens against 20 million output
+  tokens: each main-session turn re-read about 338K tokens of context, and 29 sessions ran past
+  300 turns. Session length is the main lever on spend; effort moves only output and thinking.
+- A session that both plans and executes carries every research read into every landing turn. A
+  plan file carries the decisions alone, and it survives a `/clear`.
+- A decider subagent was rejected: subagents can't ask the user, so its questions would pass
+  through the main session, and the research would be paid twice.
+- 20 landed units per session keeps a run's context bounded without splitting a PR before its
+  work is done.
