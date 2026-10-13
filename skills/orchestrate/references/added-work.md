@@ -10,7 +10,7 @@ Added work joins the run; it never becomes a side job in the main session.
    without a folder, the shared part of the briefs already written): the repo's knowledge, its
    standing rules, the skills to use. Never re-research what the plan file or `orchestrator.md`
    already holds.
-3. **Add it to the unit table and spawn it** with a named model and effort, under the same cap and the same
-   sequencing rules as every other unit.
+3. **Add it to the unit table and spawn it** with a named model and effort, under the same cap and
+   the same sequencing rules as every other unit.
 
 Never code it in the main session, however small: a one-line change is still a unit.

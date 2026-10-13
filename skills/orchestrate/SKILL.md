@@ -220,8 +220,8 @@ before you hand back; past 20, cut the least useful until it fits.
   `effort`. Never cut worktrees by hand with `git worktree add`, let builders commit, or
   cherry-pick their work: that bypasses Step 8. Only when `builder` is missing (a skills-only
   install), spawn `general-purpose` with `isolation: "worktree"` and the same `model` and `effort`;
-  the brief's standing rules already forbid committing and asking. Note which path the run uses in the plan file. Check `reviewer` and `qa`
-  the same way for Steps 7 and 9.
+  the brief's standing rules already forbid committing and asking. Note which path the run uses
+  in the plan file. Check `reviewer` and `qa` the same way for Steps 7 and 9.
 - The worktree is cut from your `HEAD` only under `worktree.baseRef: "head"`, which the install
   sets; without it, worktrees start from the remote default branch. Check the worktree, not the
   settings file: right after the first spawn, `git worktree list` must show the new worktree at
