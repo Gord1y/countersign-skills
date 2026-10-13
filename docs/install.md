@@ -133,7 +133,10 @@ when that is set, as Countersign does):
   `.claude/` folder they leave empty. Claude Code creates one wherever a session's shell worked, so
   they pile up in subfolders. It never touches the one at the project's top, which a parallel
   session may be using, and it skips `node_modules` and `.git`. `rmdir` removes only empty
-  folders, so a folder that holds anything stays.
+  folders, so a folder that holds anything stays. It runs in parallel with every other
+  `SessionEnd` hook and can't block one. Its `timeout` is 5 seconds because the highest hook
+  `timeout` sets how long Claude Code waits at exit, `/clear` and `/resume`. A cleanup cut short
+  loses nothing: the next session finishes it.
 
 The previous file goes to the backup folder first, and an unchanged file prints `ok`. Change
 settings in your profile's `settings.json` (or in `claude/settings.json`, for everyone), not in
