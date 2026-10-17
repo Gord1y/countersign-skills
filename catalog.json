@@ -89,13 +89,13 @@
     },
     {
       "name": "promotion-pr-description",
-      "version": "2.1.0",
+      "version": "3.0.0",
       "agents": [
         "claude",
         "codex",
         "antigravity"
       ],
-      "description": "Write a release or hotfix PR body (into staging or main) from its release note, plus what developers need before and after the merge.",
+      "description": "Write a release or hotfix PR body (into staging or main) from its release note, rendered for GitHub.",
       "whenToUse": "Use when asked to write, draft or update the description of a release, promotion or hotfix PR: a release branch into staging, staging into main, or a hotfix branch into either.",
       "invocation": "model",
       "path": "skills/promotion-pr-description"
