@@ -69,7 +69,22 @@ When the branch adds or renames translation keys, name them, and check every loc
 them. A reviewer who discovers a shared change you did not mention reads the rest of the document
 with less trust.
 
-## 4. Write it to a file
+## 4. Carry the repo's PR template
+
+`gh pr create --body-file` never applies the repo's pull request template, so whatever the template
+holds reaches the PR only if the body carries it. Look for the template in GitHub's places:
+`.github/pull_request_template.md`, `pull_request_template.md`, `docs/pull_request_template.md`
+(any case), or one file under a `PULL_REQUEST_TEMPLATE/` folder there when it fits this PR.
+
+- Guidance in the template (HTML comments, italic placeholder lines, "describe your change here")
+  is an instruction: follow it, then replace it with the text it asks for.
+- Every other block is fixed text: a heading with content under it, a table, a checklist, a
+  footer after a `---` rule. Copy it verbatim, in the template's order and position.
+
+A footer such as a list of review commands goes at the end of the body, exactly as the template
+has it, even when the contract doc never mentions it.
+
+## 5. Write it to a file
 
 Write the body to `changes/<date>-<branch>/pr.md` in the uncommitted drafts location from Repo
 facts: `<date>` is today as `YYYY-MM-DD`, `<branch>` the branch name with `/` written as `-`. When
@@ -95,7 +110,9 @@ gh pr edit <N> --body-file "$PR_BODY"
 
 Use only the allowed PR title types from Repo facts.
 
-## 5. Check it against the contract before handing it over
+## 6. Check it against the contract before handing it over
+
+Diff the body against the template: every fixed block from step 4 is there, word for word.
 
 Walk the contract's "Do not include" list and delete anything that crept in: a verification or
 testing section, a locales section, a recap of what a backend now sends, a commit list, a
