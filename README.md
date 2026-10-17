@@ -43,7 +43,7 @@ npx skills add Gord1y/countersign-skills
 ```
 
 It installs from the default branch, `main`, which moves only at releases. `orchestrate` still
-works this way: it carries `land-worktree` in its own `scripts/`, and falls back to
+works this way: it carries `land-worktree` and `remove-worktree` in its own `scripts/`, and falls back to
 `general-purpose` subagents when no `builder` agent is installed.
 
 **3. Countersign.** Planned for Countersign 0.3.0, not released yet. Its Skills pane will download
@@ -79,7 +79,7 @@ has, so those two rules stay out of both.
 | `codebase-research` | Picks the cheapest way to research code, with an explicit model on any spawn. | Claude Code, Codex |
 | `release-notes` | Writes release note entries, keeps an open note in step with its branch, and keeps the release index current. | Claude Code, Codex, Antigravity |
 | `feature-pr-description` | Writes the body of a feature or fix PR to the repo's description contract. | Claude Code, Codex, Antigravity |
-| `promotion-pr-description` | Writes a release or hotfix PR's body from its release note (release into staging, staging into main, a hotfix into either), plus what developers need before and after the merge. | Claude Code, Codex, Antigravity |
+| `promotion-pr-description` | Writes a release or hotfix PR's body from its release note (release into staging, staging into main, a hotfix into either), carrying the repo's PR template. | Claude Code, Codex, Antigravity |
 | `thorough-diff-review` | Runs a full local review of a diff before you push. | Claude Code, Codex, Antigravity |
 | `i18n-translate` | Translates new English message keys into the other locales, one subagent each. | Claude Code, Codex |
 | `qa-tester` | Tests a change in the running product on every surface it touched (web, API, CLI, native or mobile app, game, library), saves the evidence under `writeups/`, and reports pass or fail. Runs forked under Claude Code. | Claude Code, Codex |
@@ -142,6 +142,8 @@ and sets its own model.
   It is off until you turn it on; see [docs/statusline.md](docs/statusline.md).
 - **The gh wrapper:** `bin/gh` picks the GitHub account from the repo's remote owner, so parallel
   sessions never need `gh auth switch`; see [docs/gh.md](docs/gh.md).
+- **The worktree remover:** `bin/remove-worktree` removes landed builder worktrees instantly; see
+  [docs/install.md](docs/install.md).
 
 Make your changes in your profile, not in `~/.claude/CLAUDE.md` or `~/.claude/settings.json`.
 The installer rewrites `CLAUDE.md` on every run, a settings key the repo or your profile sets wins
