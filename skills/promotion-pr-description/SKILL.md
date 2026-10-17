@@ -136,6 +136,13 @@ WRITEUPS="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/
 PR_BODY="$WRITEUPS/releases/<version>/<promotion-staging, promotion-main or the hotfix branch>.md"
 ```
 
+`gh pr create --body-file` never applies the repo's pull request template, so the body carries it:
+copy the template's fixed blocks (a heading with content under it, a table, a footer after a `---`
+rule) verbatim and in place, as
+[`feature-pr-description`](../feature-pr-description/SKILL.md#4-carry-the-repos-pr-template)
+describes. A footer such as a list of review commands ends the body, exactly as the template has
+it.
+
 Opening or editing the PR is a separate, visible action that needs the user's go-ahead each time:
 
 ```bash
@@ -151,6 +158,7 @@ record of the release's commits on that branch: say so in the tail.
 - The body opens with the note's title and summary, not YAML; a hotfix body opens with what was
   broken.
 - Each rendered section or entry matches the note's word for word.
+- Every fixed block of the repo's pull request template is in the body, word for word.
 - The title follows the title convention, and the tail holds only what is true and still useful.
 
 ## Related
