@@ -267,15 +267,16 @@ skill's `scripts/` folder:
 cd <the main checkout's top folder>
 "${CLAUDE_SKILL_DIR}/scripts/land-worktree" <worktree>   # copies its changes here and stages them
 git commit -m "<the unit's commit message>"
-git worktree remove --force <worktree>
+remove-worktree <worktree>
 ```
 
-Run every landing and removal command from there, never from inside a worktree or a folder the
-run moves or deletes: removing the folder the shell stands in breaks every later command. If a
-removal fails, leave that worktree for Step 10 and say so; never force it twice. Inside the
-sandbox it fails on a worktree that holds a path the sandbox write-protects, such as a tracked
-`.mcp.json` or `.vscode/`, or an `.idea` folder a dependency ships into `node_modules`, and leaves
-the worktree half-removed.
+Run every landing and removal command from the main checkout's top folder. `remove-worktree` runs
+outside the sandbox, refuses a worktree whose changes are not committed here, a locked one and one
+outside `.claude/worktrees/`, and removes the rest instantly (renamed into the repo's trash,
+pruned, its `worktree-agent-*` branch deleted with `git branch -d`, the files deleted in the
+background). When it prints `kept`, leave that worktree for Step 10 and never force it. On a
+skills-only install with no `remove-worktree` on PATH, run the skill's `scripts/remove-worktree`,
+which runs inside the sandbox and can fail on write-protected paths.
 
 `land-worktree` copies nothing and exits 1 when:
 
@@ -351,12 +352,11 @@ nothing to QA; the summary says so.
 - If the repo documents a guarded cleanup command, use it (dry run first), and relay every line
   about something it kept.
 - Never unlock or remove a locked worktree: the harness holds the lock while a builder runs.
-- List each worktree whose removal failed for the user with a paste-ready
-  `git worktree remove --force <path>`, or, when it is half-removed and git no longer knows it,
-  `rm -rf <path> && git worktree prune`.
-- The harness leaves a `worktree-agent-*` branch per unit with no commits of its own. If the
-  repo's settings deny branch deletion, list them with a paste-ready `git branch -d` (it refuses
-  anything unmerged).
+- Run `remove-worktree <path>...` for each of your builders' worktrees still present, and relay
+  every `kept` line with its reason.
+- For a kept worktree give the user only `remove-worktree <path>` to run once its work is landed,
+  never `rm -rf`. Mention that `remove-worktree --landed` sweeps every landed agent worktree, from
+  any session.
 - Never push unprompted.
 
 ---

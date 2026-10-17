@@ -191,7 +191,7 @@ questions.
   - **The Bash sandbox, in auto-allow mode.** Every Bash command, in the main session and in every
     subagent, runs under macOS Seatbelt. It writes only to the working folder, the temp folders and
     the listed caches, and reaches only the listed hosts. Inside that boundary it needs no
-    approval. `gh` and `docker` run outside it and are approved as usual, but only as a command
+    approval. `gh`, `docker` and `remove-worktree` run outside it and are approved as usual, but only as a command
     of their own: a line that pipes or chains one with anything else runs sandboxed as a whole.
     There `gh` can't read its token from the keychain or verify TLS, so it looks logged out; the
     tooling rule has agents filter with `gh --jq` instead. A `git worktree *` entry was dropped:
@@ -203,7 +203,7 @@ questions.
     Edit. From the sandbox, `git worktree add` can't check out a repo that tracks `.mcp.json` or
     `.vscode/`, or remove a worktree holding one. An `.idea` folder a dependency ships into
     `node_modules` blocks both the install and the removal. Builder worktrees still work: Claude
-    Code creates them outside the sandbox. The orchestrator leaves a failed removal to you. A repo
+    Code creates them outside the sandbox. `remove-worktree` runs outside the sandbox, so the removal works. A repo
     hit by the install failure lets its exact install command out, such as
     `pnpm install --frozen-lockfile`, with an `excludedCommands` entry and a matching allow rule.
     Builders then run that command on a line of its own.
@@ -268,6 +268,26 @@ only what you approve.
 changes into the current checkout and stages them, for the orchestrator to commit. It copies
 nothing when the worktree holds commits or when one of its files changed on the branch since the
 worktree was cut. It ships inside the skill, so a skills-only install has it too.
+
+## The remove-worktree command
+
+`bin/remove-worktree <worktree>...` (or `--landed` for every worktree under `.claude/worktrees/`,
+`--dry-run` to only report) removes builder worktrees whose work is already committed. It keeps a
+worktree, and says why, when it is the main checkout or the one the shell stands in, is not listed
+by `git worktree list`, sits outside `<main checkout>/.claude/worktrees/`, is locked, has a `HEAD`
+that is not on the current branch, or has a changed or untracked file whose exact content no commit
+on the current branch ever held (a deletion counts when the file is gone or some commit deleted
+it). Work landed and then edited further on the branch is still committed, so its worktree goes.
+Ignored files such as `node_modules` never block it. Before it starts, it prunes worktrees whose
+folder is already gone.
+
+It removes by renaming the folder into `<git dir>/worktree-trash/`, running `git worktree prune`,
+deleting the `worktree-agent-*` branch with `git branch -d`, and deleting the renamed files in the
+background. The sandbox can't delete write-protected paths inside a worktree, such as an `.idea`
+folder a dependency ships into `node_modules`, and `git worktree remove` unlinks every
+`node_modules` file in the foreground, which is slow. The command runs outside the sandbox through
+`sandbox.excludedCommands`. That is safe because it only removes committed work. A skills-only
+install has the script in the orchestrate skill's `scripts/`, where it runs inside the sandbox.
 
 ## Setting up a new machine
 

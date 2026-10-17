@@ -43,7 +43,7 @@ npx skills add Gord1y/countersign-skills
 ```
 
 It installs from the default branch, `main`, which moves only at releases. `orchestrate` still
-works this way: it carries `land-worktree` in its own `scripts/`, and falls back to
+works this way: it carries `land-worktree` and `remove-worktree` in its own `scripts/`, and falls back to
 `general-purpose` subagents when no `builder` agent is installed.
 
 **3. Countersign.** Planned for Countersign 0.3.0, not released yet. Its Skills pane will download
@@ -142,6 +142,8 @@ and sets its own model.
   It is off until you turn it on; see [docs/statusline.md](docs/statusline.md).
 - **The gh wrapper:** `bin/gh` picks the GitHub account from the repo's remote owner, so parallel
   sessions never need `gh auth switch`; see [docs/gh.md](docs/gh.md).
+- **The worktree remover:** `bin/remove-worktree` removes landed builder worktrees instantly; see
+  [docs/install.md](docs/install.md).
 
 Make your changes in your profile, not in `~/.claude/CLAUDE.md` or `~/.claude/settings.json`.
 The installer rewrites `CLAUDE.md` on every run, a settings key the repo or your profile sets wins

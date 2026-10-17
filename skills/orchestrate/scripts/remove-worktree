@@ -1,0 +1,223 @@
+#!/bin/sh
+set -eu
+usage() {
+  echo "usage: remove-worktree [--dry-run] <worktree>...   removes builder worktrees whose changes are already committed here" >&2
+  echo "       remove-worktree [--dry-run] --landed        does so for every worktree under .claude/worktrees/" >&2
+  exit 2
+}
+dry=0
+landed=0
+named=0
+targets=$(mktemp "${TMPDIR:-/tmp}/remove-worktree.XXXXXX")
+registry=$(mktemp "${TMPDIR:-/tmp}/remove-worktree.XXXXXX")
+changes=$(mktemp "${TMPDIR:-/tmp}/remove-worktree.XXXXXX")
+trap 'rm -f "$targets" "$registry" "$changes"' EXIT
+for arg in "$@"; do
+  case $arg in
+    --dry-run) dry=1 ;;
+    --landed) landed=1 ;;
+    -*) usage ;;
+    *)
+      named=$((named + 1))
+      printf '%s\n' "$arg" >>"$targets"
+      ;;
+  esac
+done
+if [ "$landed" -eq 1 ] && [ "$named" -gt 0 ]; then
+  usage
+fi
+if [ "$landed" -eq 0 ] && [ "$named" -eq 0 ]; then
+  usage
+fi
+GIT_LITERAL_PATHSPECS=1
+export GIT_LITERAL_PATHSPECS
+tab=$(printf '\t')
+if ! common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null); then
+  echo "remove-worktree: run it from inside the repository" >&2
+  exit 2
+fi
+common=$(cd "$common" && pwd -P)
+main=$(dirname "$common")
+here=$(pwd -P)
+trash="$common/worktree-trash"
+mainhead=$(git -C "$main" rev-parse HEAD)
+if [ "$dry" -eq 0 ]; then
+  git -C "$main" worktree prune
+fi
+
+git -C "$main" worktree list --porcelain | {
+  path=
+  locked=0
+  branch=
+  while IFS= read -r line; do
+    case $line in
+      "worktree "*) path=${line#worktree } ;;
+      "branch "*) branch=${line#branch refs/heads/} ;;
+      locked*) locked=1 ;;
+      "")
+        if [ -n "$path" ]; then
+          if real=$(cd "$path" 2>/dev/null && pwd -P); then
+            path=$real
+          fi
+          printf '%s\t%s\t%s\n' "$path" "$locked" "$branch"
+        fi
+        path=
+        locked=0
+        branch=
+        ;;
+    esac
+  done
+} >"$registry"
+
+find_record() {
+  while IFS="$tab" read -r listed_path listed_locked listed_branch; do
+    if [ "$listed_path" = "$1" ]; then
+      record_locked=$listed_locked
+      record_branch=$listed_branch
+      return 0
+    fi
+  done <"$registry"
+  return 1
+}
+
+landed_path() {
+  worktree=$1
+  path=$2
+  if [ -L "$worktree/$path" ]; then
+    return 1
+  fi
+  if [ -e "$worktree/$path" ]; then
+    [ -f "$worktree/$path" ] || return 1
+    mine=$(git -C "$worktree" hash-object -- "$path")
+    theirs=$(git -C "$main" rev-parse -q --verify "HEAD:$path" 2>/dev/null) || theirs=
+    if [ "$mine" = "$theirs" ]; then
+      mode=$(git -C "$main" ls-tree HEAD -- "$path" | cut -c1-6)
+      if [ -x "$worktree/$path" ]; then
+        [ "$mode" = 100755 ]
+      else
+        [ "$mode" = 100644 ]
+      fi
+      return
+    fi
+    [ -n "$(git -C "$main" log -1 --format=%H --find-object="$mine" "$mainhead" -- "$path")" ]
+  else
+    if ! git -C "$main" rev-parse -q --verify "HEAD:$path" >/dev/null 2>&1; then
+      return 0
+    fi
+    [ -n "$(git -C "$main" log -1 --format=%H --diff-filter=D "$mainhead" -- "$path")" ]
+  fi
+}
+
+verdict=
+judge() {
+  worktree=$1
+  verdict=
+  if [ "$worktree" = "$main" ]; then
+    verdict="the main checkout is never removed"
+    return 1
+  fi
+  case $here in
+    "$worktree" | "$worktree"/*)
+      verdict="the shell stands in it; run remove-worktree from the main checkout"
+      return 1
+      ;;
+  esac
+  if ! find_record "$worktree"; then
+    verdict="not a worktree of this repository"
+    return 1
+  fi
+  case $worktree in
+    "$main/.claude/worktrees/"*) ;;
+    *)
+      verdict="outside $main/.claude/worktrees/"
+      return 1
+      ;;
+  esac
+  if [ "$record_locked" = 1 ]; then
+    verdict="locked, a builder may still be running"
+    return 1
+  fi
+  head=$(git -C "$worktree" rev-parse HEAD)
+  if ! git -C "$main" merge-base --is-ancestor "$head" "$mainhead" 2>/dev/null; then
+    verdict="its HEAD $head is not on the current branch of $main"
+    return 1
+  fi
+  {
+    git -C "$worktree" -c core.quotePath=false diff --name-only --no-renames HEAD
+    git -C "$worktree" -c core.quotePath=false ls-files --others --exclude-standard
+  } | sort -u >"$changes"
+  if grep -q '^"' "$changes"; then
+    verdict="a path needs quoting, check it by hand"
+    return 1
+  fi
+  while IFS= read -r path; do
+    if ! landed_path "$worktree" "$path"; then
+      verdict="not committed on the current branch: $path"
+      return 1
+    fi
+  done <"$changes"
+  return 0
+}
+
+sequence=0
+remove_one() {
+  worktree=$1
+  sequence=$((sequence + 1))
+  branch=$record_branch
+  entry="$trash/$(basename "$worktree")-$$-$sequence"
+  mkdir -p "$trash"
+  if ! mv "$worktree" "$entry"; then
+    echo "kept $worktree: could not move it into $trash"
+    return 1
+  fi
+  git -C "$main" worktree prune
+  case $branch in
+    worktree-agent-*)
+      if ! git -C "$main" branch -d "$branch" >/dev/null 2>&1; then
+        echo "kept branch $branch: not merged"
+      fi
+      ;;
+  esac
+  echo "removed $worktree"
+  nohup rm -rf -- "${entry:?}" >/dev/null 2>&1 </dev/null &
+}
+
+if [ "$dry" -eq 0 ] && [ -d "$trash" ]; then
+  for leftover in "$trash"/*; do
+    if [ -e "$leftover" ] || [ -L "$leftover" ]; then
+      nohup rm -rf -- "${leftover:?}" >/dev/null 2>&1 </dev/null &
+    fi
+  done
+fi
+
+if [ "$landed" -eq 1 ]; then
+  : >"$targets"
+  while IFS="$tab" read -r listed_path listed_locked listed_branch; do
+    case $listed_path in
+      "$main/.claude/worktrees/"*) printf '%s\n' "$listed_path" >>"$targets" ;;
+    esac
+  done <"$registry"
+fi
+
+status=0
+while IFS= read -r target; do
+  if ! worktree=$(cd "$target" 2>/dev/null && pwd -P); then
+    echo "kept $target: not a directory"
+    status=1
+    continue
+  fi
+  if judge "$worktree"; then
+    if [ "$dry" -eq 1 ]; then
+      echo "would remove $worktree"
+    elif ! remove_one "$worktree"; then
+      status=1
+    fi
+  else
+    echo "kept $worktree: $verdict"
+    status=1
+  fi
+done <"$targets"
+if [ "$landed" -eq 1 ]; then
+  status=0
+fi
+exit "$status"
