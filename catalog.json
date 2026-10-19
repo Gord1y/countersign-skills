@@ -63,14 +63,14 @@
     },
     {
       "name": "release-notes",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "agents": [
         "claude",
         "codex",
         "antigravity"
       ],
       "description": "Write or update a release note: entry format, required sections, the Fixed rule, and regenerating the release index.",
-      "whenToUse": "Use when asked to write or update a release note or changelog entry, and before reporting work on a release branch as done, so its open note covers every commit.",
+      "whenToUse": "Use when asked to write or update a release note or changelog entry, or when preparing a release branch for production. Never during feature or fix work, even on a branch cut from a release branch.",
       "invocation": "model",
       "path": "skills/release-notes"
     },

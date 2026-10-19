@@ -1,7 +1,7 @@
 ---
 name: release-notes
 description: "Write or update a release note: entry format, required sections, the Fixed rule, and regenerating the release index."
-when_to_use: "Use when asked to write or update a release note or changelog entry, and before reporting work on a release branch as done, so its open note covers every commit."
+when_to_use: "Use when asked to write or update a release note or changelog entry, or when preparing a release branch for production. Never during feature or fix work, even on a branch cut from a release branch."
 effort: medium
 ---
 
@@ -43,15 +43,17 @@ the validator disagree, the validator wins.
 3. Run the index command, then commit **both** the note and the index.
 4. The index check must pass.
 
-## An open note keeps up with its branch
+## When a note is written
 
-Nothing fails when an open note falls behind, and a later reader cannot tell a deliberate omission
-from a forgotten one. So **a commit that changes behaviour, tooling, configuration or a shipped
-document updates the note, in the same commit or the next one.** Reconstructing entries from a
-diff later is how invented ones get in.
+**A note is written on the release branch while the release is prepared for production, or when the
+user asks for one.** Feature and fix work never touches the note or its index, even on a branch cut
+from a release branch, and never reports a missing note as unfinished work. The user decides when a
+release is assembled.
 
-**Before reporting work on a release branch as done,** list every commit the branch holds that its
-target lacks, and give each one an entry or a reason it has none. Check the list, don't recall it:
+**While preparing the release,** list every commit the release branch holds that its target lacks,
+and give each one an entry or a reason it has none. Write each entry from that commit's own message
+and diff: an entry reconstructed from the combined diff is how invented ones get in. Check the
+list, don't recall it:
 
 ```bash
 git fetch origin
