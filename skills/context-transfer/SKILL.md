@@ -1,7 +1,7 @@
 ---
 name: context-transfer
 description: "Package this conversation into one self-contained block for a new chat: goal, decisions with reasons, verified progress, next steps."
-when_to_use: "Use for a handoff, a context transfer, or a next-session prompt."
+when_to_use: "Use for a handoff, a context transfer, or a next-session prompt, and when a Countersign context note asks for a handoff or tells the session to stop."
 ---
 
 # Context Transfer
@@ -39,6 +39,17 @@ Earlier handoffs failed in the same few ways, and every rule below exists to pre
   conversation. When the user says the next chat is not Claude Code in the same repo (claude.ai,
   another tool, another machine), nothing loads there on its own: include the project and user
   rules the work depends on.
+
+---
+
+## When Countersign asks for the handoff
+
+A message that opens "Context note from Countersign, the user's approval app" and asks for a
+handoff, or tells the session to stop, is served by this skill. Finish the step in hand, start
+nothing new, and save the block to the `~/.claude/plans/` path above, even when the note names a
+file such as `notes/handoff.md`: a handoff never goes inside a repo. Leave worktrees, branches,
+uncommitted work and run folders as they are, and record where each stands under Working state, so
+the next session picks them up instead of rebuilding them.
 
 ---
 

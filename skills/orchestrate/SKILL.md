@@ -108,6 +108,21 @@ Resuming an approved plan or a handoff needs no re-approval. Splitting new work 
   `~/.claude/plans/<repo>-<programme>/index.md`, lists them, and each phase is one PR with its own
   run folder (`references/run-folder.md`).
 
+### When a Countersign context note arrives
+
+A message that opens "Context note from Countersign, the user's approval app" gives this session's
+context size and what the user chose for it.
+
+- **Compact after this step:** finish the unit in hand, bring the run folder up to date (unit
+  statuses, landed SHAs, open questions), then list what the summary must keep. The run folder is
+  what survives the compaction.
+- **Hand off, or the stop:** brief nothing new and spawn nothing. Let builders already running hand
+  back, land what is ready, and leave the rest in its worktree. Never remove, reset or force a
+  worktree, branch or uncommitted change for the handoff: the next session picks them up. Record
+  each unit's status, worktree path and branch in the run folder, then hand off through
+  `context-transfer`.
+- **Any other context note** is answered at the next unit boundary and never stops a builder.
+
 No decider subagent: a subagent can't hold a dialogue with the user, so every question would pass
 back through you, and the research would be paid twice.
 
@@ -260,21 +275,22 @@ open only the files a finding names. Where no `reviewer` agent is installed, spa
 
 ## Step 8: land, commit, then gate once
 
-Per unit, from the top of the main checkout on the working branch, with `land-worktree` from this
-skill's `scripts/` folder:
+Per unit, from the top of the checkout that has the working branch out (the main checkout, or the
+worktree this session works in), with `land-worktree` from this skill's `scripts/` folder:
 
 ```bash
-cd <the main checkout's top folder>
+cd <the working branch checkout's top folder>
 "${CLAUDE_SKILL_DIR}/scripts/land-worktree" <worktree>   # copies its changes here and stages them
 git commit -m "<the unit's commit message>"
 remove-worktree <worktree>
 ```
 
-Run every landing and removal command from the main checkout's top folder. `remove-worktree` runs
-outside the sandbox, refuses a worktree whose changes are not committed here, a locked one and one
-outside `.claude/worktrees/`, and removes the rest instantly (renamed into the repo's trash,
-pruned, its `worktree-agent-*` branch deleted with `git branch -d`, the files deleted in the
-background). When it prints `kept`, leave that worktree for Step 10 and never force it. On a
+Run every landing from that checkout. `land-worktree` records what it landed, so a commit hook
+that reformats the files does not keep the worktree alive. `remove-worktree` runs outside the
+sandbox, refuses a worktree whose changes no checkout of the repo has committed, a locked one and
+one outside `.claude/worktrees/`, and removes the rest instantly (renamed into the repo's trash,
+pruned, its `worktree-agent-*` branch deleted, the files deleted in the background). When it
+prints `kept`, leave that worktree for Step 10 and never force it. On a
 skills-only install with no `remove-worktree` on PATH, run the skill's `scripts/remove-worktree`,
 which runs inside the sandbox and can fail on write-protected paths.
 
@@ -355,8 +371,8 @@ nothing to QA; the summary says so.
 - Run `remove-worktree <path>...` for each of your builders' worktrees still present, and relay
   every `kept` line with its reason.
 - For a kept worktree give the user only `remove-worktree <path>` to run once its work is landed,
-  never `rm -rf`. Mention that `remove-worktree --landed` sweeps every landed agent worktree, from
-  any session.
+  never `rm -rf`. Mention that `remove-worktree --landed` sweeps every landed builder worktree,
+  from any session, and that the install's `SessionEnd` hook runs that sweep when a session ends.
 - Never push unprompted.
 
 ---

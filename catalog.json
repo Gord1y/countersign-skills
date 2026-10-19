@@ -3,7 +3,7 @@
   "skills": [
     {
       "name": "orchestrate",
-      "version": "1.2.0",
+      "version": "1.3.0",
       "agents": [
         "claude"
       ],
@@ -14,14 +14,14 @@
     },
     {
       "name": "context-transfer",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "agents": [
         "claude",
         "codex",
         "antigravity"
       ],
       "description": "Package this conversation into one self-contained block for a new chat: goal, decisions with reasons, verified progress, next steps.",
-      "whenToUse": "Use for a handoff, a context transfer, or a next-session prompt.",
+      "whenToUse": "Use for a handoff, a context transfer, or a next-session prompt, and when a Countersign context note asks for a handoff or tells the session to stop.",
       "invocation": "model",
       "path": "skills/context-transfer"
     },
@@ -63,14 +63,14 @@
     },
     {
       "name": "release-notes",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "agents": [
         "claude",
         "codex",
         "antigravity"
       ],
       "description": "Write or update a release note: entry format, required sections, the Fixed rule, and regenerating the release index.",
-      "whenToUse": "Use when asked to write or update a release note or changelog entry, and before reporting work on a release branch as done, so its open note covers every commit.",
+      "whenToUse": "Use when asked to write or update a release note or changelog entry, or when preparing a release branch for production. Never during feature or fix work, even on a branch cut from a release branch.",
       "invocation": "model",
       "path": "skills/release-notes"
     },
