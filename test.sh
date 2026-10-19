@@ -58,13 +58,30 @@ grep -q "@$root/rules/code.md" "$home/.claude/CLAUDE.md" || fail "CLAUDE.md was 
 settings_json="$home/.claude/settings.json"
 jq -e '.hooks.Stop == [] and .theme == "light" and .worktree.baseRef == "head" and .sandbox.enabled == true and (.permissions.allow | index("Read(//kept)") != null) and (.permissions.allow | index("mcp__context7") != null) and (.permissions.ask | index("Bash(kept-ask *)") != null) and (.permissions.ask == ["Bash(kept-ask *)"]) and (.permissions.deny | index("Read(~/.ssh/**)") != null) and (.sandbox.filesystem.denyRead | index("~/.ssh") != null)' "$settings_json" >/dev/null || fail "settings.json was not merged from settings/claude.json"
 jq -e '(.permissions.deny | index("Read(**/.env)") != null) and ([.permissions.deny[] | select(test("^Read\\((\\*\\*/)?\\.env(\\.\\*)?\\)$"))] == ["Read(**/.env)"]) and ([.sandbox.filesystem.allowRead[]? | select(contains(".env"))] == [])' "$settings_json" >/dev/null || fail "settings.json must deny .env at any depth by name, never .env.* (it hides .env.example) or root-only rules, and needs no .env allowRead"
-jq -e '(.hooks.SessionEnd | length) == 2 and (.hooks.SessionEnd | map(.hooks[0].command) | index("mine") != null)' "$settings_json" >/dev/null || fail "settings.json replaced the SessionEnd hook the user had instead of joining it"
+jq -e '(.hooks.SessionEnd | length) == 3 and (.hooks.SessionEnd | map(.hooks[0].command) | index("mine") != null)' "$settings_json" >/dev/null || fail "settings.json replaced the SessionEnd hook the user had instead of joining it"
 proj="$home/proj"
 mkdir -p "$proj/.claude/.cc-writes" "$proj/a/.claude/.cc-writes" "$proj/b/.claude/.cc-writes" "$proj/c/.claude/.cc-writes" "$proj/node_modules/x/.claude/.cc-writes"
 touch "$proj/b/.claude/settings.json" "$proj/c/.claude/.cc-writes/kept"
 CLAUDE_PROJECT_DIR=$proj sh -c "$(jq -r '.hooks.SessionEnd[0].hooks[0].command' "$root/claude/settings.json")"
 [ -d "$proj/.claude/.cc-writes" ] && [ -d "$proj/node_modules/x/.claude/.cc-writes" ] && [ -f "$proj/c/.claude/.cc-writes/kept" ] || fail "the SessionEnd hook removed the project's own .cc-writes, one under node_modules, or one that holds a file"
 [ ! -e "$proj/a/.claude" ] && [ ! -e "$proj/b/.claude/.cc-writes" ] && [ -f "$proj/b/.claude/settings.json" ] || fail "the SessionEnd hook did not remove an empty nested .cc-writes and the .claude it left empty, or removed a .claude that holds a file"
+sweep="$home/sweep"
+(
+  export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=Test GIT_AUTHOR_EMAIL=test@example.com GIT_COMMITTER_NAME=Test GIT_COMMITTER_EMAIL=test@example.com
+  git init -q -b main "$sweep"
+  printf 'one\n' >"$sweep/a.txt"
+  git -C "$sweep" add -A
+  git -C "$sweep" commit -q -m "chore: seed"
+  git -C "$sweep" worktree add -q -b worktree-agent-done "$sweep/.claude/worktrees/agent-done" HEAD
+  git -C "$sweep" worktree add -q -b worktree-agent-open "$sweep/.claude/worktrees/agent-open" HEAD
+  printf 'two\n' >"$sweep/.claude/worktrees/agent-done/a.txt"
+  printf 'three\n' >"$sweep/.claude/worktrees/agent-open/a.txt"
+  printf 'two\n' >"$sweep/a.txt"
+  git -C "$sweep" commit -q -am "feat: a to two"
+  HOME=$home CLAUDE_PROJECT_DIR=$sweep sh -c "$(jq -r '.hooks.SessionEnd[1].hooks[0].command' "$root/claude/settings.json")"
+)
+[ ! -e "$sweep/.claude/worktrees/agent-done" ] && [ -d "$sweep/.claude/worktrees/agent-open" ] || fail "the SessionEnd sweep did not remove the landed builder worktree, or removed the unlanded one"
+CLAUDE_PROJECT_DIR=$home HOME=$home sh -c "$(jq -r '.hooks.SessionEnd[1].hooks[0].command' "$root/claude/settings.json")" || fail "the SessionEnd sweep failed outside a git repository"
 jq -e --slurpfile shipped "$root/claude/settings.json" '($shipped[0].sandbox.filesystem.allowWrite | length) > 0 and ($shipped[0].sandbox.filesystem.allowWrite - .sandbox.filesystem.allowWrite) == []' "$settings_json" >/dev/null || fail "settings.json lost a sandbox.filesystem.allowWrite path that claude/settings.json lists"
 jq -e '.skillListingBudgetFraction >= 0.02' "$settings_json" >/dev/null || fail "settings.json must raise skillListingBudgetFraction to 0.02, or a 200K window drops skill descriptions"
 ls "$home"/.config/countersign/skills/backups/*/claude-settings/settings.json >/dev/null 2>&1 || fail "the existing settings.json was not backed up"

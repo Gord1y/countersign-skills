@@ -260,21 +260,22 @@ open only the files a finding names. Where no `reviewer` agent is installed, spa
 
 ## Step 8: land, commit, then gate once
 
-Per unit, from the top of the main checkout on the working branch, with `land-worktree` from this
-skill's `scripts/` folder:
+Per unit, from the top of the checkout that has the working branch out (the main checkout, or the
+worktree this session works in), with `land-worktree` from this skill's `scripts/` folder:
 
 ```bash
-cd <the main checkout's top folder>
+cd <the working branch checkout's top folder>
 "${CLAUDE_SKILL_DIR}/scripts/land-worktree" <worktree>   # copies its changes here and stages them
 git commit -m "<the unit's commit message>"
 remove-worktree <worktree>
 ```
 
-Run every landing and removal command from the main checkout's top folder. `remove-worktree` runs
-outside the sandbox, refuses a worktree whose changes are not committed here, a locked one and one
-outside `.claude/worktrees/`, and removes the rest instantly (renamed into the repo's trash,
-pruned, its `worktree-agent-*` branch deleted with `git branch -d`, the files deleted in the
-background). When it prints `kept`, leave that worktree for Step 10 and never force it. On a
+Run every landing from that checkout. `land-worktree` records what it landed, so a commit hook
+that reformats the files does not keep the worktree alive. `remove-worktree` runs outside the
+sandbox, refuses a worktree whose changes no checkout of the repo has committed, a locked one and
+one outside `.claude/worktrees/`, and removes the rest instantly (renamed into the repo's trash,
+pruned, its `worktree-agent-*` branch deleted, the files deleted in the background). When it
+prints `kept`, leave that worktree for Step 10 and never force it. On a
 skills-only install with no `remove-worktree` on PATH, run the skill's `scripts/remove-worktree`,
 which runs inside the sandbox and can fail on write-protected paths.
 
@@ -355,8 +356,8 @@ nothing to QA; the summary says so.
 - Run `remove-worktree <path>...` for each of your builders' worktrees still present, and relay
   every `kept` line with its reason.
 - For a kept worktree give the user only `remove-worktree <path>` to run once its work is landed,
-  never `rm -rf`. Mention that `remove-worktree --landed` sweeps every landed agent worktree, from
-  any session.
+  never `rm -rf`. Mention that `remove-worktree --landed` sweeps every landed builder worktree,
+  from any session, and that the install's `SessionEnd` hook runs that sweep when a session ends.
 - Never push unprompted.
 
 ---
