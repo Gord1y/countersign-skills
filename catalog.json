@@ -14,14 +14,14 @@
     },
     {
       "name": "context-transfer",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "agents": [
         "claude",
         "codex",
         "antigravity"
       ],
       "description": "Package this conversation into one self-contained block for a new chat: goal, decisions with reasons, verified progress, next steps.",
-      "whenToUse": "Use for a handoff, a context transfer, or a next-session prompt.",
+      "whenToUse": "Use for a handoff, a context transfer, or a next-session prompt, and when a Countersign context note asks for a handoff or tells the session to stop.",
       "invocation": "model",
       "path": "skills/context-transfer"
     },

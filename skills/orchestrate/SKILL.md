@@ -108,6 +108,21 @@ Resuming an approved plan or a handoff needs no re-approval. Splitting new work 
   `~/.claude/plans/<repo>-<programme>/index.md`, lists them, and each phase is one PR with its own
   run folder (`references/run-folder.md`).
 
+### When a Countersign context note arrives
+
+A message that opens "Context note from Countersign, the user's approval app" gives this session's
+context size and what the user chose for it.
+
+- **Compact after this step:** finish the unit in hand, bring the run folder up to date (unit
+  statuses, landed SHAs, open questions), then list what the summary must keep. The run folder is
+  what survives the compaction.
+- **Hand off, or the stop:** brief nothing new and spawn nothing. Let builders already running hand
+  back, land what is ready, and leave the rest in its worktree. Never remove, reset or force a
+  worktree, branch or uncommitted change for the handoff: the next session picks them up. Record
+  each unit's status, worktree path and branch in the run folder, then hand off through
+  `context-transfer`.
+- **Any other context note** is answered at the next unit boundary and never stops a builder.
+
 No decider subagent: a subagent can't hold a dialogue with the user, so every question would pass
 back through you, and the research would be paid twice.
 
