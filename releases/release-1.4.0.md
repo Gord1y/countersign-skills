@@ -1,14 +1,14 @@
 ---
 version: 1.4.0
 date: 2026-10-19
-title: "countersign-skills 1.4.0: builder worktrees cleaned up for real"
-summary: "Finished builder worktrees now go away: remove-worktree recognises work landed on any checkout of the repo, and work a commit hook reformatted, and a session-end hook sweeps landed worktrees automatically. Release notes are written only while a release is prepared, never during feature work."
+title: "countersign-skills 1.4.0: worktrees cleaned up, handoffs on Countersign's cue"
+summary: "Finished builder worktrees now go away: remove-worktree recognises work landed on any checkout of the repo, and work a commit hook reformatted, and a session-end hook sweeps landed worktrees automatically. Countersign's context notes hand off through context-transfer, and release notes wait for release preparation."
 type: minor
 breaking: false
 highlights:
   - "Landed builder worktrees are removed when a session ends"
   - "Work landed on a feature branch or reformatted on commit counts as landed"
-  - "Release notes wait for release preparation"
+  - "Countersign context notes hand off through context-transfer"
 tags:
   - claude-code
   - skills
@@ -25,6 +25,10 @@ testedWith:
 
 ## Changed
 
+- `context-transfer` 1.1.0 and `orchestrate` 1.3.0 act on Countersign's context notes. A request
+  to hand off or to stop finishes the step in hand, starts nothing new, keeps worktrees, branches and
+  uncommitted work as they are, and saves the handoff to `~/.claude/plans/`, never inside the repo.
+  An orchestrator brings its run folder up to date before a compaction or a handoff.
 - `orchestrate` 1.3.0: `land-worktree` records what it landed, and units land from whichever
   checkout has the working branch out, the main checkout or the worktree the session works in.
 - `release-notes` 1.2.0 triggers only on a request or while a release branch is prepared for
