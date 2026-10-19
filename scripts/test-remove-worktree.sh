@@ -3,6 +3,7 @@ set -eu
 
 root=$(cd "$(dirname "$0")/.." && pwd)
 remove="$root/skills/orchestrate/scripts/remove-worktree"
+land="$root/skills/orchestrate/scripts/land-worktree"
 work=$(mktemp -d "${TMPDIR:-/tmp}/test-remove-worktree.XXXXXX")
 trap 'rm -rf "$work"' EXIT
 failures=0
@@ -147,6 +148,59 @@ elif ! grep -qx "removed $(wt sweepgood)" "$work/out" || [ -e "$(wt sweepgood)" 
   fail "--landed did not remove the landed worktree: $(cat "$work/out")"
 elif ! grep -q "^kept $(wt sweepbad): " "$work/out" || [ ! -d "$(wt sweepbad)" ]; then
   fail "--landed did not keep the unlanded worktree: $(cat "$work/out")"
+fi
+
+cut hooked
+printf 'eight\n' >"$(wt hooked)/a.txt"
+(cd "$repo" && "$land" "$(wt hooked)") >/dev/null
+printf 'EIGHT\n' >"$repo/a.txt"
+git -C "$repo" commit -q -am "feat: a to eight, rewritten by a commit hook"
+run "$(wt hooked)"
+if [ "$status" -ne 0 ] || [ -e "$(wt hooked)" ]; then
+  fail "a landed worktree whose file a commit hook rewrote was not removed: $status $(cat "$work/out")"
+fi
+
+cut touched
+printf 'nine\n' >"$(wt touched)/b.txt"
+(cd "$repo" && "$land" "$(wt touched)") >/dev/null
+printf 'NINE\n' >"$repo/b.txt"
+git -C "$repo" commit -q -am "feat: b to nine"
+printf 'nine, changed after landing\n' >"$(wt touched)/b.txt"
+run "$(wt touched)"
+if [ "$status" -ne 1 ] || [ "$(cat "$(wt touched)/b.txt")" != "nine, changed after landing" ]; then
+  fail "a worktree changed after its landing was not kept: $status $(cat "$work/out")"
+fi
+
+cut uncommitted
+printf 'ten\n' >"$(wt uncommitted)/a.txt"
+(cd "$repo" && "$land" "$(wt uncommitted)") >/dev/null
+printf 'TEN\n' >"$repo/a.txt"
+run "$(wt uncommitted)"
+if [ "$status" -ne 1 ] || [ ! -d "$(wt uncommitted)" ]; then
+  fail "a landed worktree whose landing is not committed was not kept: $status $(cat "$work/out")"
+fi
+git -C "$repo" checkout -q -- a.txt
+git -C "$repo" reset -q
+
+git -C "$repo" worktree add -q -b feature "$work/feature" HEAD
+git -C "$repo" worktree add -q -b worktree-agent-onfeature "$(wt onfeature)" feature
+printf 'feature\n' >"$work/feature/feature.txt"
+git -C "$work/feature" add feature.txt
+git -C "$work/feature" commit -q -m "feat: feature file"
+printf 'eleven\n' >"$(wt onfeature)/b.txt"
+printf 'eleven\n' >"$work/feature/b.txt"
+git -C "$work/feature" commit -q -am "feat: b to eleven"
+run "$(wt onfeature)"
+if [ "$status" -ne 0 ] || [ -e "$(wt onfeature)" ]; then
+  fail "a worktree landed in a linked checkout was not removed from the main one: $status $(cat "$work/out")"
+elif has_branch onfeature; then
+  fail "the branch of a worktree landed in a linked checkout is still there"
+fi
+
+git -C "$repo" worktree add -q --detach "$repo/.claude/worktrees/perf" HEAD
+run --landed
+if [ ! -d "$repo/.claude/worktrees/perf" ]; then
+  fail "--landed removed a worktree that is not a builder's: $(cat "$work/out")"
 fi
 
 run

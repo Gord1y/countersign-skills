@@ -1,8 +1,8 @@
 #!/bin/sh
 set -eu
 usage() {
-  echo "usage: remove-worktree [--dry-run] <worktree>...   removes builder worktrees whose changes are already committed here" >&2
-  echo "       remove-worktree [--dry-run] --landed        does so for every worktree under .claude/worktrees/" >&2
+  echo "usage: remove-worktree [--dry-run] <worktree>...   removes builder worktrees whose changes are already committed in a checkout of this repository" >&2
+  echo "       remove-worktree [--dry-run] --landed        does so for every builder worktree under .claude/worktrees/agent-*" >&2
   exit 2
 }
 dry=0
@@ -11,7 +11,8 @@ named=0
 targets=$(mktemp "${TMPDIR:-/tmp}/remove-worktree.XXXXXX")
 registry=$(mktemp "${TMPDIR:-/tmp}/remove-worktree.XXXXXX")
 changes=$(mktemp "${TMPDIR:-/tmp}/remove-worktree.XXXXXX")
-trap 'rm -f "$targets" "$registry" "$changes"' EXIT
+references=$(mktemp "${TMPDIR:-/tmp}/remove-worktree.XXXXXX")
+trap 'rm -f "$targets" "$registry" "$changes" "$references"' EXIT
 for arg in "$@"; do
   case $arg in
     --dry-run) dry=1 ;;
@@ -40,7 +41,7 @@ common=$(cd "$common" && pwd -P)
 main=$(dirname "$common")
 here=$(pwd -P)
 trash="$common/worktree-trash"
-mainhead=$(git -C "$main" rev-parse HEAD)
+builders="$main/.claude/worktrees/agent-"
 if [ "$dry" -eq 0 ]; then
   git -C "$main" worktree prune
 fi
@@ -69,6 +70,17 @@ git -C "$main" worktree list --porcelain | {
   done
 } >"$registry"
 
+while IFS="$tab" read -r listed_path listed_locked listed_branch; do
+  case $listed_path in
+    "$builders"*) ;;
+    *)
+      if listed_head=$(git -C "$listed_path" rev-parse -q --verify HEAD 2>/dev/null); then
+        printf '%s\t%s\n' "$listed_path" "$listed_head" >>"$references"
+      fi
+      ;;
+  esac
+done <"$registry"
+
 find_record() {
   while IFS="$tab" read -r listed_path listed_locked listed_branch; do
     if [ "$listed_path" = "$1" ]; then
@@ -80,18 +92,25 @@ find_record() {
   return 1
 }
 
+recorded_landing() {
+  record="$(git -C "$worktree" rev-parse --absolute-git-dir)/countersign-landed"
+  [ -f "$record" ] || return 1
+  grep -Fxq "$mine$tab$path" "$record" || return 1
+  [ -z "$(git -C "$reference" status --porcelain -- "$path")" ] || return 1
+  [ -n "$(git -C "$reference" log -1 --format=%H "$head..$referencehead" -- "$path")" ]
+}
+
 landed_path() {
-  worktree=$1
-  path=$2
+  path=$1
   if [ -L "$worktree/$path" ]; then
     return 1
   fi
   if [ -e "$worktree/$path" ]; then
     [ -f "$worktree/$path" ] || return 1
     mine=$(git -C "$worktree" hash-object -- "$path")
-    theirs=$(git -C "$main" rev-parse -q --verify "HEAD:$path" 2>/dev/null) || theirs=
+    theirs=$(git -C "$reference" rev-parse -q --verify "$referencehead:$path" 2>/dev/null) || theirs=
     if [ "$mine" = "$theirs" ]; then
-      mode=$(git -C "$main" ls-tree HEAD -- "$path" | cut -c1-6)
+      mode=$(git -C "$reference" ls-tree "$referencehead" -- "$path" | cut -c1-6)
       if [ -x "$worktree/$path" ]; then
         [ "$mode" = 100755 ]
       else
@@ -99,16 +118,29 @@ landed_path() {
       fi
       return
     fi
-    [ -n "$(git -C "$main" log -1 --format=%H --find-object="$mine" "$mainhead" -- "$path")" ]
-  else
-    if ! git -C "$main" rev-parse -q --verify "HEAD:$path" >/dev/null 2>&1; then
+    if [ -n "$(git -C "$reference" log -1 --format=%H --find-object="$mine" "$referencehead" -- "$path")" ]; then
       return 0
     fi
-    [ -n "$(git -C "$main" log -1 --format=%H --diff-filter=D "$mainhead" -- "$path")" ]
+    recorded_landing
+  else
+    if ! git -C "$reference" rev-parse -q --verify "$referencehead:$path" >/dev/null 2>&1; then
+      return 0
+    fi
+    [ -n "$(git -C "$reference" log -1 --format=%H --diff-filter=D "$referencehead" -- "$path")" ]
   fi
 }
 
+landed_in() {
+  while IFS= read -r path; do
+    if ! landed_path "$path"; then
+      miss="not committed in $reference: $path"
+      return 1
+    fi
+  done <"$changes"
+}
+
 verdict=
+judged=
 judge() {
   worktree=$1
   verdict=
@@ -138,10 +170,6 @@ judge() {
     return 1
   fi
   head=$(git -C "$worktree" rev-parse HEAD)
-  if ! git -C "$main" merge-base --is-ancestor "$head" "$mainhead" 2>/dev/null; then
-    verdict="its HEAD $head is not on the current branch of $main"
-    return 1
-  fi
   {
     git -C "$worktree" -c core.quotePath=false diff --name-only --no-renames HEAD
     git -C "$worktree" -c core.quotePath=false ls-files --others --exclude-standard
@@ -150,13 +178,27 @@ judge() {
     verdict="a path needs quoting, check it by hand"
     return 1
   fi
-  while IFS= read -r path; do
-    if ! landed_path "$worktree" "$path"; then
-      verdict="not committed on the current branch: $path"
-      return 1
+  verdict="its HEAD $head is on no checkout's branch"
+  first_miss=
+  while IFS="$tab" read -r reference referencehead; do
+    if [ "$reference" = "$worktree" ]; then
+      continue
     fi
-  done <"$changes"
-  return 0
+    if ! git -C "$main" merge-base --is-ancestor "$head" "$referencehead" 2>/dev/null; then
+      continue
+    fi
+    if landed_in; then
+      judged=$referencehead
+      return 0
+    fi
+    if [ -z "$first_miss" ]; then
+      first_miss=$miss
+    fi
+  done <"$references"
+  if [ -n "$first_miss" ]; then
+    verdict=$first_miss
+  fi
+  return 1
 }
 
 sequence=0
@@ -173,7 +215,9 @@ remove_one() {
   git -C "$main" worktree prune
   case $branch in
     worktree-agent-*)
-      if ! git -C "$main" branch -d "$branch" >/dev/null 2>&1; then
+      if ! tip=$(git -C "$main" rev-parse -q --verify "refs/heads/$branch"); then
+        :
+      elif ! git -C "$main" merge-base --is-ancestor "$tip" "$judged" || ! git -C "$main" branch -D "$branch" >/dev/null 2>&1; then
         echo "kept branch $branch: not merged"
       fi
       ;;
@@ -194,7 +238,7 @@ if [ "$landed" -eq 1 ]; then
   : >"$targets"
   while IFS="$tab" read -r listed_path listed_locked listed_branch; do
     case $listed_path in
-      "$main/.claude/worktrees/"*) printf '%s\n' "$listed_path" >>"$targets" ;;
+      "$builders"*) printf '%s\n' "$listed_path" >>"$targets" ;;
     esac
   done <"$registry"
 fi

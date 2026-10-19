@@ -142,7 +142,8 @@ and sets its own model.
   It is off until you turn it on; see [docs/statusline.md](docs/statusline.md).
 - **The gh wrapper:** `bin/gh` picks the GitHub account from the repo's remote owner, so parallel
   sessions never need `gh auth switch`; see [docs/gh.md](docs/gh.md).
-- **The worktree remover:** `bin/remove-worktree` removes landed builder worktrees instantly; see
+- **The worktree remover:** `bin/remove-worktree` removes landed builder worktrees instantly, and a
+  `SessionEnd` hook sweeps them when a session ends; see
   [docs/install.md](docs/install.md).
 
 Make your changes in your profile, not in `~/.claude/CLAUDE.md` or `~/.claude/settings.json`.

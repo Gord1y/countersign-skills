@@ -97,3 +97,12 @@ while IFS= read -r path; do
   git add -A -- "$path"
   echo "already here  $path"
 done <"$here"
+tab=$(printf '\t')
+record="$(git -C "$worktree" rev-parse --absolute-git-dir)/countersign-landed"
+if ! while IFS= read -r path; do
+  if [ -f "$worktree/$path" ] && [ ! -L "$worktree/$path" ]; then
+    printf '%s%s%s\n' "$(git -C "$worktree" hash-object -- "$path")" "$tab" "$path"
+  fi
+done <"$list" 2>/dev/null >"$record"; then
+  echo "land-worktree: could not record the landing in $record, so remove-worktree may keep this worktree once a commit hook rewrites its files" >&2
+fi
