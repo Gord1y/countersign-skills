@@ -135,10 +135,13 @@ back through you, and the research would be paid twice.
 
 - **`sonnet` with effort `medium`, the default,** when the brief names the exact changes: files,
   shapes, decisions.
-- **`opus` with effort `high`** only when the implementation itself is intricate with every
-  decision made: a cross-cutting refactor, a subtle concurrency or cache interaction, anything where
-  a plausible wrong answer still compiles and passes. Not "edge-case heavy": list the cases (Step 5)
-  and use `sonnet`. Its one-line reason goes into the split and the unit table.
+- **A planner first** when the implementation is intricate: a cross-cutting refactor, a subtle
+  concurrency or cache interaction, anything where a plausible wrong answer still compiles and
+  passes. Spawn `planner` with `model: "opus"` and `effort: "high"`, pointing at the unit file. Then
+  spawn the builder on `sonnet` with `medium`, or `high` for the hardest units, from the brief plus
+  the spec. Builders never run on opus. Questions the planner writes go under `## Waiting for you`,
+  and only that unit parks. The one-line reason for the planner goes into the split and the unit
+  table. Not "edge-case heavy": list the cases (Step 5) and skip the planner.
 - **`haiku`** only where a known fan-out skill pins it, such as one translator per locale.
 - **Never omit `model` or `effort`**: an unnamed spawn inherits the main session's tier and
   effort. The `Agent` tool's `effort` beats the agent's frontmatter, so pass both even to agents
@@ -239,7 +242,9 @@ before you hand back; past 20, cut the least useful until it fits.
   cherry-pick their work: that bypasses Step 8. Only when `builder` is missing (a skills-only
   install), spawn `general-purpose` with `isolation: "worktree"` and the same `model` and `effort`;
   the brief's standing rules already forbid committing and asking. Note which path the run uses
-  in the plan file. Check `reviewer` and `qa` the same way for Steps 7 and 9.
+  in the plan file. Check `planner`, `reviewer` and `qa` the same way for Steps 3, 7 and 9. Where
+  `planner` is missing, spawn `general-purpose` with `opus` and `high`, told to change nothing but
+  the unit file.
 - The worktree is cut from your `HEAD` only under `worktree.baseRef: "head"`, which the install
   sets; without it, worktrees start from the remote default branch. Check the worktree, not the
   settings file: right after the first spawn, `git worktree list` must show the new worktree at
@@ -426,5 +431,6 @@ the check the user should do when QA was skipped. Never an artifact page, unless
 - Open-ended briefs with no case list and no budget.
 - Messaging an over-budget builder instead of stopping it.
 - Amend loops: bundle every hand-back finding into one follow-up.
+- An opus builder: plan on opus, build on sonnet.
 
 If `local.md` exists next to this file, read it; where it disagrees with this file, it wins.

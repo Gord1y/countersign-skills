@@ -9,7 +9,7 @@
 - 3 or more independently verifiable commits: invoke `orchestrate`. Units of a few dozen lines skip
   the builders: write them yourself, one commit each.
 - Every Agent spawn names `model` and `effort`: `haiku` with `low` to search and read, `sonnet`
-  with `medium` to build and QA and `high` to review, `opus` with `high` only with the reason in the
-  prompt.
+  with `medium` to build and QA and `high` to review, `opus` with `high` for the planner, or
+  anything else only with the reason in the prompt.
 - Handoffs go through the `context-transfer` skill only. If it isn't offered, the install is
   broken: say so and ask me to re-run `install.sh`.

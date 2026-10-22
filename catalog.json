@@ -308,6 +308,12 @@
       "path": "agents/builder.md"
     },
     {
+      "name": "planner",
+      "description": "Turns one orchestrated unit's brief into an exact implementation spec, read-only; a sonnet builder implements it. Spawned by orchestrate for intricate units.",
+      "model": "opus",
+      "path": "agents/planner.md"
+    },
+    {
       "name": "qa",
       "description": "QAs a finished change in the running product on every surface it touched, then writes the walkthrough; writes only evidence and notes into writeups/. Spawned by orchestrate after each landed batch that touches a surface, and after the gate.",
       "model": "sonnet",

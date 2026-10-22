@@ -123,6 +123,7 @@ Claude Code only, linked into `~/.claude/agents`. Each is split by what it may d
 and sets its own model.
 
 - `builder` (`sonnet`, effort `medium`): implements one orchestrated unit in its own worktree, never committing.
+- `planner` (`opus`, effort `high`): read-only, turns an intricate unit's brief into an exact spec that a sonnet builder implements.
 - `researcher` (`haiku`, effort `low`): read-only lookups, without CLAUDE.md, at most 30 lines back.
 - `reviewer` (`sonnet`, effort `high`): read-only review of a unit's worktree against its brief, with `thorough-diff-review` preloaded.
 - `qa` (`sonnet`, effort `medium`): QA after each landed batch and at the end of a run, on every surface it touched, then the walkthrough, with `qa-tester` and `walkthrough` preloaded; it writes only into `writeups/`.

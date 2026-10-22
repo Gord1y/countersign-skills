@@ -44,6 +44,18 @@ landed commit had rewritten. That is why every hand-back still checks the base.
 - In one 60-day window, top-tier builders were an eighth of all builders and used about a third of
   all builder tokens.
 
+## Why opus plans and sonnet builds
+
+- Measured over 10-19 to 10-23: 22 opus/high builders cost 32.7M weighted tokens, as much as all
+  146 sonnet/medium builders (31.3M).
+- A median opus/high builder cost 1.3M over 62 turns. A median sonnet/medium builder cost 166K over
+  23 turns. The most expensive single agent was an opus builder: 5.9M over 153 turns.
+- The cost comes from opus running the whole build loop: reading, editing, iterating and gating.
+  The judgement is needed only for the design.
+- So a read-only `planner` on opus turns the brief into an exact spec in few turns, and a sonnet
+  builder implements it. Builders never run on opus. A product or contract decision is never the
+  planner's: it becomes a question, and the unit parks.
+
 ## Builder speed
 
 - Builders burned 30 to 60 minutes each on repeated production builds, rediscovering before/after
