@@ -5,6 +5,8 @@
   build. Verify it yourself: never hand me a check you can run.
 - Keep output small: run a gate as `set -o pipefail; <cmd> 2>&1 | tail -n 60`, and read big files
   by range.
+- Read an Artifact once: its `read` action saves the page to a file, so work from that file by range
+  and fetch again only after the page changed.
 - Run `gh` as a command of its own and filter with `--jq`: piped or chained, it runs sandboxed and
   looks logged out.
 - A file you show me or point me at (an option sheet, a screenshot, evidence, a draft) goes into
