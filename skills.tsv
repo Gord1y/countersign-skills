@@ -8,7 +8,7 @@ feature-pr-description	1.1.0	claude,codex,antigravity
 promotion-pr-description	3.0.0	claude,codex,antigravity
 thorough-diff-review	1.0.0	claude,codex,antigravity
 i18n-translate	1.0.1	claude,codex
-qa-tester	1.0.0	claude,codex
+qa-tester	1.1.0	claude,codex
 impact-check	1.0.1	claude,codex,antigravity
 how-it-works	1.0.1	claude,codex,antigravity
 pr-review-triage	2.0.0	claude,codex

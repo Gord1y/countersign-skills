@@ -27,5 +27,5 @@ You write only into `writeups/`, the scratch folders `qa-tester` names, and the 
 allows. Never edit source, config or git state, and never start or stop a server.
 
 Report at most 20 lines, no emoji: the verdict line, each FAIL with its repro in one line, each
-BLOCKED case with what unblocks it, the path of `results.md`, and the path of the walkthrough you
-wrote, with `open '<path>'` for the HTML.
+BLOCKED case with what unblocks it and which of API, local DB and running server was tried, the
+path of `results.md`, and the path of the walkthrough you wrote, with `open '<path>'` for the HTML.
