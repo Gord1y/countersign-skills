@@ -71,9 +71,11 @@ Both carry the same four sections and about 40 lines of content, in plain words 
 - `## Not covered`: what was not exercised, so the reader knows where to look themselves.
 
 To build the HTML page, copy `references/for-you.src.html` to the session scratchpad as
-`page.src.html` and fill it. Put light and dark shots of one screen in one `.shots` grid. Reference
-each screenshot as `{{SHOT:<path relative to the run folder, without .png>|<alt text of 20+
-characters saying what to notice>}}`. Then, from the top of the product repo (Playwright comes from
+`page.src.html` and fill it. Each shot gets a full-width row in a `.shots` block; only light and
+dark shots of one screen share a row, in a `.shots pair` block. Every shot opens full size on click.
+Reference each screenshot as `{{SHOT:<path relative to the run folder, without .png>|<alt text of
+20+ characters saying what to notice>}}`. Take the shots sharp and cropped, as `qa-tester`'s web
+reference says. Then, from the top of the product repo (Playwright comes from
 there), with the sandbox off as section 3 says:
 
 ```bash

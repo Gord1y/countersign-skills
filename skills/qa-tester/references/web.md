@@ -98,6 +98,22 @@ pollutes the tree. Copy each screenshot a case cites into `$QA` under the same n
 back to confirm it shows what the case claims. For a FAIL, save the console errors and the failing
 request (method, URL, status, response snippet) as `NN-<case>.log`.
 
+Shots a person reads are sharp and cropped to the point:
+
+- **2x.** The MCP browser renders at device scale 1, which blurs on a retina screen. Before the
+  first evidence shot, switch the page to 2x once; it holds until the browser closes:
+
+```js
+async (page) => {
+  const cdp = await page.context().newCDPSession(page)
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 2, mobile: false })
+}
+```
+
+- **Crop.** When the "look for" is a small part of the screen (a menu, a tooltip, a badge, a
+  field), shoot that region: `locator.screenshot()` on its container, or a `clip` with about 16 px
+  of padding. Shoot the whole viewport only when the layout is the point.
+
 ## Cases worth covering
 
 - **Smoke:** the Repo facts smoke pages. If the app has locales, spot-check one non-default locale:
