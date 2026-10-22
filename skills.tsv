@@ -12,5 +12,5 @@ qa-tester	1.0.0	claude,codex
 impact-check	1.0.1	claude,codex,antigravity
 how-it-works	1.0.1	claude,codex,antigravity
 pr-review-triage	2.0.0	claude,codex
-walkthrough	1.0.0	claude,codex,antigravity
-writeups-cleanup	1.0.1	claude,codex,antigravity
+walkthrough	1.1.0	claude,codex,antigravity
+writeups-cleanup	1.0.2	claude,codex,antigravity

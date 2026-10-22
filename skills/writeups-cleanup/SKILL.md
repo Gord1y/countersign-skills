@@ -27,7 +27,7 @@ the user once, then suggest the one line to add to CLAUDE.md so the next run fin
 
 ```
 writeups/
-  changes/<date>-<branch-or-run>/   pr.md, walkthrough.md, shots/, qa/
+  changes/<date>-<branch-or-run>/   pr.md, walkthrough.md or walkthrough.html, shots/, qa/
   releases/<version>/               promotion-staging.md, promotion-main.md, walkthrough.html, shots/
   briefs/<date>-<topic>.md          asks for other repos or teams
   scratch/                          delete any time

@@ -56,7 +56,12 @@ evidence. If no evidence exists, get it first (section 1).
 
 ### Format
 
-Write `walkthrough.md`, about 40 lines, in plain words (see `human-voice-writing`). Four sections:
+Pick the file by surface. A change that touched a UI surface (web, native or mobile app, game)
+gets `walkthrough.html`, one self-contained page with the screenshots inlined, and no `.md`. Every
+other change (API, CLI, library, docs) gets `walkthrough.md`.
+
+Both carry the same four sections and about 40 lines of content, in plain words (see
+`human-voice-writing`):
 
 - `## What changed`: 3 to 5 lines, described by behaviour, not by file.
 - `## Try it`: numbered steps, written as the surface's user performs them: a click, a request, a
@@ -65,13 +70,26 @@ Write `walkthrough.md`, about 40 lines, in plain words (see `human-voice-writing
 - `## Files worth reading`: at most 5 paths, one line each on why that file matters.
 - `## Not covered`: what was not exercised, so the reader knows where to look themselves.
 
+To build the HTML page, copy `references/for-you.src.html` to the session scratchpad as
+`page.src.html` and fill it. Put light and dark shots of one screen in one `.shots` grid. Reference
+each screenshot as `{{SHOT:<path relative to the run folder, without .png>|<alt text of 20+
+characters saying what to notice>}}`. Then, from the top of the product repo (Playwright comes from
+there), with the sandbox off as section 3 says:
+
+```bash
+node "${CLAUDE_SKILL_DIR}/scripts/inline.mjs" "$SCRATCH/page.src.html" "<run folder>" "<run folder>/walkthrough.html"
+node "${CLAUDE_SKILL_DIR}/scripts/verify.mjs" "<run folder>/walkthrough.html" "$SCRATCH/verify.png"
+```
+
+Fix every broken image, missing alt or sideways scroll the check reports, and run both again.
+
 ### Evidence per surface
 
 Each step shows the evidence of the surface it exercises, from `qa/`:
 
 | Surface | What a step shows |
 | --- | --- |
-| Web, native or mobile app, game | the screenshot, as `![Step 2](qa/02-settings-saved.png)` |
+| Web, native or mobile app, game | the screenshot, inlined in the HTML page as `{{SHOT:qa/02-settings-saved\|alt text}}` |
 | HTTP API | the request line and the response's decisive lines in an `http` block, then a link to the full `qa/NN-<case>.http` |
 | CLI and scripts | the command and its decisive output lines in a `console` block, then a link to the full transcript |
 | Library | the few lines of the call and their output, before and after when the behaviour changed, from `qa/NN-<case>-before.txt` and `-after.txt` |
@@ -89,10 +107,12 @@ this resolves to the right folder from the main checkout and from any worktree a
 ```bash
 WRITEUPS="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/writeups"
 NOTE="$WRITEUPS/changes/<date>-<run>/walkthrough.md"
+PAGE="$WRITEUPS/changes/<date>-<run>/walkthrough.html"
 ```
 
-The note is never committed and never pasted into a PR, unless the user asks. It is never an HTML
-page or an artifact unless the user asks. Report its path when done.
+The note is never committed and never pasted into a PR, unless the user asks. The HTML page is a
+local file, never an artifact, never committed. Report its path when done, with the exact command
+for the user to open it, `open '<path>'`, because the sandbox blocks `open`.
 
 ## 3. For customers
 

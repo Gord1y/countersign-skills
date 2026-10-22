@@ -5,14 +5,15 @@ const [src, shotsDir, out, ...rest] = process.argv.slice(2)
 if (!src || !shotsDir || !out) {
   console.error(
     'usage: node inline.mjs <page.src.html> <shots-dir> <out.html> [forbidden-string ...]\n' +
-      '  placeholders look like {{SHOT:name|alt text describing the image}}'
+      '  placeholders look like {{SHOT:name|alt text describing the image}}\n' +
+      '  names may include sub-folders, e.g. {{SHOT:qa/09-final/01-sidebar-light|alt text}}'
   )
   process.exit(1)
 }
 
 const FORBIDDEN = rest.length ? rest : ['localhost:', 'http://127.0.0.1']
 
-const PLACEHOLDER = /\{\{SHOT:([a-z0-9-]+)\|([^}]+)\}\}/g
+const PLACEHOLDER = /\{\{SHOT:([A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*)\|([^}]+)\}\}/g
 
 const escapeAttribute = value =>
   value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')

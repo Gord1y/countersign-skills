@@ -177,7 +177,7 @@
     },
     {
       "name": "walkthrough",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "agents": [
         "claude",
         "codex",
@@ -190,7 +190,7 @@
     },
     {
       "name": "writeups-cleanup",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "agents": [
         "claude",
         "codex",

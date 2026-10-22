@@ -259,7 +259,7 @@ resolved from the main checkout so that a worktree cleanup never deletes it:
 
 ```
 writeups/
-  changes/<date>-<branch-or-run>/   pr.md, walkthrough.md, shots/, qa/
+  changes/<date>-<branch-or-run>/   pr.md, walkthrough.md or walkthrough.html, shots/, qa/
   releases/<version>/               promotion-staging.md, promotion-main.md, walkthrough.html, shots/
   briefs/<date>-<topic>.md          asks for other repos or teams
   scratch/<date>-<topic>/           anything shown to the user that no skill places; delete any time
