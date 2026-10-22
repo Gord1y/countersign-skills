@@ -101,7 +101,9 @@ Resuming an approved plan or a handoff needs no re-approval. Splitting new work 
   file. A run of 3 units or fewer may go on in the same session.
 - **An execution session** starts from the plan file and only briefs, lands, commits and runs QA.
   It never re-opens an answered question.
-- **At most 20 landed units per execution session.** Then update the run folder and hand off
+- **At most 10 landed units, or about 300K tokens of context, per execution session, whichever
+  comes first.** The session knows its size from a Countersign context note or the status line.
+  When neither shows it, count units. Then update the run folder and hand off
   through `context-transfer`. A PR ends when its work is done, not at a unit count: unfinished
   work goes on in the same branch and PR in the next session.
 - **Work bigger than one PR**, or past about twelve questions, becomes phases: one index plan,
@@ -133,10 +135,13 @@ back through you, and the research would be paid twice.
 
 - **`sonnet` with effort `medium`, the default,** when the brief names the exact changes: files,
   shapes, decisions.
-- **`opus` with effort `high`** only when the implementation itself is intricate with every
-  decision made: a cross-cutting refactor, a subtle concurrency or cache interaction, anything where
-  a plausible wrong answer still compiles and passes. Not "edge-case heavy": list the cases (Step 5)
-  and use `sonnet`. Its one-line reason goes into the split and the unit table.
+- **A planner first** when the implementation is intricate: a cross-cutting refactor, a subtle
+  concurrency or cache interaction, anything where a plausible wrong answer still compiles and
+  passes. Spawn `planner` with `model: "opus"` and `effort: "high"`, pointing at the unit file. Then
+  spawn the builder on `sonnet` with `medium`, or `high` for the hardest units, from the brief plus
+  the spec. Builders never run on opus. Questions the planner writes go under `## Waiting for you`,
+  and only that unit parks. The one-line reason for the planner goes into the split and the unit
+  table. Not "edge-case heavy": list the cases (Step 5) and skip the planner.
 - **`haiku`** only where a known fan-out skill pins it, such as one translator per locale.
 - **Never omit `model` or `effort`**: an unnamed spawn inherits the main session's tier and
   effort. The `Agent` tool's `effort` beats the agent's frontmatter, so pass both even to agents
@@ -237,7 +242,9 @@ before you hand back; past 20, cut the least useful until it fits.
   cherry-pick their work: that bypasses Step 8. Only when `builder` is missing (a skills-only
   install), spawn `general-purpose` with `isolation: "worktree"` and the same `model` and `effort`;
   the brief's standing rules already forbid committing and asking. Note which path the run uses
-  in the plan file. Check `reviewer` and `qa` the same way for Steps 7 and 9.
+  in the plan file. Check `planner`, `reviewer` and `qa` the same way for Steps 3, 7 and 9. Where
+  `planner` is missing, spawn `general-purpose` with `opus` and `high`, told to change nothing but
+  the unit file.
 - The worktree is cut from your `HEAD` only under `worktree.baseRef: "head"`, which the install
   sets; without it, worktrees start from the remote default branch. Check the worktree, not the
   settings file: right after the first spawn, `git worktree list` must show the new worktree at
@@ -251,7 +258,8 @@ before you hand back; past 20, cut the least useful until it fits.
   it got wrong into the pending briefs, then fan out. Skip it for 3 or fewer, near-identical units,
   or a resume past a clean first hand-back.
 - **Watch the budget.** Each time you are re-invoked, compare each builder's elapsed time with its
-  budget. Past twice the budget, stop it, note why, and re-brief a smaller unit.
+  budget. Past twice the budget, stop it with `TaskStop`. A message through `SendMessage` does not
+  stop a running agent. Then note why and re-brief a smaller unit.
 - Research agents don't count against the cap. Only known fan-out skills nest subagents.
 
 ## Step 7: verify the hand-back
@@ -297,7 +305,9 @@ which runs inside the sandbox and can fail on write-protected paths.
 `land-worktree` copies nothing and exits 1 when:
 
 - **a file changed on this branch since the worktree was cut**: the unit overlapped a landed one.
-  Port its diff by hand with Edit (integration work), or respawn it on the new `HEAD`.
+  Port its diff by hand with Edit (integration work), or respawn it on the new `HEAD`. After
+  committing a hand-port, run `"${CLAUDE_SKILL_DIR}/scripts/land-worktree" --ported <worktree>`,
+  which records the landing, then `remove-worktree <worktree>` as usual.
 - **the worktree is not on this branch**: the builder committed. Port the diff by hand.
 - **a file is uncommitted in this checkout**: commit or set aside your own edits first; never
   discard the user's.
@@ -372,7 +382,14 @@ nothing to QA; the summary says so.
   every `kept` line with its reason.
 - For a kept worktree give the user only `remove-worktree <path>` to run once its work is landed,
   never `rm -rf`. Mention that `remove-worktree --landed` sweeps every landed builder worktree,
-  from any session, and that the install's `SessionEnd` hook runs that sweep when a session ends.
+  clean detached scratch worktree and folder of ignored output, from any session, and that the
+  install's `SessionEnd` hook runs that sweep when a session ends.
+- Refresh the PR description. When the branch has a PR, or the run's folder already holds a
+  `pr.md`, rewrite that `pr.md` draft with `feature-pr-description` over the whole branch,
+  including this run's commits. Find the PR with `gh pr view --json number,title`, run as a command
+  of its own. Do not edit the PR on GitHub. The closing summary gives the user one ready block of
+  exact commands: `git push`, then `gh pr edit <N> --title "<title>" --body-file <path>`, or
+  `gh pr create …` when no PR exists. When the user asks to push, push and edit the PR together.
 - Never push unprompted.
 
 ---
@@ -412,6 +429,8 @@ the check the user should do when QA was skipped. Never an artifact page, unless
 - Letting a builder measure what you already know.
 - Spawning a parallel batch one message at a time.
 - Open-ended briefs with no case list and no budget.
+- Messaging an over-budget builder instead of stopping it.
 - Amend loops: bundle every hand-back finding into one follow-up.
+- An opus builder: plan on opus, build on sonnet.
 
 If `local.md` exists next to this file, read it; where it disagrees with this file, it wins.

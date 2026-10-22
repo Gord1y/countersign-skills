@@ -40,6 +40,9 @@ Use the three-dot form for the diff so the base's own commits stay out of it. If
 target the base the branch flow from Repo facts names for a feature PR. Ask rather than assume when
 the branch name does not make it obvious.
 
+When a PR already exists and the branch gained commits since its body was written, the description
+covers the whole branch again, never only the new commits. Propose the title with it every time.
+
 ## 2. Read the diff, not the commit messages
 
 Commit subjects are what you intended; the diff is what shipped. Every claim in the description has

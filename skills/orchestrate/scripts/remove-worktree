@@ -2,84 +2,9 @@
 set -eu
 usage() {
   echo "usage: remove-worktree [--dry-run] <worktree>...   removes builder worktrees whose changes are already committed in a checkout of this repository" >&2
-  echo "       remove-worktree [--dry-run] --landed        does so for every builder worktree under .claude/worktrees/agent-*" >&2
+  echo "       remove-worktree [--dry-run] --landed        does so for every builder worktree, every clean detached worktree and every folder of ignored output under .claude/worktrees/" >&2
   exit 2
 }
-dry=0
-landed=0
-named=0
-targets=$(mktemp "${TMPDIR:-/tmp}/remove-worktree.XXXXXX")
-registry=$(mktemp "${TMPDIR:-/tmp}/remove-worktree.XXXXXX")
-changes=$(mktemp "${TMPDIR:-/tmp}/remove-worktree.XXXXXX")
-references=$(mktemp "${TMPDIR:-/tmp}/remove-worktree.XXXXXX")
-trap 'rm -f "$targets" "$registry" "$changes" "$references"' EXIT
-for arg in "$@"; do
-  case $arg in
-    --dry-run) dry=1 ;;
-    --landed) landed=1 ;;
-    -*) usage ;;
-    *)
-      named=$((named + 1))
-      printf '%s\n' "$arg" >>"$targets"
-      ;;
-  esac
-done
-if [ "$landed" -eq 1 ] && [ "$named" -gt 0 ]; then
-  usage
-fi
-if [ "$landed" -eq 0 ] && [ "$named" -eq 0 ]; then
-  usage
-fi
-GIT_LITERAL_PATHSPECS=1
-export GIT_LITERAL_PATHSPECS
-tab=$(printf '\t')
-if ! common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null); then
-  echo "remove-worktree: run it from inside the repository" >&2
-  exit 2
-fi
-common=$(cd "$common" && pwd -P)
-main=$(dirname "$common")
-here=$(pwd -P)
-trash="$common/worktree-trash"
-builders="$main/.claude/worktrees/agent-"
-if [ "$dry" -eq 0 ]; then
-  git -C "$main" worktree prune
-fi
-
-git -C "$main" worktree list --porcelain | {
-  path=
-  locked=0
-  branch=
-  while IFS= read -r line; do
-    case $line in
-      "worktree "*) path=${line#worktree } ;;
-      "branch "*) branch=${line#branch refs/heads/} ;;
-      locked*) locked=1 ;;
-      "")
-        if [ -n "$path" ]; then
-          if real=$(cd "$path" 2>/dev/null && pwd -P); then
-            path=$real
-          fi
-          printf '%s\t%s\t%s\n' "$path" "$locked" "$branch"
-        fi
-        path=
-        locked=0
-        branch=
-        ;;
-    esac
-  done
-} >"$registry"
-
-while IFS="$tab" read -r listed_path listed_locked listed_branch; do
-  case $listed_path in
-    "$builders"*) ;;
-    *)
-      if listed_head=$(git -C "$listed_path" rev-parse -q --verify HEAD 2>/dev/null); then
-        printf '%s\t%s\n' "$listed_path" "$listed_head" >>"$references"
-      fi
-      ;;
-  esac
-done <"$registry"
 
 find_record() {
   while IFS="$tab" read -r listed_path listed_locked listed_branch; do
@@ -139,8 +64,103 @@ landed_in() {
   done <"$changes"
 }
 
-verdict=
-judged=
+process_state=
+process_pid=
+find_process() {
+  if [ -z "$process_state" ]; then
+    process_state=failed
+    if command -v lsof >/dev/null 2>&1; then
+      lsof -a -d cwd -Fpn >"$processes" 2>/dev/null || :
+      if [ -s "$processes" ]; then
+        process_state=ok
+      fi
+    fi
+  fi
+  process_pid=
+  [ "$process_state" = ok ] || return 2
+  pid=
+  while IFS= read -r line; do
+    case $line in
+      p*) pid=${line#p} ;;
+      n*)
+        cwd=${line#n}
+        case $cwd in
+          "$1" | "$1"/*)
+            process_pid=$pid
+            return 0
+            ;;
+        esac
+        ;;
+    esac
+  done <"$processes"
+  return 1
+}
+
+check_processes() {
+  status_code=0
+  find_process "$1" || status_code=$?
+  case $status_code in
+    0)
+      verdict="process $process_pid runs in it"
+      return 1
+      ;;
+    2)
+      verdict="cannot check for running processes"
+      return 1
+      ;;
+  esac
+  return 0
+}
+
+judge_scratch() {
+  head=$(git -C "$worktree" rev-parse HEAD)
+  if ! state=$(git -C "$worktree" status --porcelain 2>/dev/null); then
+    verdict="cannot read its status"
+    return 1
+  fi
+  if [ -n "$state" ]; then
+    verdict="it has uncommitted changes"
+    return 1
+  fi
+  gitdir=$(git -C "$worktree" rev-parse --absolute-git-dir)
+  if [ -e "$gitdir/rebase-merge" ] || [ -e "$gitdir/rebase-apply" ] || [ -e "$gitdir/BISECT_LOG" ]; then
+    verdict="a rebase or bisect is in progress"
+    return 1
+  fi
+  if [ -z "$(git -C "$main" for-each-ref --contains "$head" refs/heads)" ]; then
+    verdict="its HEAD $head is on no branch"
+    return 1
+  fi
+  check_processes "$worktree"
+}
+
+judge_orphan() {
+  record_branch=
+  if [ -e "$worktree/.git" ] || [ -L "$worktree/.git" ]; then
+    verdict="it has a .git entry but is not a worktree of this repository"
+    return 1
+  fi
+  find "$worktree" -mindepth 1 -maxdepth 1 >"$changes"
+  if [ ! -s "$changes" ] && [ -z "$(find "$worktree" -maxdepth 0 -mmin +10)" ]; then
+    verdict="empty and new, a worktree may be on its way"
+    return 1
+  fi
+  while IFS= read -r entry_path; do
+    entry=$(basename "$entry_path")
+    if [ -d "$entry_path" ] && [ ! -L "$entry_path" ]; then
+      entry="$entry/"
+    elif [ -d "$main/$entry" ]; then
+      verdict="holds $entry, which the repository does not ignore"
+      return 1
+    fi
+    if ! env -u GIT_LITERAL_PATHSPECS git -C "$main" check-ignore -q --no-index -- "$entry"; then
+      verdict="holds $entry, which the repository does not ignore"
+      return 1
+    fi
+  done <"$changes"
+  check_processes "$worktree"
+}
+
 judge() {
   worktree=$1
   verdict=
@@ -155,6 +175,10 @@ judge() {
       ;;
   esac
   if ! find_record "$worktree"; then
+    if [ "$(dirname "$worktree")" = "$main/.claude/worktrees" ] && [ "$worktree" != "$trash" ]; then
+      judge_orphan
+      return
+    fi
     verdict="not a worktree of this repository"
     return 1
   fi
@@ -169,6 +193,15 @@ judge() {
     verdict="locked, a builder may still be running"
     return 1
   fi
+  case $worktree in
+    "$builders"*) ;;
+    *)
+      if [ -z "$record_branch" ]; then
+        judge_scratch
+        return
+      fi
+      ;;
+  esac
   head=$(git -C "$worktree" rev-parse HEAD)
   {
     git -C "$worktree" -c core.quotePath=false diff --name-only --no-renames HEAD
@@ -201,7 +234,6 @@ judge() {
   return 1
 }
 
-sequence=0
 remove_one() {
   worktree=$1
   sequence=$((sequence + 1))
@@ -226,42 +258,139 @@ remove_one() {
   nohup rm -rf -- "${entry:?}" >/dev/null 2>&1 </dev/null &
 }
 
-if [ "$dry" -eq 0 ] && [ -d "$trash" ]; then
-  for leftover in "$trash"/*; do
-    if [ -e "$leftover" ] || [ -L "$leftover" ]; then
-      nohup rm -rf -- "${leftover:?}" >/dev/null 2>&1 </dev/null &
-    fi
+main() {
+  dry=0
+  landed=0
+  named=0
+  targets=$(mktemp "${TMPDIR:-/tmp}/remove-worktree.XXXXXX")
+  registry=$(mktemp "${TMPDIR:-/tmp}/remove-worktree.XXXXXX")
+  changes=$(mktemp "${TMPDIR:-/tmp}/remove-worktree.XXXXXX")
+  references=$(mktemp "${TMPDIR:-/tmp}/remove-worktree.XXXXXX")
+  processes=$(mktemp "${TMPDIR:-/tmp}/remove-worktree.XXXXXX")
+  trap 'rm -f "$targets" "$registry" "$changes" "$references" "$processes"' EXIT
+  for arg in "$@"; do
+    case $arg in
+      --dry-run) dry=1 ;;
+      --landed) landed=1 ;;
+      -*) usage ;;
+      *)
+        named=$((named + 1))
+        printf '%s\n' "$arg" >>"$targets"
+        ;;
+    esac
   done
-fi
+  if [ "$landed" -eq 1 ] && [ "$named" -gt 0 ]; then
+    usage
+  fi
+  if [ "$landed" -eq 0 ] && [ "$named" -eq 0 ]; then
+    usage
+  fi
+  GIT_LITERAL_PATHSPECS=1
+  export GIT_LITERAL_PATHSPECS
+  tab=$(printf '\t')
+  if ! common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null); then
+    echo "remove-worktree: run it from inside the repository" >&2
+    exit 2
+  fi
+  common=$(cd "$common" && pwd -P)
+  main=$(dirname "$common")
+  here=$(pwd -P)
+  trash="$common/worktree-trash"
+  builders="$main/.claude/worktrees/agent-"
+  if [ "$dry" -eq 0 ]; then
+    git -C "$main" worktree prune
+  fi
 
-if [ "$landed" -eq 1 ]; then
-  : >"$targets"
+  git -C "$main" worktree list --porcelain | {
+    path=
+    locked=0
+    branch=
+    while IFS= read -r line; do
+      case $line in
+        "worktree "*) path=${line#worktree } ;;
+        "branch "*) branch=${line#branch refs/heads/} ;;
+        locked*) locked=1 ;;
+        "")
+          if [ -n "$path" ]; then
+            if real=$(cd "$path" 2>/dev/null && pwd -P); then
+              path=$real
+            fi
+            printf '%s\t%s\t%s\n' "$path" "$locked" "$branch"
+          fi
+          path=
+          locked=0
+          branch=
+          ;;
+      esac
+    done
+  } >"$registry"
+
   while IFS="$tab" read -r listed_path listed_locked listed_branch; do
     case $listed_path in
-      "$builders"*) printf '%s\n' "$listed_path" >>"$targets" ;;
+      "$builders"*) ;;
+      *)
+        if listed_head=$(git -C "$listed_path" rev-parse -q --verify HEAD 2>/dev/null); then
+          printf '%s\t%s\n' "$listed_path" "$listed_head" >>"$references"
+        fi
+        ;;
     esac
   done <"$registry"
-fi
 
-status=0
-while IFS= read -r target; do
-  if ! worktree=$(cd "$target" 2>/dev/null && pwd -P); then
-    echo "kept $target: not a directory"
-    status=1
-    continue
+  judged=
+  sequence=0
+
+  if [ "$dry" -eq 0 ] && [ -d "$trash" ]; then
+    for leftover in "$trash"/*; do
+      if [ -e "$leftover" ] || [ -L "$leftover" ]; then
+        nohup rm -rf -- "${leftover:?}" >/dev/null 2>&1 </dev/null &
+      fi
+    done
   fi
-  if judge "$worktree"; then
-    if [ "$dry" -eq 1 ]; then
-      echo "would remove $worktree"
-    elif ! remove_one "$worktree"; then
+
+  if [ "$landed" -eq 1 ]; then
+    : >"$targets"
+    while IFS="$tab" read -r listed_path listed_locked listed_branch; do
+      case $listed_path in
+        "$builders"*) printf '%s\n' "$listed_path" >>"$targets" ;;
+        "$main/.claude/worktrees/"*)
+          if [ -z "$listed_branch" ]; then
+            printf '%s\n' "$listed_path" >>"$targets"
+          fi
+          ;;
+      esac
+    done <"$registry"
+    if [ -d "$main/.claude/worktrees" ]; then
+      find "$main/.claude/worktrees" -mindepth 1 -maxdepth 1 -type d | sort >"$changes"
+      while IFS= read -r folder; do
+        if ! find_record "$folder" && [ "$folder" != "$trash" ]; then
+          printf '%s\n' "$folder" >>"$targets"
+        fi
+      done <"$changes"
+    fi
+  fi
+
+  status=0
+  while IFS= read -r target; do
+    if ! worktree=$(cd "$target" 2>/dev/null && pwd -P); then
+      echo "kept $target: not a directory"
+      status=1
+      continue
+    fi
+    if judge "$worktree"; then
+      if [ "$dry" -eq 1 ]; then
+        echo "would remove $worktree"
+      elif ! remove_one "$worktree"; then
+        status=1
+      fi
+    else
+      echo "kept $worktree: $verdict"
       status=1
     fi
-  else
-    echo "kept $worktree: $verdict"
-    status=1
+  done <"$targets"
+  if [ "$landed" -eq 1 ]; then
+    status=0
   fi
-done <"$targets"
-if [ "$landed" -eq 1 ]; then
-  status=0
-fi
-exit "$status"
+  exit "$status"
+}
+
+main "$@"; exit

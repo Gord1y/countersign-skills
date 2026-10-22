@@ -123,6 +123,7 @@ Claude Code only, linked into `~/.claude/agents`. Each is split by what it may d
 and sets its own model.
 
 - `builder` (`sonnet`, effort `medium`): implements one orchestrated unit in its own worktree, never committing.
+- `planner` (`opus`, effort `high`): read-only, turns an intricate unit's brief into an exact spec that a sonnet builder implements.
 - `researcher` (`haiku`, effort `low`): read-only lookups, without CLAUDE.md, at most 30 lines back.
 - `reviewer` (`sonnet`, effort `high`): read-only review of a unit's worktree against its brief, with `thorough-diff-review` preloaded.
 - `qa` (`sonnet`, effort `medium`): QA after each landed batch and at the end of a run, on every surface it touched, then the walkthrough, with `qa-tester` and `walkthrough` preloaded; it writes only into `writeups/`.
@@ -143,7 +144,8 @@ and sets its own model.
 - **The gh wrapper:** `bin/gh` picks the GitHub account from the repo's remote owner, so parallel
   sessions never need `gh auth switch`; see [docs/gh.md](docs/gh.md).
 - **The worktree remover:** `bin/remove-worktree` removes landed builder worktrees instantly, and a
-  `SessionEnd` hook sweeps them when a session ends; see
+  `SessionEnd` hook sweeps them, clean scratch worktrees and ignored-output folders when a session
+  ends; see
   [docs/install.md](docs/install.md).
 
 Make your changes in your profile, not in `~/.claude/CLAUDE.md` or `~/.claude/settings.json`.

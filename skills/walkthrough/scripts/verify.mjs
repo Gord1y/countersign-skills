@@ -24,7 +24,7 @@ try {
   await page.goto(file, { waitUntil: 'networkidle' })
 
   const report = await page.evaluate(() => {
-    const imgs = [...document.images]
+    const imgs = [...document.images].filter(i => !i.closest('dialog'))
     return {
       images: imgs.length,
       broken: imgs.filter(i => !i.complete || i.naturalWidth === 0).length,

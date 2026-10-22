@@ -32,13 +32,16 @@ directory:
   | open | anything the builder flagged |
 
 - parked units with their questions, and the calls made
-- the count of units landed this session, against the limit of 20
+- the count of units landed this session, against the limit of 10 or about 300K tokens of context
+
+The first line of the file names the session's landed-unit count, so the 10-unit limit is visible
+without a re-read.
 
 A finished unit stays one row. When the file nears its cap, move the detail of finished rounds to
 `log.md`.
 
 **It stays current after every landing**: update the unit's row and the session's count before
-the next spawn. A handoff at the 20-unit limit, or after an interruption, is then a short write
+the next spawn. A handoff at the limit, or after an interruption, is then a short write
 that points at this file.
 
 **`units/NN-<slug>.md`** holds the whole brief, written once; the spawn prompt only points at it.
@@ -46,9 +49,11 @@ A retry edits this file and respawns, so no brief is ever written twice. At hand
 builder's report under a `## Hand-back` heading in the same file and update the table row. Each
 brief starts by pointing at `common.md`, so the shared rules are written once.
 
-**Reading rules.** After a compaction or a resume, read `orchestrator.md` and nothing else. Open
-`plan.md` only to add a question or to settle a decision `orchestrator.md` leaves in doubt, and a
-unit file only to re-brief or recover that unit. Never read `log.md` during a run. Never write any
+**Reading rules.** After a compaction or a resume, read `orchestrator.md` once. It stays under
+about 120 lines, so one read is cheap. Never re-read it whole within one context: keep the table in
+mind and read a range only to check a row. Read a unit file or `plan.md` only by the range you
+need: `plan.md` to add a question or to settle a decision `orchestrator.md` leaves in doubt, a
+unit file to re-brief or recover that unit. Never read `log.md` during a run. Never write any
 of these files, or a handoff, inside the repo.
 
 ## Phases: one index plan, one run folder per phase

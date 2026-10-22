@@ -3,7 +3,7 @@
   "skills": [
     {
       "name": "orchestrate",
-      "version": "1.3.0",
+      "version": "1.4.0",
       "agents": [
         "claude"
       ],
@@ -76,7 +76,7 @@
     },
     {
       "name": "feature-pr-description",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "agents": [
         "claude",
         "codex",
@@ -127,7 +127,7 @@
     },
     {
       "name": "qa-tester",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "agents": [
         "claude",
         "codex"
@@ -177,7 +177,7 @@
     },
     {
       "name": "walkthrough",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "agents": [
         "claude",
         "codex",
@@ -190,7 +190,7 @@
     },
     {
       "name": "writeups-cleanup",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "agents": [
         "claude",
         "codex",
@@ -306,6 +306,12 @@
       "description": "Implements one unit of an orchestrated run in its own git worktree, gated but never committed; the orchestrator lands and commits it. Spawned by the orchestrate skill with a pointer to the unit's brief.",
       "model": "sonnet",
       "path": "agents/builder.md"
+    },
+    {
+      "name": "planner",
+      "description": "Turns one orchestrated unit's brief into an exact implementation spec, read-only; a sonnet builder implements it. Spawned by orchestrate for intricate units.",
+      "model": "opus",
+      "path": "agents/planner.md"
     },
     {
       "name": "qa",

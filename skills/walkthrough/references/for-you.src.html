@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RUN_NAME walkthrough</title>
+<style>
+:root {
+  --bg: #ffffff;
+  --surface: #f5f6f8;
+  --text: #1a1d21;
+  --muted: #5b6370;
+  --border: #d5d9e0;
+  --accent: #2557d6;
+  --pass-bg: #dff5e4;
+  --pass-text: #14532d;
+  --fail-bg: #fde2e2;
+  --fail-text: #7f1d1d;
+  --blocked-bg: #fdf0cf;
+  --blocked-text: #6b4a05;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121418;
+    --surface: #1b1e24;
+    --text: #e8eaee;
+    --muted: #9aa3b2;
+    --border: #343a45;
+    --accent: #7ba3ff;
+    --pass-bg: #163a22;
+    --pass-text: #a7f0bb;
+    --fail-bg: #4a1818;
+    --fail-text: #ffb4b4;
+    --blocked-bg: #4a3a12;
+    --blocked-text: #f6dc93;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+main {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+h1 { font-size: 1.75rem; line-height: 1.25; margin: 0 0 8px; }
+h2 { font-size: 1.25rem; margin: 40px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.lede { margin: 0 0 4px; }
+.meta { margin: 0; color: var(--muted); font-size: 0.9rem; }
+ul, ol { padding-left: 1.4rem; }
+li { margin: 0 0 16px; }
+li > p { margin: 0 0 6px; }
+.look { color: var(--muted); }
+.verdict {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  vertical-align: middle;
+}
+.verdict.pass { background: var(--pass-bg); color: var(--pass-text); }
+.verdict.fail { background: var(--fail-bg); color: var(--fail-text); }
+.verdict.blocked { background: var(--blocked-bg); color: var(--blocked-text); }
+.shots {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin: 10px 0 0;
+}
+.shots.pair { grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); }
+figure { margin: 0; min-width: 0; }
+figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: zoom-in;
+}
+dialog.viewer {
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: rgba(0, 0, 0, 0.92);
+  color: #fff;
+}
+dialog.viewer::backdrop { background: rgba(0, 0, 0, 0.6); }
+.viewer-bar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.75);
+  font-size: 0.9rem;
+  z-index: 1;
+}
+.viewer-bar span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.viewer-bar button {
+  font: inherit;
+  color: #fff;
+  background: #2b2f36;
+  border: 1px solid #4a505b;
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.viewer-stage { overflow: auto; height: calc(100vh - 44px); display: grid; place-items: center; }
+.viewer-stage img { display: block; max-width: 100%; max-height: calc(100vh - 60px); cursor: zoom-in; }
+.viewer-stage.actual { place-items: start; }
+.viewer-stage.actual img { max-width: none; max-height: none; cursor: zoom-out; }
+figcaption { margin-top: 4px; color: var(--muted); font-size: 0.85rem; }
+code, pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
+code { background: var(--surface); border-radius: 4px; padding: 1px 5px; }
+pre { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+</style>
+</head>
+<body>
+<main>
+<header>
+<h1>RUN_NAME</h1>
+<p class="lede">ONE_LINE_OF_WHAT_CHANGED</p>
+<p class="meta">DATE · branch <code>BRANCH_NAME</code></p>
+</header>
+
+<section>
+<h2>What changed</h2>
+<ul>
+<li>BEHAVIOUR_BULLET_1</li>
+<li>BEHAVIOUR_BULLET_2</li>
+<li>BEHAVIOUR_BULLET_3</li>
+</ul>
+</section>
+
+<section>
+<h2>Try it</h2>
+<ol>
+<li>
+<p>STEP_TEXT <span class="verdict pass">PASS</span></p>
+<p class="look">Look for: LOOK_FOR_TEXT</p>
+<div class="shots pair">
+<figure>
+{{SHOT:qa/NN-folder/NN-step-light|ALT_TEXT_OF_TWENTY_PLUS_CHARACTERS_SAYING_WHAT_TO_NOTICE}}
+<figcaption>Light</figcaption>
+</figure>
+<figure>
+{{SHOT:qa/NN-folder/NN-step-dark|ALT_TEXT_OF_TWENTY_PLUS_CHARACTERS_SAYING_WHAT_TO_NOTICE}}
+<figcaption>Dark</figcaption>
+</figure>
+</div>
+</li>
+</ol>
+</section>
+
+<section>
+<h2>Files worth reading</h2>
+<ul>
+<li><code>path/to/file</code> WHY_THIS_FILE_MATTERS</li>
+</ul>
+</section>
+
+<section>
+<h2>Not covered</h2>
+<ul>
+<li>NOT_COVERED_ITEM</li>
+</ul>
+</section>
+</main>
+<dialog class="viewer" aria-label="Screenshot viewer">
+<div class="viewer-bar">
+<span></span>
+<button type="button" data-action="prev" aria-label="Previous screenshot">←</button>
+<button type="button" data-action="next" aria-label="Next screenshot">→</button>
+<button type="button" data-action="size">Full size</button>
+<button type="button" data-action="close">Close</button>
+</div>
+<div class="viewer-stage"><img alt=""></div>
+</dialog>
+<script>
+const shots = [...document.querySelectorAll('figure img')]
+const viewer = document.querySelector('dialog.viewer')
+const stage = viewer.querySelector('.viewer-stage')
+const big = stage.querySelector('img')
+const label = viewer.querySelector('.viewer-bar span')
+const sizeButton = viewer.querySelector('[data-action="size"]')
+let current = 0
+const setActual = actual => {
+  stage.classList.toggle('actual', actual)
+  sizeButton.textContent = actual ? 'Fit to screen' : 'Full size'
+  big.style.width = actual ? `${big.naturalWidth}px` : ''
+}
+const show = index => {
+  current = (index + shots.length) % shots.length
+  big.src = shots[current].src
+  big.alt = shots[current].alt
+  label.textContent = `${current + 1} / ${shots.length} · ${shots[current].alt}`
+  setActual(false)
+  if (!viewer.open) viewer.showModal()
+}
+shots.forEach((shot, index) => shot.addEventListener('click', () => show(index)))
+big.addEventListener('click', () => setActual(!stage.classList.contains('actual')))
+viewer.addEventListener('click', event => {
+  const action = event.target.dataset.action
+  if (action === 'prev') show(current - 1)
+  if (action === 'next') show(current + 1)
+  if (action === 'size') setActual(!stage.classList.contains('actual'))
+  if (action === 'close' || event.target === stage) viewer.close()
+})
+document.addEventListener('keydown', event => {
+  if (!viewer.open) return
+  if (event.key === 'ArrowLeft') show(current - 1)
+  if (event.key === 'ArrowRight') show(current + 1)
+})
+</script>
+</body>
+</html>
