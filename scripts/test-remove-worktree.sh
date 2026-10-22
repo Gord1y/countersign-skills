@@ -197,10 +197,119 @@ elif has_branch onfeature; then
   fail "the branch of a worktree landed in a linked checkout is still there"
 fi
 
-git -C "$repo" worktree add -q --detach "$repo/.claude/worktrees/perf" HEAD
+scratch() {
+  git -C "$repo" worktree add -q --detach "$repo/.claude/worktrees/$1" HEAD
+}
+
+scratch perf
+run --dry-run --landed
+if [ "$status" -ne 0 ] || ! grep -qx "would remove $repo/.claude/worktrees/perf" "$work/out"; then
+  fail "the dry run did not say would remove for a scratch worktree: $status $(cat "$work/out")"
+elif [ ! -d "$repo/.claude/worktrees/perf" ]; then
+  fail "the dry run removed a scratch worktree"
+fi
 run --landed
-if [ ! -d "$repo/.claude/worktrees/perf" ]; then
-  fail "--landed removed a worktree that is not a builder's: $(cat "$work/out")"
+if [ "$status" -ne 0 ] || [ -e "$repo/.claude/worktrees/perf" ]; then
+  fail "--landed kept a clean detached scratch worktree: $status $(cat "$work/out")"
+elif git -C "$repo" worktree list --porcelain | grep -qx "worktree $repo/.claude/worktrees/perf"; then
+  fail "git still lists the removed scratch worktree"
+fi
+
+scratch dirty
+printf 'x\n' >"$repo/.claude/worktrees/dirty/loose.txt"
+run --landed
+if [ ! -f "$repo/.claude/worktrees/dirty/loose.txt" ] || ! grep -q "^kept .*/dirty: it has uncommitted changes" "$work/out"; then
+  fail "--landed did not keep a scratch worktree with an untracked file: $(cat "$work/out")"
+fi
+
+scratch stray
+printf 'stray\n' >"$repo/.claude/worktrees/stray/stray.txt"
+git -C "$repo/.claude/worktrees/stray" add stray.txt
+git -C "$repo/.claude/worktrees/stray" commit -q -m "feat: stray"
+run --landed
+if [ ! -d "$repo/.claude/worktrees/stray" ] || ! grep -q "^kept .*/stray: its HEAD .* is on no branch" "$work/out"; then
+  fail "--landed did not keep a scratch worktree whose HEAD is on no branch: $(cat "$work/out")"
+fi
+
+git -C "$repo" worktree add -q -b session-feature "$repo/.claude/worktrees/session-feature" HEAD
+run --landed
+if [ ! -d "$repo/.claude/worktrees/session-feature" ]; then
+  fail "--landed removed a clean worktree on its own branch: $(cat "$work/out")"
+fi
+
+mkdir -p "$repo/.claude/worktrees/cache/node_modules"
+printf 'x\n' >"$repo/.claude/worktrees/cache/node_modules/x"
+run --landed
+if [ "$status" -ne 0 ] || [ -e "$repo/.claude/worktrees/cache" ]; then
+  fail "--landed kept an orphan folder of ignored output: $status $(cat "$work/out")"
+fi
+
+mkdir -p "$repo/.claude/worktrees/notes"
+printf 'x\n' >"$repo/.claude/worktrees/notes/notes.txt"
+run --landed
+if [ ! -f "$repo/.claude/worktrees/notes/notes.txt" ] || ! grep -q "^kept .*/notes: holds notes.txt, which the repository does not ignore" "$work/out"; then
+  fail "--landed did not keep an orphan folder with a file the repository does not ignore: $(cat "$work/out")"
+fi
+
+if command -v lsof >/dev/null 2>&1; then
+  scratch served
+  (cd "$repo/.claude/worktrees/served" && exec sleep 30) &
+  served_pid=$!
+  sleep 1
+  run --landed
+  {
+    kill "$served_pid"
+    wait "$served_pid" || :
+  } 2>/dev/null
+  if [ ! -d "$repo/.claude/worktrees/served" ] || ! grep -q "^kept .*/served: process [0-9]* runs in it" "$work/out"; then
+    fail "--landed did not keep a scratch worktree with a running process: $(cat "$work/out")"
+  fi
+else
+  echo "test-remove-worktree: lsof is missing, skipped the running-process case"
+fi
+
+mkdir -p "$work/stub"
+printf '#!/bin/sh\nexit 1\n' >"$work/stub/lsof"
+chmod +x "$work/stub/lsof"
+scratch blind
+(cd "$repo" && PATH="$work/stub:$PATH" "$remove" --landed) >"$work/out" 2>&1 || :
+if [ ! -d "$repo/.claude/worktrees/blind" ] || ! grep -q "^kept .*/blind: cannot check for running processes" "$work/out"; then
+  fail "--landed removed a scratch worktree although lsof failed: $(cat "$work/out")"
+fi
+git -C "$repo" worktree remove --force "$repo/.claude/worktrees/blind"
+
+mkdir -p "$repo/.claude/worktrees/gitfile/node_modules"
+printf 'gitdir: elsewhere\n' >"$repo/.claude/worktrees/gitfile/.git"
+run --landed
+if [ ! -d "$repo/.claude/worktrees/gitfile" ] || ! grep -q "^kept .*/gitfile: it has a .git entry" "$work/out"; then
+  fail "--landed removed an orphan folder with a .git entry: $(cat "$work/out")"
+fi
+
+mkdir -p "$repo/.claude/worktrees/cache2/node_modules"
+printf 'x\n' >"$repo/.claude/worktrees/cache2/node_modules/x"
+run --dry-run --landed
+if ! grep -qx "would remove $repo/.claude/worktrees/cache2" "$work/out" || [ ! -f "$repo/.claude/worktrees/cache2/node_modules/x" ]; then
+  fail "the dry run on an orphan folder did not only report: $(cat "$work/out")"
+fi
+
+run "$repo/.claude/worktrees/cache2"
+if [ "$status" -ne 0 ] || [ -e "$repo/.claude/worktrees/cache2" ]; then
+  fail "a named orphan folder of ignored output was not removed: $status $(cat "$work/out")"
+fi
+
+mkdir -p "$repo/node_modules" "$repo/.claude/worktrees/filevsdir"
+printf 'x\n' >"$repo/.claude/worktrees/filevsdir/node_modules"
+run --landed
+rmdir "$repo/node_modules"
+if [ ! -f "$repo/.claude/worktrees/filevsdir/node_modules" ] || ! grep -q "^kept .*/filevsdir: holds node_modules, which the repository does not ignore" "$work/out"; then
+  fail "--landed removed an orphan holding a file named like an ignored directory: $(cat "$work/out")"
+fi
+
+mkdir -p "$repo/.claude/worktrees/hollow"
+touch -t 202001010000 "$repo/.claude/worktrees/hollow"
+run --landed
+if [ -e "$repo/.claude/worktrees/hollow" ]; then
+  fail "--landed kept an old empty orphan folder: $(cat "$work/out")"
 fi
 
 run

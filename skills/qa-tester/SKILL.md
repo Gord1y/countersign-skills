@@ -86,13 +86,21 @@ the reason, and stop.
 
 If any precondition fails, report which one and how to fix it. Do not fake results.
 
+**Missing state is not BLOCKED yet.** Before marking a case BLOCKED for a missing account, record
+or state, try in order: the app's API with the QA account; then the local database the Repo facts
+name (its MCP server or client), writing only `qa-<run>-` data on the local stack; then the servers
+the user already runs on the documented ports. BLOCKED is only for what none of these reaches, and
+the case says which of the three failed and why. Never ask the user to run a check you can run.
+
 ## 2. The loop, for every case
 
 1. **Act** the way the surface's user does: click, request, run, call.
 2. **Wait** for the outcome to settle. Never assert on a stale read.
 3. **Assert** the expected outcome is there and nothing else went wrong: the row shows and the
    network log has no 500; the status and body are right; the command exits 0 with nothing on
-   stderr.
+   stderr. Prefer a code assertion that reads the outcome: DOM text, counts, attributes, bounding
+   boxes, the network log, the persisted record. Save its output as `.txt` evidence. A screenshot
+   is the evidence a human needs, not how you check.
 4. **Capture** the evidence (section 5) at the decisive moment.
 5. **Record** the case as PASS, FAIL or BLOCKED, with its evidence.
 
@@ -169,6 +177,11 @@ different `$TMPDIR`. Each evidence file is `NN-<case>.<ext>`, numbered in case o
 a screenshot, `.http` for a request with its response, `.txt` for a terminal transcript, `.log`
 for a log excerpt. Each reference file says what its surface captures. `walkthrough` reads this
 folder, so nothing secret and no real person's data goes into it.
+
+Take one screenshot per "look for", in one theme. Take the second theme only when the case is
+about theme or colour, or the change touched colour tokens. Take no full-page accessibility
+snapshot unless a locator fails, and then scope it to the element's container. Never read the same
+screenshot back twice.
 
 ## 6. Reporting
 

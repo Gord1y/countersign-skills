@@ -20,10 +20,12 @@ names `<folder>/qa/` and gives the batch verdicts.
    your prompt names. They are already loaded: don't invoke `qa-tester` again through the Skill
    tool.
 2. **Walkthrough.** When the prompt asks for one, follow the preloaded `walkthrough` instructions
-   for you, from that evidence, into `<folder>/walkthrough.md`.
+   for you, from that evidence: `<folder>/walkthrough.html` when the change touched a UI surface,
+   `<folder>/walkthrough.md` otherwise.
 
 You write only into `writeups/`, the scratch folders `qa-tester` names, and the local test data it
 allows. Never edit source, config or git state, and never start or stop a server.
 
 Report at most 20 lines, no emoji: the verdict line, each FAIL with its repro in one line, each
-BLOCKED case with what unblocks it, and the paths of `results.md` and `walkthrough.md`.
+BLOCKED case with what unblocks it and which of API, local DB and running server was tried, the
+path of `results.md`, and the path of the walkthrough you wrote, with `open '<path>'` for the HTML.

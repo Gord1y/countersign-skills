@@ -58,6 +58,38 @@ page: close them, or leave them out of hit tests. Sign in with a saved browser s
 the repo's e2e setup writes one. Throwaway measuring scripts go under `$SCRATCH`, never the repo
 root, where linters pick them up.
 
+## Loading and transitions
+
+For a change that touches data loading, a skeleton, a route transition or an optimistic update:
+- **Slow the network** for the case: Playwright `page.route` with a delay, or CDP
+  `Network.emulateNetworkConditions`. Capture the loading state and the loaded state at the same
+  viewport.
+- **Skeleton matches layout:** compare the bounding boxes of the main regions in both states
+  with a tolerance.
+- **Layout shift:** the sum of `layout-shift` entries from a `PerformanceObserver` stays under 0.1.
+- **No flash:** the empty state never shows between skeleton and data, and no second skeleton of a
+  different size replaces the first.
+
+```js
+async (page) => {
+  await page.addInitScript(() => {
+    window.shift = 0;
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) if (!entry.hadRecentInput) window.shift += entry.value;
+    }).observe({ type: 'layout-shift', buffered: true });
+  });
+  await page.route('**/api/**', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await route.continue();
+  });
+  await page.goto('http://localhost:3000/<route>');
+  const skeleton = await page.locator('<skeleton region>').boundingBox();
+  await page.locator('<loaded region>').waitFor();
+  const loaded = await page.locator('<loaded region>').boundingBox();
+  return { skeleton, loaded, shift: await page.evaluate(() => window.shift) };
+}
+```
+
 ## Evidence
 
 The Playwright MCP writes under `.playwright-mcp/` (gitignored). Always pass an explicit path,
@@ -65,6 +97,22 @@ The Playwright MCP writes under `.playwright-mcp/` (gitignored). Always pass an 
 pollutes the tree. Copy each screenshot a case cites into `$QA` under the same name, and read it
 back to confirm it shows what the case claims. For a FAIL, save the console errors and the failing
 request (method, URL, status, response snippet) as `NN-<case>.log`.
+
+Shots a person reads are sharp and cropped to the point:
+
+- **2x.** The MCP browser renders at device scale 1, which blurs on a retina screen. Before the
+  first evidence shot, switch the page to 2x once; it holds until the browser closes:
+
+```js
+async (page) => {
+  const cdp = await page.context().newCDPSession(page)
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 2, mobile: false })
+}
+```
+
+- **Crop.** When the "look for" is a small part of the screen (a menu, a tooltip, a badge, a
+  field), shoot that region: `locator.screenshot()` on its container, or a `clip` with about 16 px
+  of padding. Shoot the whole viewport only when the layout is the point.
 
 ## Cases worth covering
 

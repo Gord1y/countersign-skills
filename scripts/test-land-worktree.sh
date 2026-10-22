@@ -81,6 +81,74 @@ elif [ "$(cat "$repo/c.txt")" != two ]; then
   fail "a refused overlap copied the file"
 fi
 
+remove="$root/skills/orchestrate/scripts/remove-worktree"
+builder() {
+  git -C "$repo" worktree add -q -b "worktree-agent-$1" "$repo/.claude/worktrees/agent-$1" HEAD
+}
+ported() {
+  (cd "$repo" && "$land" --ported "$repo/.claude/worktrees/agent-$1") >"$work/out" 2>&1
+}
+dropped() {
+  (cd "$repo" && "$remove" "$repo/.claude/worktrees/agent-$1") >"$work/out" 2>&1
+}
+record_of() {
+  echo "$(git -C "$repo/.claude/worktrees/agent-$1" rev-parse --absolute-git-dir)/countersign-landed"
+}
+
+builder hand
+printf 'branch\n' >"$repo/a.txt"
+git -C "$repo" commit -q -am "feat: a on the branch"
+printf 'three\n' >"$repo/.claude/worktrees/agent-hand/a.txt"
+if (cd "$repo" && "$land" "$repo/.claude/worktrees/agent-hand") >"$work/out" 2>&1; then
+  fail "an overlapped unit landed"
+fi
+printf 'merged\n' >"$repo/a.txt"
+git -C "$repo" commit -q -am "feat: a ported by hand"
+if ! ported hand; then
+  fail "--ported refused a committed hand-port: $(cat "$work/out")"
+elif ! grep -qx "recorded  a.txt" "$work/out"; then
+  fail "--ported did not report the file: $(cat "$work/out")"
+elif ! dropped hand || ! grep -q "^removed .*/agent-hand$" "$work/out" || [ -e "$repo/.claude/worktrees/agent-hand" ]; then
+  fail "a recorded hand-port was not removed: $(cat "$work/out")"
+fi
+
+builder open
+printf 'four\n' >"$repo/.claude/worktrees/agent-open/b.txt"
+if ported open; then
+  fail "--ported accepted a file that is not committed here"
+elif ! grep -q "not committed here since" "$work/out"; then
+  fail "--ported did not name the file: $(cat "$work/out")"
+elif [ -e "$(record_of open)" ]; then
+  fail "--ported wrote a record although it refused"
+elif dropped open && grep -q "^removed .*/agent-open$" "$work/out"; then
+  fail "remove-worktree removed a worktree that was never landed"
+fi
+
+printf 'four\n' >"$repo/b.txt"
+if ported open; then
+  fail "--ported accepted a file with an uncommitted change here"
+fi
+
+mkdir -p "$repo/tools"
+cp -p "$land" "$repo/tools/land-worktree"
+git -C "$repo" add tools/land-worktree
+git -C "$repo" commit -q -m "chore: vendor land-worktree"
+builder selfupdate
+updated="$repo/.claude/worktrees/agent-selfupdate/tools/land-worktree"
+{
+  sed -n '1,2p' "$repo/tools/land-worktree"
+  printf 'true\ntrue\ntrue\ntrue\n'
+  sed -n '3,$p' "$repo/tools/land-worktree"
+} >"$work/updated"
+cp "$work/updated" "$updated"
+if ! (cd "$repo" && sh tools/land-worktree "$repo/.claude/worktrees/agent-selfupdate") >"$work/out" 2>&1; then
+  fail "a checkout's own land-worktree could not land a new version of itself: $(cat "$work/out")"
+elif ! cmp -s "$updated" "$repo/tools/land-worktree"; then
+  fail "the self-update was not copied"
+elif [ ! -f "$(record_of selfupdate)" ]; then
+  fail "the self-update wrote no landing record"
+fi
+
 if [ "$failures" -gt 0 ]; then
   exit 1
 fi

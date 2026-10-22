@@ -20,6 +20,11 @@ not failed. Verify the hand-back as Step 7 says, reading the whole diff, land it
 gate cover it; record `tooling blocked` and the gate runs as 0 in the unit table. Use the retry
 only when the diff itself falls short of the brief.
 
+## A stuck or over-budget builder
+
+Past twice its budget, stop the builder with `TaskStop`. A message through `SendMessage` does not
+stop a running agent. Then note why and re-brief a smaller unit.
+
 ## A failed unit
 
 **One corrected retry, then park it.** The respawn's brief names exactly what went wrong and fixes

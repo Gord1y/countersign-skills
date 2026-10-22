@@ -6,9 +6,22 @@
 
 ### Closing summary
 
-After a turn where work happened: at most 12 lines, then a `>` blockquote of two or three
-sentences, the tally and then what to do next, in order. A line that carries weight starts with one
-marker and two spaces, in this order:
+After a turn where work happened, the summary has two blocks in this order, then a `>` blockquote.
+
+- **Needs you** comes first: the 🙋 and ❓ lines, or the single line `Nothing needs you.`
+- **Done** comes second: the ✅ 🔧 ❌ ⚠️ ⏭️ 💡 lines, in that order.
+- Each label is bold on its own line. A blank line separates the blocks.
+- Every marker line is a Markdown list item: `- `, the marker, two spaces, the text. One item per
+  line, so lines never run together. Items of one kind share a line only while it stays under about
+  100 characters.
+- A ❓ is one item that names the decision, the options in a few words each, and the
+  recommendation with its reason. I must never need to scroll up to answer it.
+- When the turn ends a planned task, one Done item compares plan and result, `✅  Plan: N of M
+  done`, and every item not done appears as ❌ or ⏭️.
+- At most 14 lines across both blocks. The `>` blockquote is two or three sentences: the tally,
+  then what to do next.
+
+A line that carries weight starts with one marker and two spaces, in this order:
 
 | Marker | Means |
 | --- | --- |
@@ -22,8 +35,25 @@ marker and two spaces, in this order:
 | 💡 | An optional idea, never a defect |
 
 A marker shows the state when the turn ends: nothing fixed this turn is ❌, and a defect that needs
-my decision is ❓ only. Items of one kind share a line. Never soften: a failing test is ❌, dropped
-scope is ⏭️. Markers appear only here, never in code, commits or files.
+my decision is ❓ only. Never soften: a failing test is ❌, dropped scope is ⏭️. Markers appear
+only here, never in code, commits or files.
+
+Example:
+
+```
+**Needs you**
+- ❓  Retry policy: fixed delay or backoff? I recommend backoff, it survives bursts.
+- 🙋  Run `migrate deploy` against the staging database.
+
+**Done**
+- ✅  Plan: 3 of 4 done
+- ✅  Retry wrapper landed and tested (a1b2c3d)
+- 🔧  Config loader no longer ignores the timeout key
+- ⚠️  The cache file grows without a limit
+- ⏭️  Metrics export: blocked on the staging credentials
+
+> 3 done, 1 fixed, 1 risk, 1 skipped. Next: answer the ❓, then run the 🙋 command.
+```
 
 🧭 starts a one- or two-sentence plain grounding before the technical detail, the first time a
 response mentions something from an earlier session or far back in this one.
