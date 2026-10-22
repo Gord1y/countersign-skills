@@ -101,7 +101,9 @@ Resuming an approved plan or a handoff needs no re-approval. Splitting new work 
   file. A run of 3 units or fewer may go on in the same session.
 - **An execution session** starts from the plan file and only briefs, lands, commits and runs QA.
   It never re-opens an answered question.
-- **At most 20 landed units per execution session.** Then update the run folder and hand off
+- **At most 10 landed units, or about 300K tokens of context, per execution session, whichever
+  comes first.** The session knows its size from a Countersign context note or the status line.
+  When neither shows it, count units. Then update the run folder and hand off
   through `context-transfer`. A PR ends when its work is done, not at a unit count: unfinished
   work goes on in the same branch and PR in the next session.
 - **Work bigger than one PR**, or past about twelve questions, becomes phases: one index plan,
@@ -251,7 +253,8 @@ before you hand back; past 20, cut the least useful until it fits.
   it got wrong into the pending briefs, then fan out. Skip it for 3 or fewer, near-identical units,
   or a resume past a clean first hand-back.
 - **Watch the budget.** Each time you are re-invoked, compare each builder's elapsed time with its
-  budget. Past twice the budget, stop it, note why, and re-brief a smaller unit.
+  budget. Past twice the budget, stop it with `TaskStop`. A message through `SendMessage` does not
+  stop a running agent. Then note why and re-brief a smaller unit.
 - Research agents don't count against the cap. Only known fan-out skills nest subagents.
 
 ## Step 7: verify the hand-back
@@ -421,6 +424,7 @@ the check the user should do when QA was skipped. Never an artifact page, unless
 - Letting a builder measure what you already know.
 - Spawning a parallel batch one message at a time.
 - Open-ended briefs with no case list and no budget.
+- Messaging an over-budget builder instead of stopping it.
 - Amend loops: bundle every hand-back finding into one follow-up.
 
 If `local.md` exists next to this file, read it; where it disagrees with this file, it wins.
