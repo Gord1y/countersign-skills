@@ -376,6 +376,12 @@ nothing to QA; the summary says so.
   never `rm -rf`. Mention that `remove-worktree --landed` sweeps every landed builder worktree,
   clean detached scratch worktree and folder of ignored output, from any session, and that the
   install's `SessionEnd` hook runs that sweep when a session ends.
+- Refresh the PR description. When the branch has a PR, or the run's folder already holds a
+  `pr.md`, rewrite that `pr.md` draft with `feature-pr-description` over the whole branch,
+  including this run's commits. Find the PR with `gh pr view --json number,title`, run as a command
+  of its own. Do not edit the PR on GitHub. The closing summary gives the user one ready block of
+  exact commands: `git push`, then `gh pr edit <N> --title "<title>" --body-file <path>`, or
+  `gh pr create …` when no PR exists. When the user asks to push, push and edit the PR together.
 - Never push unprompted.
 
 ---
