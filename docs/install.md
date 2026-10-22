@@ -138,12 +138,13 @@ when that is set, as Countersign does):
   `timeout` sets how long Claude Code waits at exit, `/clear` and `/resume`. A cleanup cut short
   loses nothing: the next session finishes it.
 - A second `SessionEnd` hook runs `remove-worktree --landed` in the project folder, so builder
-  worktrees whose work is committed go when the session ends, whichever session cut them. It does
+  worktrees whose work is committed go when the session ends, whichever session cut them. So do
+  clean detached worktrees and folders of ignored output under `.claude/worktrees/`. It does
   nothing outside a git repository or without `~/.local/bin/remove-worktree`, and prints nothing,
-  so it adds no context. It keeps what `remove-worktree` keeps: a locked worktree whose builder may
-  still run in a parallel session, and any change no checkout has committed. Its `timeout` is 30
-  seconds; a sweep cut short loses nothing, since the folders already renamed into the trash are
-  deleted by the next run.
+  so it adds no context. It keeps what `remove-worktree` keeps: a locked worktree whose builder
+  may still run in a parallel session, any change no checkout has committed, and any folder with
+  a process running in it. Its `timeout` is 30 seconds; a sweep cut short loses nothing, since
+  the folders already renamed into the trash are deleted by the next run.
 
 The previous file goes to the backup folder first, and an unchanged file prints `ok`. Change
 settings in your profile's `settings.json` (or in `claude/settings.json`, for everyone), not in
@@ -308,8 +309,27 @@ It keeps a worktree, and says why, when it is the main checkout or the one the s
 not listed by `git worktree list`, sits outside `<main checkout>/.claude/worktrees/`, is locked,
 has a `HEAD` on no checkout's branch, or has a file no checkout has committed. Ignored files such
 as `node_modules` never block it. Before it starts, it prunes worktrees whose folder is already
-gone. `--landed` leaves every non-builder worktree under `.claude/worktrees/` alone, such as one a
-session entered to work on a branch, even when it holds nothing uncommitted.
+gone.
+
+`--landed` also sweeps two things that are not builders, both directly under
+`.claude/worktrees/`. A scratch worktree is detached, unlocked, has no uncommitted change and no
+untracked file that is not ignored, and has a `HEAD` on some local branch. Hand-made QA and
+profiling worktrees are of this kind. An orphan folder is not a worktree, has no `.git` entry, and
+holds only entries the main checkout ignores, such as the `.next` cache a dev server wrote back
+after its worktree was removed. A scratch worktree with changes is kept as `it has uncommitted
+changes`, one on no branch as `its HEAD <sha> is on no branch`, and an orphan folder as `holds
+<entry>, which the repository does not ignore`. A file named like a directory the main checkout
+ignores does not count as ignored. A scratch worktree in the middle of a rebase or bisect is
+kept, and so is an empty orphan folder younger than 10 minutes, which a parallel session may be
+filling. A non-builder worktree on a branch, such as one a session entered to work on a feature,
+stays untouched even when clean. Naming a scratch worktree or an orphan folder applies the same
+rules.
+
+For a scratch worktree or an orphan folder it also asks `lsof -a -d cwd` once whether any process
+has its current directory inside, which a dev server serving a QA build does. Such a folder is
+kept as `process <pid> runs in it`. When `lsof` is missing or fails, it is kept as `cannot check
+for running processes`. `lsof` sees only the user's own processes. Builders skip this check,
+since their lock covers them.
 
 It removes by renaming the folder into `<git dir>/worktree-trash/`, running `git worktree prune`,
 deleting the `worktree-agent-*` branch, and deleting the renamed files in the background. The

@@ -374,7 +374,8 @@ nothing to QA; the summary says so.
   every `kept` line with its reason.
 - For a kept worktree give the user only `remove-worktree <path>` to run once its work is landed,
   never `rm -rf`. Mention that `remove-worktree --landed` sweeps every landed builder worktree,
-  from any session, and that the install's `SessionEnd` hook runs that sweep when a session ends.
+  clean detached scratch worktree and folder of ignored output, from any session, and that the
+  install's `SessionEnd` hook runs that sweep when a session ends.
 - Never push unprompted.
 
 ---

@@ -129,6 +129,26 @@ if ported open; then
   fail "--ported accepted a file with an uncommitted change here"
 fi
 
+mkdir -p "$repo/tools"
+cp -p "$land" "$repo/tools/land-worktree"
+git -C "$repo" add tools/land-worktree
+git -C "$repo" commit -q -m "chore: vendor land-worktree"
+builder selfupdate
+updated="$repo/.claude/worktrees/agent-selfupdate/tools/land-worktree"
+{
+  sed -n '1,2p' "$repo/tools/land-worktree"
+  printf 'true\ntrue\ntrue\ntrue\n'
+  sed -n '3,$p' "$repo/tools/land-worktree"
+} >"$work/updated"
+cp "$work/updated" "$updated"
+if ! (cd "$repo" && sh tools/land-worktree "$repo/.claude/worktrees/agent-selfupdate") >"$work/out" 2>&1; then
+  fail "a checkout's own land-worktree could not land a new version of itself: $(cat "$work/out")"
+elif ! cmp -s "$updated" "$repo/tools/land-worktree"; then
+  fail "the self-update was not copied"
+elif [ ! -f "$(record_of selfupdate)" ]; then
+  fail "the self-update wrote no landing record"
+fi
+
 if [ "$failures" -gt 0 ]; then
   exit 1
 fi

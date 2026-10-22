@@ -1,138 +1,142 @@
 #!/bin/sh
 set -eu
-ported=0
-if [ $# -eq 2 ] && [ "$1" = "--ported" ]; then
-  ported=1
-  shift
-fi
-if [ $# -ne 1 ]; then
-  echo "usage: land-worktree <worktree>   copies a builder worktree's uncommitted changes into this checkout and stages them" >&2
-  echo "       land-worktree --ported <worktree>   records a worktree whose changes were ported by hand and committed here, so remove-worktree can clear it" >&2
-  exit 2
-fi
-GIT_LITERAL_PATHSPECS=1
-export GIT_LITERAL_PATHSPECS
-worktree=$(cd "$1" && pwd -P)
-target=$(cd "$(git rev-parse --show-toplevel)" && pwd -P)
-if [ "$worktree" = "$target" ]; then
-  echo "land-worktree: run it from the checkout that receives the work, not from the worktree" >&2
-  exit 2
-fi
-cd "$target"
-base=$(git -C "$worktree" rev-parse HEAD)
-if ! git merge-base --is-ancestor "$base" HEAD 2>/dev/null; then
-  echo "land-worktree: the worktree is at $base, which is not on this branch; a builder that committed is landed by hand" >&2
-  exit 1
-fi
-list=$(mktemp "${TMPDIR:-/tmp}/land-worktree.XXXXXX")
-todo=$(mktemp "${TMPDIR:-/tmp}/land-worktree.XXXXXX")
-here=$(mktemp "${TMPDIR:-/tmp}/land-worktree.XXXXXX")
-trap 'rm -f "$list" "$todo" "$here"' EXIT
-{
-  git -C "$worktree" -c core.quotePath=false diff --name-only --no-renames "$base"
-  git -C "$worktree" -c core.quotePath=false ls-files --others --exclude-standard
-} | sort -u >"$list"
-if [ ! -s "$list" ]; then
-  echo "land-worktree: the worktree has no changes" >&2
-  exit 1
-fi
-if grep -q '^"' "$list"; then
-  echo "land-worktree: a path needs quoting, land this worktree by hand:" >&2
-  grep '^"' "$list" >&2
-  exit 1
-fi
-write_record() {
-  tab=$(printf '\t')
-  record="$(git -C "$worktree" rev-parse --absolute-git-dir)/countersign-landed"
-  if ! while IFS= read -r path; do
-    if [ -f "$worktree/$path" ] && [ ! -L "$worktree/$path" ]; then
-      printf '%s%s%s\n' "$(git -C "$worktree" hash-object -- "$path")" "$tab" "$path"
-    fi
-  done <"$list" 2>/dev/null >"$record"; then
-    echo "land-worktree: could not record the landing in $record, so remove-worktree may keep this worktree once a commit hook rewrites its files" >&2
+main() {
+  ported=0
+  if [ $# -eq 2 ] && [ "$1" = "--ported" ]; then
+    ported=1
+    shift
   fi
-}
-if [ "$ported" = 1 ]; then
-  refused=$(while IFS= read -r path; do
-    if [ -f "$worktree/$path" ] && [ ! -L "$worktree/$path" ]; then
-      if [ -n "$(git status --porcelain -- "$path")" ] || [ -z "$(git log -1 --format=%H "$base..HEAD" -- "$path")" ]; then
-        echo "not committed here since $base: $path"
-      fi
-    fi
-  done <"$list")
-  if [ -n "$refused" ]; then
-    echo "land-worktree: nothing recorded" >&2
-    echo "$refused" >&2
+  if [ $# -ne 1 ]; then
+    echo "usage: land-worktree <worktree>   copies a builder worktree's uncommitted changes into this checkout and stages them" >&2
+    echo "       land-worktree --ported <worktree>   records a worktree whose changes were ported by hand and committed here, so remove-worktree can clear it" >&2
+    exit 2
+  fi
+  GIT_LITERAL_PATHSPECS=1
+  export GIT_LITERAL_PATHSPECS
+  worktree=$(cd "$1" && pwd -P)
+  target=$(cd "$(git rev-parse --show-toplevel)" && pwd -P)
+  if [ "$worktree" = "$target" ]; then
+    echo "land-worktree: run it from the checkout that receives the work, not from the worktree" >&2
+    exit 2
+  fi
+  cd "$target"
+  base=$(git -C "$worktree" rev-parse HEAD)
+  if ! git merge-base --is-ancestor "$base" HEAD 2>/dev/null; then
+    echo "land-worktree: the worktree is at $base, which is not on this branch; a builder that committed is landed by hand" >&2
     exit 1
   fi
-  write_record
+  list=$(mktemp "${TMPDIR:-/tmp}/land-worktree.XXXXXX")
+  todo=$(mktemp "${TMPDIR:-/tmp}/land-worktree.XXXXXX")
+  here=$(mktemp "${TMPDIR:-/tmp}/land-worktree.XXXXXX")
+  trap 'rm -f "$list" "$todo" "$here"' EXIT
+  {
+    git -C "$worktree" -c core.quotePath=false diff --name-only --no-renames "$base"
+    git -C "$worktree" -c core.quotePath=false ls-files --others --exclude-standard
+  } | sort -u >"$list"
+  if [ ! -s "$list" ]; then
+    echo "land-worktree: the worktree has no changes" >&2
+    exit 1
+  fi
+  if grep -q '^"' "$list"; then
+    echo "land-worktree: a path needs quoting, land this worktree by hand:" >&2
+    grep '^"' "$list" >&2
+    exit 1
+  fi
+  write_record() {
+    tab=$(printf '\t')
+    record="$(git -C "$worktree" rev-parse --absolute-git-dir)/countersign-landed"
+    if ! while IFS= read -r path; do
+      if [ -f "$worktree/$path" ] && [ ! -L "$worktree/$path" ]; then
+        printf '%s%s%s\n' "$(git -C "$worktree" hash-object -- "$path")" "$tab" "$path"
+      fi
+    done <"$list" 2>/dev/null >"$record"; then
+      echo "land-worktree: could not record the landing in $record, so remove-worktree may keep this worktree once a commit hook rewrites its files" >&2
+    fi
+  }
+  if [ "$ported" = 1 ]; then
+    refused=$(while IFS= read -r path; do
+      if [ -f "$worktree/$path" ] && [ ! -L "$worktree/$path" ]; then
+        if [ -n "$(git status --porcelain -- "$path")" ] || [ -z "$(git log -1 --format=%H "$base..HEAD" -- "$path")" ]; then
+          echo "not committed here since $base: $path"
+        fi
+      fi
+    done <"$list")
+    if [ -n "$refused" ]; then
+      echo "land-worktree: nothing recorded" >&2
+      echo "$refused" >&2
+      exit 1
+    fi
+    write_record
+    while IFS= read -r path; do
+      if [ -f "$worktree/$path" ] && [ ! -L "$worktree/$path" ]; then
+        echo "recorded  $path"
+      fi
+    done <"$list"
+    exit 0
+  fi
+  matches() {
+    if [ -L "$worktree/$1" ] || [ -L "$1" ]; then
+      return 1
+    fi
+    if [ -e "$worktree/$1" ]; then
+      [ -f "$1" ] && cmp -s "$worktree/$1" "$1"
+    else
+      [ ! -e "$1" ]
+    fi
+  }
+  protected() {
+    case "$1" in
+      .claude/settings.json | .claude/settings.local.json | .claude/scheduled_tasks.json | .mcp.json) return 0 ;;
+      .claude/skills/* | .claude/agents/* | .claude/commands/* | .claude/hooks/* | .claude/workflows/*) return 0 ;;
+      .vscode/* | .idea/* | */.idea/*) return 0 ;;
+      .gitconfig | .bashrc | .bash_profile | .profile | .zshrc | .zprofile | .zshenv) return 0 ;;
+    esac
+    return 1
+  }
   while IFS= read -r path; do
-    if [ -f "$worktree/$path" ] && [ ! -L "$worktree/$path" ]; then
-      echo "recorded  $path"
+    if matches "$path"; then
+      echo "$path" >>"$here"
+    else
+      echo "$path" >>"$todo"
     fi
   done <"$list"
-  exit 0
-fi
-matches() {
-  if [ -L "$worktree/$1" ] || [ -L "$1" ]; then
-    return 1
+  blocked=$(while IFS= read -r path; do
+    if ! git diff --quiet "$base" HEAD -- "$path"; then
+      echo "changed on this branch since $base: $path"
+    elif [ -n "$(git status --porcelain -- "$path")" ]; then
+      echo "uncommitted in this checkout: $path"
+    fi
+  done <"$todo")
+  if [ -n "$blocked" ]; then
+    echo "land-worktree: nothing copied" >&2
+    echo "$blocked" >&2
+    exit 1
   fi
-  if [ -e "$worktree/$1" ]; then
-    [ -f "$1" ] && cmp -s "$worktree/$1" "$1"
-  else
-    [ ! -e "$1" ]
+  guarded=$(while IFS= read -r path; do
+    if protected "$path"; then
+      echo "$path"
+    fi
+  done <"$todo")
+  if [ -n "$guarded" ]; then
+    echo "land-worktree: nothing copied. The sandbox write-protects these paths: port each with the Edit tool, then run land-worktree again, which skips files that already match:" >&2
+    echo "$guarded" >&2
+    exit 1
   fi
+  while IFS= read -r path; do
+    if [ -e "$worktree/$path" ] || [ -L "$worktree/$path" ]; then
+      mkdir -p "$(dirname "$path")"
+      cp -P -p "$worktree/$path" "$path"
+    else
+      rm -f "$path"
+    fi
+    git add -A -- "$path"
+    echo "landed  $path"
+  done <"$todo"
+  while IFS= read -r path; do
+    git add -A -- "$path"
+    echo "already here  $path"
+  done <"$here"
+  write_record
 }
-protected() {
-  case "$1" in
-    .claude/settings.json | .claude/settings.local.json | .claude/scheduled_tasks.json | .mcp.json) return 0 ;;
-    .claude/skills/* | .claude/agents/* | .claude/commands/* | .claude/hooks/* | .claude/workflows/*) return 0 ;;
-    .vscode/* | .idea/* | */.idea/*) return 0 ;;
-    .gitconfig | .bashrc | .bash_profile | .profile | .zshrc | .zprofile | .zshenv) return 0 ;;
-  esac
-  return 1
-}
-while IFS= read -r path; do
-  if matches "$path"; then
-    echo "$path" >>"$here"
-  else
-    echo "$path" >>"$todo"
-  fi
-done <"$list"
-blocked=$(while IFS= read -r path; do
-  if ! git diff --quiet "$base" HEAD -- "$path"; then
-    echo "changed on this branch since $base: $path"
-  elif [ -n "$(git status --porcelain -- "$path")" ]; then
-    echo "uncommitted in this checkout: $path"
-  fi
-done <"$todo")
-if [ -n "$blocked" ]; then
-  echo "land-worktree: nothing copied" >&2
-  echo "$blocked" >&2
-  exit 1
-fi
-guarded=$(while IFS= read -r path; do
-  if protected "$path"; then
-    echo "$path"
-  fi
-done <"$todo")
-if [ -n "$guarded" ]; then
-  echo "land-worktree: nothing copied. The sandbox write-protects these paths: port each with the Edit tool, then run land-worktree again, which skips files that already match:" >&2
-  echo "$guarded" >&2
-  exit 1
-fi
-while IFS= read -r path; do
-  if [ -e "$worktree/$path" ] || [ -L "$worktree/$path" ]; then
-    mkdir -p "$(dirname "$path")"
-    cp -P -p "$worktree/$path" "$path"
-  else
-    rm -f "$path"
-  fi
-  git add -A -- "$path"
-  echo "landed  $path"
-done <"$todo"
-while IFS= read -r path; do
-  git add -A -- "$path"
-  echo "already here  $path"
-done <"$here"
-write_record
+
+main "$@"; exit
