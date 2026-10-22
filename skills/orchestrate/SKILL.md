@@ -297,7 +297,9 @@ which runs inside the sandbox and can fail on write-protected paths.
 `land-worktree` copies nothing and exits 1 when:
 
 - **a file changed on this branch since the worktree was cut**: the unit overlapped a landed one.
-  Port its diff by hand with Edit (integration work), or respawn it on the new `HEAD`.
+  Port its diff by hand with Edit (integration work), or respawn it on the new `HEAD`. After
+  committing a hand-port, run `"${CLAUDE_SKILL_DIR}/scripts/land-worktree" --ported <worktree>`,
+  which records the landing, then `remove-worktree <worktree>` as usual.
 - **the worktree is not on this branch**: the builder committed. Port the diff by hand.
 - **a file is uncommitted in this checkout**: commit or set aside your own edits first; never
   discard the user's.

@@ -283,6 +283,13 @@ a commit. The record is how `remove-worktree` still knows that work landed. It l
 dir, not the worktree, so it is never landed itself, and `git worktree prune` deletes it with the
 worktree. A record that can't be written only warns: the landing itself still counts.
 
+`land-worktree --ported <worktree>` is for a unit that was ported by hand because a file changed on
+the branch since the worktree was cut. Run it after committing the port. It copies and stages
+nothing. For every regular file the worktree changed, it checks that this checkout has no
+uncommitted change to it and that a commit since the worktree's `HEAD` touched it, then writes the
+same record and prints `recorded  <path>` per file. Otherwise it records nothing and names each file
+as `not committed here since <base>: <path>`.
+
 ## The remove-worktree command
 
 `bin/remove-worktree <worktree>...` (or `--landed` for every builder worktree, the ones under
