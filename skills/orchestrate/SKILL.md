@@ -38,6 +38,7 @@ integration itself creates (an overlap you port by hand, a hook failure on your 
 ## Repo facts
 
 Look each one up in the repo's CLAUDE.md (or AGENTS.md) and the files it imports or points to,
+reading only this skill's section of a repo-facts file (`sed -n '/^## orchestrate$/,/^## /p'`),
 then in `local.md` next to this file. If neither has it, take the default and suggest the one line
 to add to CLAUDE.md.
 

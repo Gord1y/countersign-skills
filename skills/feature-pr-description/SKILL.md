@@ -10,7 +10,8 @@ effort: medium
 ## Repo facts
 
 This skill needs the facts below. Look each one up in the repo's CLAUDE.md (or AGENTS.md) and
-the files it imports or points to, then in `local.md` next to this file. If neither has it, ask
+the files it imports or points to (of a repo-facts file, only this skill's section:
+`sed -n '/^## feature-pr-description$/,/^## /p' <file>`), then in `local.md` next to this file. If neither has it, ask
 the user once, then suggest the one line to add to CLAUDE.md so the next run finds it.
 
 | Fact | Example |

@@ -31,7 +31,8 @@ conversation that called you. Elsewhere it runs in the chat. Either way:
 ## Repo facts
 
 This skill needs the facts below. Look each one up in the repo's CLAUDE.md (or AGENTS.md) and
-the files it imports or points to, then in `local.md` next to this file. If neither has it, infer
+the files it imports or points to (of a repo-facts file, only this skill's section:
+`sed -n '/^## qa-tester$/,/^## /p' <file>`), then in `local.md` next to this file. If neither has it, infer
 it from the repo (README, scripts, `.mcp.json`) only when that is unambiguous, and say so;
 otherwise report it as missing, with the one line to add to CLAUDE.md so the next run finds it.
 
