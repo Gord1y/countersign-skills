@@ -23,7 +23,8 @@ plan file (step 5).
 ## Repo facts
 
 This skill needs the facts below. Look each one up in the repo's CLAUDE.md (or AGENTS.md) and
-the files it imports or points to, then in `local.md` next to this file. If neither has it, report
+the files it imports or points to (of a repo-facts file, only this skill's section:
+`sed -n '/^## pr-review-triage$/,/^## /p' <file>`), then in `local.md` next to this file. If neither has it, report
 it as missing, with the one line to add to CLAUDE.md so the next run finds it.
 
 | Fact | Example |

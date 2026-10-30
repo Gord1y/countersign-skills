@@ -8,7 +8,7 @@ agent running `thorough-diff-review`.
 ## Read the whole change, then the code around it
 
 - Open the diff of every changed file. For a release, that is
-  `git diff origin/main...origin/staging`, file by file, after `git fetch origin`.
+  `git diff origin/main...<release branch>`, file by file, after `git fetch origin`.
 - The diff is the entry point, not the boundary. Before writing a finding, read the code that could
   disprove it: the definitions the change calls, its callers, and the tests that pin the behaviour.
   Report only what still holds.

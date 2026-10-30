@@ -78,26 +78,26 @@ run() {
 }
 
 set -- .github/rulesets/*.json
-[ $# -eq 3 ] || fail "expected three committed rulesets, found $#"
-[ "$(jq -r .name .github/rulesets/staging.json)" = staging ] || fail "staging.json is not the staging ruleset"
+[ $# -eq 2 ] || fail "expected two committed rulesets, found $#"
+[ "$(jq -r .name .github/rulesets/main.json)" = main ] || fail "main.json is not the main ruleset"
 
 serve
 out=$(run --check) || fail "matching rulesets failed the check: $out"
 [ "$out" = "rulesets: ok" ] || fail "a passing check did not print only ok: $out"
-for id in 11 12 13; do
+for id in 11 12; do
   grep -qx "GET repos/Gord1y/countersign-skills/rulesets/$id" "$stub/calls" || fail "the check never read ruleset $id"
 done
 
 serve
-edit 13 '(.rules[] | select(.type == "pull_request") | .parameters.required_approving_review_count) = 1'
+edit 11 '(.rules[] | select(.type == "pull_request") | .parameters.required_approving_review_count) = 1'
 status=0
 out=$(run --check) || status=$?
 [ "$status" -eq 1 ] || fail "a drifted ruleset passed the check"
-echo "$out" | grep -q '"staging" on GitHub differs' || fail "a drift did not name its ruleset: $out"
+echo "$out" | grep -q '"main" on GitHub differs' || fail "a drift did not name its ruleset: $out"
 echo "$out" | grep -q '^+.*"required_approving_review_count": 1' || fail "a drift did not show the GitHub value: $out"
 
 serve
-for id in 11 12 13; do edit "$id" '.bypass_actors = null'; done
+for id in 11 12; do edit "$id" '.bypass_actors = null'; done
 out=$(run --check) || fail "bypass actors the token cannot see failed the check: $out"
 
 serve
@@ -124,17 +124,17 @@ echo "$out" | grep -q '"release tags" from .github/rulesets/release-tags.json is
   fail "a missing ruleset was not named: $out"
 
 serve
-edit 13 '(.rules[] | select(.type == "pull_request") | .parameters.required_approving_review_count) = 1'
+edit 11 '(.rules[] | select(.type == "pull_request") | .parameters.required_approving_review_count) = 1'
 out=$(run --apply) || fail "applying over a drift did not end in a passing check: $out"
-grep -qx "PUT repos/Gord1y/countersign-skills/rulesets/13" "$stub/calls" || fail "apply did not update staging"
-echo "$out" | grep -qx 'rulesets: updated "staging"' || fail "apply did not report the update: $out"
+grep -qx "PUT repos/Gord1y/countersign-skills/rulesets/11" "$stub/calls" || fail "apply did not update main"
+echo "$out" | grep -qx 'rulesets: updated "main"' || fail "apply did not report the update: $out"
 echo "$out" | tail -n 1 | grep -qx 'rulesets: ok' || fail "apply did not end with a passing check: $out"
 
 serve
-unlist staging
+unlist main
 out=$(run --apply) || fail "applying a missing ruleset did not end in a passing check: $out"
-grep -qx "POST repos/Gord1y/countersign-skills/rulesets" "$stub/calls" || fail "apply did not create staging"
-echo "$out" | grep -qx 'rulesets: created "staging"' || fail "apply did not report the creation: $out"
+grep -qx "POST repos/Gord1y/countersign-skills/rulesets" "$stub/calls" || fail "apply did not create main"
+echo "$out" | grep -qx 'rulesets: created "main"' || fail "apply did not report the creation: $out"
 
 expect_usage() {
   status=0

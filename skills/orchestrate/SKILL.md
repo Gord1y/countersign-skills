@@ -38,6 +38,7 @@ integration itself creates (an overlap you port by hand, a hook failure on your 
 ## Repo facts
 
 Look each one up in the repo's CLAUDE.md (or AGENTS.md) and the files it imports or points to,
+reading only this skill's section of a repo-facts file (`sed -n '/^## orchestrate$/,/^## /p'`),
 then in `local.md` next to this file. If neither has it, take the default and suggest the one line
 to add to CLAUDE.md.
 
@@ -86,7 +87,11 @@ Write one plan file, `~/.claude/plans/<repo>-<run>.md`, holding:
 
 Give the user the file's path, then ask the same questions through the forms (AskUserQuestion), at
 most four at a time and the highest-leverage first, and write each answer back to its `Answer:`
-line. After each batch, drop what the answers settled and ask the next. A run with a run folder
+line. A change the user did not ask for that alters behaviour they would notice, or reverts or
+rewrites earlier work, is load-bearing however cheap it is to undo, and gets its own question.
+Fixes for defects found along the way stay automatic. The last batch ends with one question that
+lists every reversible call with its default: "OK with these?". After each batch, drop what the
+answers settled and ask the next. A run with a run folder
 (4 or more units) keeps this file as the folder's `plan.md`.
 
 During the run, a load-bearing question that turns up goes under `## Waiting for you`, with its
@@ -243,8 +248,8 @@ before you hand back; past 20, cut the least useful until it fits.
   install), spawn `general-purpose` with `isolation: "worktree"` and the same `model` and `effort`;
   the brief's standing rules already forbid committing and asking. Note which path the run uses
   in the plan file. Check `planner`, `reviewer` and `qa` the same way for Steps 3, 7 and 9. Where
-  `planner` is missing, spawn `general-purpose` with `opus` and `high`, told to change nothing but
-  the unit file.
+  `planner` is missing, write the spec yourself in the main session: an `opus` `general-purpose`
+  spawn would re-read everything this session already holds.
 - The worktree is cut from your `HEAD` only under `worktree.baseRef: "head"`, which the install
   sets; without it, worktrees start from the remote default branch. Check the worktree, not the
   settings file: right after the first spawn, `git worktree list` must show the new worktree at
@@ -293,7 +298,9 @@ git commit -m "<the unit's commit message>"
 remove-worktree <worktree>
 ```
 
-Run every landing from that checkout. `land-worktree` records what it landed, so a commit hook
+Run every landing from that checkout, and `remove-worktree` as a Bash call of its own, with no
+`cd`, `;`, `&&`, pipe or redirect: chained or piped it runs inside the sandbox, which cannot
+write `.git/worktrees`. `land-worktree` records what it landed, so a commit hook
 that reformats the files does not keep the worktree alive. `remove-worktree` runs outside the
 sandbox, refuses a worktree whose changes no checkout of the repo has committed, a locked one and
 one outside `.claude/worktrees/`, and removes the rest instantly (renamed into the repo's trash,
@@ -378,12 +385,16 @@ nothing to QA; the summary says so.
 - If the repo documents a guarded cleanup command, use it (dry run first), and relay every line
   about something it kept.
 - Never unlock or remove a locked worktree: the harness holds the lock while a builder runs.
-- Run `remove-worktree <path>...` for each of your builders' worktrees still present, and relay
-  every `kept` line with its reason.
+- Run `remove-worktree <path>...`, alone in its Bash call, for each of your builders' worktrees
+  still present, and relay every `kept` line with its reason. Removing what it removes needs no
+  question.
 - For a kept worktree give the user only `remove-worktree <path>` to run once its work is landed,
   never `rm -rf`. Mention that `remove-worktree --landed` sweeps every landed builder worktree,
   clean detached scratch worktree and folder of ignored output, from any session, and that the
   install's `SessionEnd` hook runs that sweep when a session ends.
+- Once a branch is merged or squash-merged on the remote, run `prune-branches`, alone in its Bash
+  call: it deletes each local branch whose changes are already on a remote branch, which
+  `git branch -d` refuses after a squash.
 - Refresh the PR description. When the branch has a PR, or the run's folder already holds a
   `pr.md`, rewrite that `pr.md` draft with `feature-pr-description` over the whole branch,
   including this run's commits. Find the PR with `gh pr view --json number,title`, run as a command

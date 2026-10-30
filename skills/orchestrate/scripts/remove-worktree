@@ -249,8 +249,10 @@ remove_one() {
     worktree-agent-*)
       if ! tip=$(git -C "$main" rev-parse -q --verify "refs/heads/$branch"); then
         :
-      elif ! git -C "$main" merge-base --is-ancestor "$tip" "$judged" || ! git -C "$main" branch -D "$branch" >/dev/null 2>&1; then
+      elif ! git -C "$main" merge-base --is-ancestor "$tip" "$judged"; then
         echo "kept branch $branch: not merged"
+      elif ! failure=$(git -C "$main" branch -D "$branch" 2>&1 >/dev/null); then
+        echo "kept branch $branch: git branch -D failed: $failure"
       fi
       ;;
   esac
@@ -298,6 +300,14 @@ main() {
   trash="$common/worktree-trash"
   builders="$main/.claude/worktrees/agent-"
   if [ "$dry" -eq 0 ]; then
+    probe_dir="$common/worktrees"
+    [ -d "$probe_dir" ] || probe_dir=$common
+    probe="$probe_dir/.remove-worktree-probe-$$"
+    if ! touch "$probe" 2>/dev/null; then
+      echo "remove-worktree: cannot write $probe_dir, so it ran inside the sandbox; run it as a Bash call of its own, with no cd, ;, &&, pipe or redirect" >&2
+      exit 2
+    fi
+    rm -f "$probe"
     git -C "$main" worktree prune
   fi
 

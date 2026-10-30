@@ -14,7 +14,8 @@ directory:
   log.md               append-only history, never re-read during the run
 ```
 
-**`orchestrator.md`** stays under about 120 lines:
+**`orchestrator.md`** stays under 6 KB (`wc -c`), checked before every spawn; over it, move
+finished units' detail to `log.md` first. It holds:
 
 - the goal, in two lines
 - decisions, one line each with the reason

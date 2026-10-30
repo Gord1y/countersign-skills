@@ -199,7 +199,7 @@ questions.
   - **The Bash sandbox, in auto-allow mode.** Every Bash command, in the main session and in every
     subagent, runs under macOS Seatbelt. It writes only to the working folder, the temp folders and
     the listed caches, and reaches only the listed hosts. Inside that boundary it needs no
-    approval. `gh`, `docker` and `remove-worktree` run outside it and are approved as usual, but only as a command
+    approval. `gh`, `docker`, `remove-worktree` and `prune-branches` run outside it and are approved as usual, but only as a command
     of their own: a line that pipes or chains one with anything else runs sandboxed as a whole.
     There `gh` can't read its token from the keychain or verify TLS, so it looks logged out; the
     tooling rule has agents filter with `gh --jq` instead. A `git worktree *` entry was dropped:
@@ -340,6 +340,26 @@ folder a dependency ships into `node_modules`, and `git worktree remove` unlinks
 `node_modules` file in the foreground, which is slow. The command runs outside the sandbox through
 `sandbox.excludedCommands`. That is safe because it only removes committed work. A skills-only
 install has the script in the orchestrate skill's `scripts/`, where it runs inside the sandbox.
+
+## The prune-branches command
+
+`bin/prune-branches` (with `--dry-run` to only report, `--remote <name>` for a remote other than
+`origin`) deletes local branches whose changes are already on a branch of the remote. Git counts a
+branch as merged only when its tip is an ancestor of the target, and a squash merge writes a new
+commit with other ancestry, so `git branch -d` refuses every squash-merged branch. A branch counts
+as landed on a remote branch when one of these holds, checked against the remote's default branch
+first:
+
+- its tip is an ancestor of that branch (a merge or a fast-forward);
+- a squash of it is already there: a commit with the branch's tree on its merge-base has the same
+  patch as one on that branch (`git cherry`, as `git-delete-squashed` does);
+- every file it changed since the merge-base has the same content there.
+
+It never deletes `main`, `master`, `staging`, the remote's default branch, a branch checked out in
+any worktree, or a branch nothing was committed on yet. It never judges a branch against its own
+remote copy or its upstream, so a pushed branch with an open pull request stays. It prints
+`deleted <branch>: <how>` or `kept <branch>: <why>` per branch. Like `remove-worktree`, it exits
+before deleting anything when it runs inside the sandbox.
 
 ## Setting up a new machine
 

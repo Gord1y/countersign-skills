@@ -1,0 +1,120 @@
+#!/bin/sh
+set -eu
+usage() {
+  echo "usage: prune-branches [--dry-run] [--remote <name>]   deletes local branches whose changes are already on a branch of the remote (default origin): merged, squash-merged, or every changed file equal there" >&2
+  exit 2
+}
+
+dry=0
+remote=origin
+while [ $# -gt 0 ]; do
+  case $1 in
+    --dry-run) dry=1 ;;
+    --remote)
+      [ $# -ge 2 ] || usage
+      remote=$2
+      shift
+      ;;
+    *) usage ;;
+  esac
+  shift
+done
+
+if ! common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null); then
+  echo "prune-branches: run it from inside the repository" >&2
+  exit 2
+fi
+if ! git remote get-url "$remote" >/dev/null 2>&1; then
+  echo "prune-branches: no remote named $remote" >&2
+  exit 2
+fi
+if [ "$dry" -eq 0 ]; then
+  probe="$common/.prune-branches-probe-$$"
+  if ! touch "$probe" 2>/dev/null; then
+    echo "prune-branches: cannot write $common, so it ran inside the sandbox; run it as a Bash call of its own, with no cd, ;, &&, pipe or redirect" >&2
+    exit 2
+  fi
+  rm -f "$probe"
+fi
+
+default=$(git symbolic-ref -q --short "refs/remotes/$remote/HEAD" 2>/dev/null || :)
+default=${default#"$remote"/}
+checked_out=$(git worktree list --porcelain | sed -n 's#^branch refs/heads/##p')
+targets=$(git for-each-ref --format='%(refname)' "refs/remotes/$remote" | grep -v "^refs/remotes/$remote/HEAD$" | grep -vx "refs/remotes/$remote/$default" || :)
+if [ -n "$default" ]; then
+  targets="refs/remotes/$remote/$default $targets"
+fi
+
+protected() {
+  case $1 in
+    main | master | staging | "$default") return 0 ;;
+  esac
+  printf '%s\n' "$checked_out" | grep -Fxq -- "$1"
+}
+
+files_on() {
+  base=$(git merge-base "$2" "$1") || return 1
+  changed=$(git diff --name-only --no-renames "$base" "$1")
+  [ -n "$changed" ] || return 1
+  printf '%s\n' "$changed" | while IFS= read -r path; do
+    mine=$(git rev-parse -q --verify "$1:$path" 2>/dev/null || :)
+    theirs=$(git rev-parse -q --verify "$2:$path" 2>/dev/null || :)
+    [ "$mine" = "$theirs" ] || exit 1
+  done
+}
+
+squashed_on() {
+  base=$(git merge-base "$2" "$1") || return 1
+  tree=$(git rev-parse "$1^{tree}")
+  [ "$tree" != "$(git rev-parse "$base^{tree}")" ] || return 1
+  squash=$(git commit-tree "$tree" -p "$base" -m squash 2>/dev/null) || return 1
+  case $(git cherry "$2" "$squash") in
+    -*) return 0 ;;
+  esac
+  return 1
+}
+
+landed_on() {
+  own=$(git rev-parse -q --symbolic-full-name "$1@{upstream}" 2>/dev/null || :)
+  for target in $targets; do
+    if [ "$target" = "refs/remotes/$remote/$2" ] || [ "$target" = "$own" ]; then
+      continue
+    fi
+    if git merge-base --is-ancestor "$1" "$target"; then
+      how="merged into ${target#refs/remotes/}"
+      return 0
+    fi
+    if squashed_on "$1" "$target"; then
+      how="squashed into ${target#refs/remotes/}"
+      return 0
+    fi
+    if files_on "$1" "$target"; then
+      how="every changed file equal on ${target#refs/remotes/}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+git for-each-ref --format='%(refname:short)' refs/heads | while IFS= read -r branch; do
+  if protected "$branch"; then
+    continue
+  fi
+  if ! git reflog show --format=%gs "refs/heads/$branch" 2>/dev/null | grep -qv '^branch: Created from'; then
+    if [ -n "$(git reflog show "refs/heads/$branch" 2>/dev/null)" ]; then
+      echo "kept $branch: nothing committed on it yet"
+      continue
+    fi
+  fi
+  if ! landed_on "refs/heads/$branch" "$branch"; then
+    echo "kept $branch: its changes are on no $remote branch"
+    continue
+  fi
+  if [ "$dry" -eq 1 ]; then
+    echo "would delete $branch: $how"
+  elif failure=$(git branch -D "$branch" 2>&1 >/dev/null); then
+    echo "deleted $branch: $how"
+  else
+    echo "kept $branch: git branch -D failed: $failure"
+  fi
+done

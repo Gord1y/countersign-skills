@@ -34,13 +34,13 @@ characters, and rejects any `Co-Authored-By` line naming an AI tool or a "Genera
 
 ## Branches and pull requests
 
-Open every pull request against `staging`; `main` only moves when a release is cut.
+Open every pull request against `main`. The maintainer's own work collects on one branch per
+release, with one Conventional Commit per task, and goes into `main` through one pull request.
 
-- One task per pull request. It is squash-merged into `staging` as a single commit whose subject
-  is the pull request's title followed by ` (#<number>)`, and whose body is empty, so write the
-  title as a Conventional Commit (`<type>[(scope)][!]: <subject>`). The `title` check enforces it.
-- A pull request merges once `gates`, `commits`, `lint` and `title` pass and the branch is up to
-  date with `staging` ("Update branch" on the pull request brings it up to date). The maintainer
+- A pull request is merged with a merge commit, so each commit of the branch lands as it is: write
+  every commit message, and the pull request's title, as a Conventional Commit
+  (`<type>[(scope)][!]: <subject>`). The `commits` and `title` checks enforce it.
+- A pull request merges once `gates`, `commits`, `lint` and `title` pass. The maintainer
   reviews every pull request someone else opens before merging it (their review is requested
   automatically), and reviews their own work locally before each release, against
   [docs/review-checklist.md](docs/review-checklist.md).
@@ -48,16 +48,15 @@ Open every pull request against `staging`; `main` only moves when a release is c
   maintainer merges, so a required approval would only block the maintainer's own work. An
   automated Claude review supplied it until 1.0.0 and was removed, as in Countersign.
 - For a pull request from a fork, the workflows wait until the maintainer approves them to run.
-- Nobody pushes to `staging` or `main` directly, the maintainer included.
+- Nobody pushes to `main` directly, the maintainer included.
 
 ## Rulesets
 
-Three rulesets enforce this, and none has a bypass actor, so they bind the maintainer too:
+Two rulesets enforce this, and neither has a bypass actor, so they bind the maintainer too:
 
 - `main`: no deletion, no force push, changes only through a pull request merged with a merge
   commit, and the required checks `gates`, `commits`, `lint` and `title`, each expected from the
   GitHub Actions app. No up-to-date requirement.
-- `staging`: the same, but squash only and up to date.
 - `release tags`: a `v*` tag can never be moved or deleted.
 
 Each is committed as `.github/rulesets/<name>.json` in GitHub's own ruleset format, and the files
@@ -74,7 +73,7 @@ remove it in GitHub's settings and delete its file in the same pull request.
 files.
 
 Auto-merge is on. With no approval required, "Enable auto-merge" on a pull request merges it by
-itself once the required checks pass, and for `staging` once the branch is up to date. GitHub
+itself once the required checks pass. GitHub
 Actions may run only GitHub's own actions, each pinned to a full commit SHA. The workflows' default
 token is read-only and may not create or approve pull requests, and the repository has no Actions
 secrets: no workflow reads one.
@@ -83,14 +82,14 @@ secrets: no workflow reads one.
 
 A release is cut by the maintainer:
 
-1. Add the release note under `releases/` in a `docs(release): add <x.y.z> notes` commit, in the
-   format described in [releases/README.md](releases/README.md). It comes first.
+1. Add the release note under `releases/` on the release branch, in a
+   `docs(release): add <x.y.z> notes` commit, in the format described in
+   [releases/README.md](releases/README.md).
 2. Review the whole release locally against [docs/review-checklist.md](docs/review-checklist.md):
-   every file of `git diff origin/main...origin/staging`, after `git fetch origin`. Fix what it
-   finds through pull requests into `staging` first.
-3. Merge `staging` into `main` with a merge commit, through a pull request titled
-   `chore(release): v<x.y.z>`. GitHub takes the merge commit's subject from that title and leaves
-   its body empty.
+   every file of `git diff origin/main...<release branch>`, after `git fetch origin`. Fix what it
+   finds on the same branch.
+3. Merge the branch into `main` with a merge commit, through a pull request titled
+   `chore(release): v<x.y.z>`. GitHub takes the merge commit's subject from that title.
 4. Tag the merge commit on `main` as `v<x.y.z>`.
 
 The tag starts the release workflow. It checks that the note exists and that its `version` matches

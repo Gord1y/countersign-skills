@@ -32,9 +32,13 @@ Earlier handoffs failed in the same few ways, and every rule below exists to pre
   replying, and put that path in the block's header, so the next chat can re-read the brief after
   its own context is compacted. Never write it inside a repo or a project folder.
 - **Written to the next model, in the second person.** "You are continuing…", not "we did…".
-- **Self-contained.** The block is the whole briefing. It may point to a file as reference, but
-  nothing in it may depend on reading another document first. When a plan or run file holds
-  something the next chat needs, carry that part into the block.
+- **Delta only.** The next chat is as capable as you and loads CLAUDE.md, rules, memory, skills
+  and repo facts on its own. Write only what it cannot read anywhere: decisions and their reasons,
+  verified state, traps hit in this session, next steps. Never restate a rule, a skill's procedure,
+  a repo fact or a command list the repo documents.
+- **Point, don't copy.** When a plan or run file under `~/.claude/plans/` holds the state, name it
+  and say which part is current; never copy it into the block. Copy only what the next chat
+  cannot open (a claude.ai chat, another machine).
 - **Arguments narrow it.** `/context-transfer <focus>` limits the block to that thread of the
   conversation. When the user says the next chat is not Claude Code in the same repo (claude.ai,
   another tool, another machine), nothing loads there on its own: include the project and user
@@ -101,13 +105,12 @@ empty.
    half-written inside them. *Not started.*
 5. **Working state.** The `git status` summary, worktrees, stashes, unpushed commits, running
    processes, and anything temporary this session created, with whether to keep or remove it.
-6. **References.** Every file, command, URL, ID, name, figure and error message the next chat
-   needs, as exact values: full paths, line numbers where they help, commands with their flags,
-   errors verbatim, units on numbers.
-7. **Gotchas.** What failed and why, traps in the environment, dead ends not worth repeating. One
-   line each: tried X, it fails because Y.
-8. **Preferences from this conversation.** What the user asked for here that is not already in
-   `CLAUDE.md` or memory. Do not restate what loads on its own.
+6. **References.** Exact values the next chat needs and cannot find in the repo or the run file:
+   IDs, URLs, figures, errors verbatim. Not paths it finds with one search.
+7. **Gotchas.** Only traps hit in this session that no repo doc records yet. One line each:
+   tried X, it fails because Y. A trap worth keeping goes into the repo's docs, not here.
+8. **Preferences from this conversation.** Only what the user asked for here that is written
+   nowhere else.
 9. **Open questions.** Decisions waiting on the user, each with its options and your
    recommendation.
 10. **Where we left off.** The last exchange, quoting the user's last message when it is still
@@ -127,9 +130,9 @@ empty.
 - **No secrets.** Never a token, key or `.env` value: name the variable and where it lives.
 - **Granular, not padded.** Length follows the content. Every line must be something the next
   chat would otherwise rediscover or get wrong; cut anything it learns from one command.
-- **Budget: about 8 KB (2K tokens).** The block is pasted into the next chat's context, where it
-  is re-sent with every request of that session; earlier handoffs of 18 to 30 KB cost 5 to 8K
-  tokens before any work. Over budget, cut story first, then anything the next chat can see in
+- **Budget: about 3 KB.** The block is re-sent with every request of the next session, and
+  handoffs of 7 to 10 KB were mostly restated rules and copied run files. Over budget, cut story
+  first, then anything the next chat can see in
   the repo in one command. Long verbatim material (logs, diffs, whole files) becomes a path or a
   command in References, never inline. Decisions, their reasons and the next steps are never cut.
 - **Plain markdown only inside the block** — headings and lists, none of the summary markers.
