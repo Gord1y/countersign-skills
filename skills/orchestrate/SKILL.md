@@ -293,7 +293,9 @@ git commit -m "<the unit's commit message>"
 remove-worktree <worktree>
 ```
 
-Run every landing from that checkout. `land-worktree` records what it landed, so a commit hook
+Run every landing from that checkout, and `remove-worktree` as a Bash call of its own, with no
+`cd`, `;`, `&&`, pipe or redirect: chained or piped it runs inside the sandbox, which cannot
+write `.git/worktrees`. `land-worktree` records what it landed, so a commit hook
 that reformats the files does not keep the worktree alive. `remove-worktree` runs outside the
 sandbox, refuses a worktree whose changes no checkout of the repo has committed, a locked one and
 one outside `.claude/worktrees/`, and removes the rest instantly (renamed into the repo's trash,
@@ -378,8 +380,9 @@ nothing to QA; the summary says so.
 - If the repo documents a guarded cleanup command, use it (dry run first), and relay every line
   about something it kept.
 - Never unlock or remove a locked worktree: the harness holds the lock while a builder runs.
-- Run `remove-worktree <path>...` for each of your builders' worktrees still present, and relay
-  every `kept` line with its reason.
+- Run `remove-worktree <path>...`, alone in its Bash call, for each of your builders' worktrees
+  still present, and relay every `kept` line with its reason. Removing what it removes needs no
+  question.
 - For a kept worktree give the user only `remove-worktree <path>` to run once its work is landed,
   never `rm -rf`. Mention that `remove-worktree --landed` sweeps every landed builder worktree,
   clean detached scratch worktree and folder of ignored output, from any session, and that the
