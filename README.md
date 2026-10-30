@@ -145,8 +145,8 @@ and sets its own model.
   sessions never need `gh auth switch`; see [docs/gh.md](docs/gh.md).
 - **The worktree remover:** `bin/remove-worktree` removes landed builder worktrees instantly, and a
   `SessionEnd` hook sweeps them, clean scratch worktrees and ignored-output folders when a session
-  ends; see
-  [docs/install.md](docs/install.md).
+  ends. `bin/prune-branches` deletes local branches already merged or squash-merged on the remote;
+  see [docs/install.md](docs/install.md).
 
 Make your changes in your profile, not in `~/.claude/CLAUDE.md` or `~/.claude/settings.json`.
 The installer rewrites `CLAUDE.md` on every run, a settings key the repo or your profile sets wins

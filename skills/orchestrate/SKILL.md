@@ -392,6 +392,9 @@ nothing to QA; the summary says so.
   never `rm -rf`. Mention that `remove-worktree --landed` sweeps every landed builder worktree,
   clean detached scratch worktree and folder of ignored output, from any session, and that the
   install's `SessionEnd` hook runs that sweep when a session ends.
+- Once a branch is merged or squash-merged on the remote, run `prune-branches`, alone in its Bash
+  call: it deletes each local branch whose changes are already on a remote branch, which
+  `git branch -d` refuses after a squash.
 - Refresh the PR description. When the branch has a PR, or the run's folder already holds a
   `pr.md`, rewrite that `pr.md` draft with `feature-pr-description` over the whole branch,
   including this run's commits. Find the PR with `gh pr view --json number,title`, run as a command

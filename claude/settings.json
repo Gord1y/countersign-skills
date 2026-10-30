@@ -54,7 +54,7 @@
   "sandbox": {
     "enabled": true,
     "autoAllowBashIfSandboxed": true,
-    "excludedCommands": ["gh *", "docker *", "remove-worktree *"],
+    "excludedCommands": ["gh *", "docker *", "remove-worktree *", "prune-branches *"],
     "filesystem": {
       "allowWrite": [
         "~/Library/pnpm",
