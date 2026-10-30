@@ -86,7 +86,11 @@ Write one plan file, `~/.claude/plans/<repo>-<run>.md`, holding:
 
 Give the user the file's path, then ask the same questions through the forms (AskUserQuestion), at
 most four at a time and the highest-leverage first, and write each answer back to its `Answer:`
-line. After each batch, drop what the answers settled and ask the next. A run with a run folder
+line. A change the user did not ask for that alters behaviour they would notice, or reverts or
+rewrites earlier work, is load-bearing however cheap it is to undo, and gets its own question.
+Fixes for defects found along the way stay automatic. The last batch ends with one question that
+lists every reversible call with its default: "OK with these?". After each batch, drop what the
+answers settled and ask the next. A run with a run folder
 (4 or more units) keeps this file as the folder's `plan.md`.
 
 During the run, a load-bearing question that turns up goes under `## Waiting for you`, with its
@@ -243,8 +247,8 @@ before you hand back; past 20, cut the least useful until it fits.
   install), spawn `general-purpose` with `isolation: "worktree"` and the same `model` and `effort`;
   the brief's standing rules already forbid committing and asking. Note which path the run uses
   in the plan file. Check `planner`, `reviewer` and `qa` the same way for Steps 3, 7 and 9. Where
-  `planner` is missing, spawn `general-purpose` with `opus` and `high`, told to change nothing but
-  the unit file.
+  `planner` is missing, write the spec yourself in the main session: an `opus` `general-purpose`
+  spawn would re-read everything this session already holds.
 - The worktree is cut from your `HEAD` only under `worktree.baseRef: "head"`, which the install
   sets; without it, worktrees start from the remote default branch. Check the worktree, not the
   settings file: right after the first spawn, `git worktree list` must show the new worktree at
