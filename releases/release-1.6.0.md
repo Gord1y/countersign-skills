@@ -33,6 +33,8 @@ testedWith:
   6 KB. With no `planner` agent installed, the main session writes the spec itself.
 - The `safety` rule removes what `remove-worktree` or `prune-branches` verifies as landed without
   asking. The `orchestration` rule shows reversible calls for approval before building.
+- Releases go from one branch straight into `main` through one pull request; the `staging`
+  branch and its ruleset are gone.
 
 ## Fixed
 
