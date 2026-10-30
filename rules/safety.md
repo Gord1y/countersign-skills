@@ -3,7 +3,10 @@
 - Force-pushing, rebasing a pushed branch or hard-resetting shared work needs my explicit
   confirmation, even when I ask casually.
 - Deleting files or branches, `DROP`, `TRUNCATE`, `migrate reset` and `rm -rf` need my yes, or a
-  plan I approved that names exactly what is lost.
+  plan I approved that names exactly what is lost. Not for what is verified as landed: a worktree
+  or branch `remove-worktree` removes, or a local branch never pushed whose tree a commit on its
+  target already holds. Remove those without asking; where the repo denies the command, give it
+  as a 🙋.
 - Checks write only local test data prefixed `qa-`, through the app's API first, and delete it
   after. The project's standing QA account stays. Never a shared or remote environment, email,
   payments or anything that leaves the local stack.

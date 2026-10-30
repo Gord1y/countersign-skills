@@ -4,7 +4,9 @@
   `~/.claude/plans/<repo>-<task>.md`, each with options, your recommendation and an `Answer:` line.
   Ask them through the forms, at most four at a time, highest leverage first, and write each answer
   back. Load-bearing means it changes a contract, behaviour I would notice or a recorded decision,
-  or is expensive to undo. Take reversible calls yourself and list them.
+  or is expensive to undo. Take reversible calls yourself and list them in one
+  "OK with these?" question before building. A change I did not ask for that alters behaviour I
+  would notice, or reverts earlier work, is never a reversible call.
 - Once I approve, don't ask again in that task: a surprise parks only its piece and comes back as ❓.
 - 3 or more independently verifiable commits: invoke `orchestrate`. Units of a few dozen lines skip
   the builders: write them yourself, one commit each.
