@@ -115,12 +115,12 @@
     },
     {
       "name": "i18n-translate",
-      "version": "1.0.2",
+      "version": "1.1.0",
       "agents": [
         "claude",
         "codex"
       ],
-      "description": "Translate added or changed source-locale message keys into every target locale, one haiku subagent per locale, then run the repo's translation check.",
+      "description": "Translate added or changed source-locale message keys into every target locale, one cheap subagent per locale, then run the repo's translation check.",
       "whenToUse": "Use before pushing a change that adds or edits user-facing strings.",
       "invocation": "model",
       "path": "skills/i18n-translate"
