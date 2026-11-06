@@ -148,6 +148,9 @@ back through you, and the research would be paid twice.
   and only that unit parks. The one-line reason for the planner goes into the split and the unit
   table. Not "edge-case heavy": list the cases (Step 5) and skip the planner.
 - **`haiku`** only where a known fan-out skill pins it, such as one translator per locale.
+  Under T3 Code that skill routes the fan-out itself, to the cheap ChatGPT model the routing
+  table in the orchestration rule names; never re-route it, and never route a builder, planner,
+  reviewer or researcher there.
 - **Never omit `model` or `effort`**: an unnamed spawn inherits the main session's tier and
   effort. The `Agent` tool's `effort` beats the agent's frontmatter, so pass both even to agents
   that pin them.

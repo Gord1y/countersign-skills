@@ -67,7 +67,12 @@ fm_get() {
 
 skills=
 if [ -f "$folder/skills.tsv" ]; then
+  skills_line=0
   while IFS=$tab read -r name version agents || [ -n "$name" ]; do
+    skills_line=$((skills_line + 1))
+    printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' &&
+      printf '%s\n' "$agents" | grep -Eq '^[a-z]+(,[a-z]+)*$' ||
+      die "skills.tsv:$skills_line: $name needs name, a x.y.z version and agents, separated by tabs"
     rel="skills/$name/SKILL.md"
     [ -f "$folder/$rel" ] || die "$rel:1: skills.tsv lists $name but the file is missing"
     fm_get "$rel" description 1
@@ -90,7 +95,11 @@ fi
 
 rules=
 if [ -f "$folder/rules.tsv" ]; then
+  rules_line=0
   while IFS=$tab read -r name agents || [ -n "$name" ]; do
+    rules_line=$((rules_line + 1))
+    printf '%s\n' "$agents" | grep -Eq '^[a-z]+(,[a-z]+)*$' ||
+      die "rules.tsv:$rules_line: $name needs name and agents, separated by a tab"
     rel="rules/$name.md"
     [ -f "$folder/$rel" ] || die "$rel:1: rules.tsv lists $name but the file is missing"
     title=$(awk '/^## / { sub(/^## /, ""); print; exit }' "$folder/$rel")

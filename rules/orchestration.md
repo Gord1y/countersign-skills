@@ -13,5 +13,14 @@
 - Every Agent spawn names `model` and `effort`: `haiku` with `low` to search and read, `sonnet`
   with `medium` to build and QA and `high` to review, `opus` with `high` for the planner, or
   anything else only with the reason in the prompt.
+- Under T3 Code, mechanical fan-outs go to a cheap ChatGPT model through `delegate_task`, so my
+  Claude quota pays only for judgement. Route by the table below. When T3, its codex provider or
+  the model is missing, use the last column and say so in the report.
+
+| Work | Under T3 | Outside T3, or on fallback |
+| --- | --- | --- |
+| One translator per locale (`i18n-translate`) | `delegate_task` to `codex`, `gpt-6.1-terra`, `reasoningEffort: low` | `haiku`, `low` |
+| Everything else: research, building, review, QA, planning | Claude, as above | Claude, as above |
+
 - Handoffs go through the `context-transfer` skill only. If it isn't offered, the install is
   broken: say so and ask me to re-run `install.sh`.

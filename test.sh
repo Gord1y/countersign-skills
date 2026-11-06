@@ -397,5 +397,19 @@ if badcat_err=$("$root/scripts/catalog.sh" "$badcat" 2>&1 >/dev/null); then
   fail "catalog.sh accepted a block scalar description"
 fi
 echo "$badcat_err" | grep -q 'skills/bad/SKILL.md:3' || fail "catalog.sh did not name the line of an unreadable value"
+printf 'bad\t1.0.0claude\n' >"$badcat/skills.tsv"
+printf -- '---\nname: bad\ndescription: one line\n---\n' >"$badcat/skills/bad/SKILL.md"
+if badcat_err=$("$root/scripts/catalog.sh" "$badcat" 2>&1 >/dev/null); then
+  fail "catalog.sh accepted a skills.tsv row with a missing tab"
+fi
+echo "$badcat_err" | grep -q 'skills.tsv:1' || fail "catalog.sh did not name the malformed skills.tsv line"
+rm "$badcat/skills.tsv"
+mkdir -p "$badcat/rules"
+printf 'bad\n' >"$badcat/rules.tsv"
+printf '## Bad\n' >"$badcat/rules/bad.md"
+if badcat_err=$("$root/scripts/catalog.sh" "$badcat" 2>&1 >/dev/null); then
+  fail "catalog.sh accepted a rules.tsv row without agents"
+fi
+echo "$badcat_err" | grep -q 'rules.tsv:1' || fail "catalog.sh did not name the malformed rules.tsv line"
 
 echo "test.sh: ok"
