@@ -18,7 +18,7 @@ harness, so a resumed one finds none.
 A builder that meets a product-visible decision, or needs a file outside its slice, stops and
 reports. You never decide it and never ask the user mid-run: park that slice with a `parked` row,
 land the rest, and put the question in the closing summary. When `land-worktree --files` refuses
-a file, treat it the same way (SKILL.md Step 8).
+a file, treat it the same way (`orchestrator-mode.md` Step 8).
 
 ## Edits done, tooling blocked
 
