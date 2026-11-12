@@ -291,3 +291,76 @@ the body file named by `-F`, `--body-file` or `--body-file=` (relative to `cwd`,
 
 When denied, add a `## Walkthrough` section with the screenshots, or a link to a walkthrough that
 shows them (the `walkthrough` skill builds one), then create the PR again.
+
+### gate
+
+`bin/gate` runs the repo's own gates and stamps the exact working tree it checked.
+`hooks/policy/gate.sh` blocks a stop (`Stop` and `SubagentStop`) while the work differs from its
+base and the current tree has no stamp.
+
+The gate line is the first line of the form `gate: <command>` under `## Gates` in `CLAUDE.md` at the
+repo root, or in `AGENTS.md` when there is no `CLAUDE.md`. Fenced code blocks are skipped, and a
+`gate:` line under another heading does not count. `bin/gate` runs the command from the repo root
+through `sh -c`, prints the last 60 lines of its output, and keeps the full output in
+`<git-dir>/countersign/gate.log`.
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | The gate passed and the tree is stamped |
+| 1 | The gate command failed; no stamp |
+| 2 | Not a git repository, a wrong argument, an unhashable tree or an unwritable folder |
+| 3 | No gate line; the message names the exact line to add |
+| 4 | The gate passed but changed the tree while it ran; no stamp |
+
+An exit 4 means the gate writes files that are neither ignored nor committed. Ignore or commit them,
+then run `gate` again.
+
+#### The tree hash
+
+The hash is `git write-tree` over a temporary copy of the real index (`cp -p`, so git's racy-stat
+check still sees the original timestamp) after `git add -A`. It covers committed, uncommitted and
+untracked files that are not ignored, and never touches the real index. Because the copy carries
+the stat data, only changed and untracked files are rehashed: about the cost of one `git status`
+(inferred, not measured on a large repo). Untracked blobs land in `.git/objects` as loose objects,
+which `git gc` prunes. The temporary index is removed on exit, `INT` and `TERM`.
+
+`.claude/worktrees` is excluded from the hash, because builders' worktrees live there and are
+nested repositories. Any other untracked nested repository counts as a change: adding one makes the
+tree differ. A dirty submodule is not held, since only its `HEAD` commit is hashed.
+
+A stamp is the file `<common-git-dir>/countersign/gate/<tree-hash>`, shared by all worktrees of a
+repo. A commit keeps the tree, so a stamp survives it, and a builder's stamp is valid in the main
+checkout once the orchestrator lands the same changes.
+
+#### Who is held
+
+The base is the tree a stop must differ from.
+
+- A builder (a `SubagentStop` in a linked worktree) is held against `HEAD`'s tree, so any
+  uncommitted change needs a stamp. A subagent in the main checkout (the read-only ones) passes.
+- The main session is held against the tree recorded at its first tool call, in
+  `<git-dir>/countersign/sessions/<session_id>`. A session that changed nothing, or only answered,
+  never blocks. A stop before any tool call records the base and passes. A session id with other
+  characters than letters, digits, `.`, `_` and `-`, or starting with `.`, is not held. Files older
+  than 30 days are removed from the sessions folder. Parallel first tool calls publish the base
+  with a hard link, so the first one wins.
+- A `cwd` outside a git repository, and any failure to hash, pass.
+
+The base is the tree at the session's first tool call, so any later change to the tree counts as the
+session's own, including another session's edit or a pull. The wall cannot tell them apart. It caps
+the cost at one block per session, provider and tree, by writing
+`<git-dir>/countersign/sessions/<session_id>.<provider>.<tree-hash>.blocked`: the next stop on the
+same unstamped tree passes, and a new tree blocks again. The same marker applies to a builder, so a
+subagent whose worktree tree is unstamped gets one block per tree. A block also happens once per
+stop chain, as for every wall (see The stop loop). When a turn reports nothing as done, ending it
+again passes.
+
+A repo with no gate line is not blocked for good: the main session gets one block per session and
+provider that names the line to add, then passes. The marker is
+`<git-dir>/countersign/sessions/<session_id>.<provider>.told`. A builder gets the message once per
+tree, like any block.
+
+#### Unverified
+
+Whether a builder's `SubagentStop` payload carries the worktree as `cwd`. If it carries the main
+checkout, builders pass unheld (the wall fails open). Check it once live after install.

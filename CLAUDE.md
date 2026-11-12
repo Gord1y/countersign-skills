@@ -32,12 +32,10 @@ Antigravity), installed by POSIX `sh` scripts (`install.sh`, `update.sh`, `unins
 
 ## Gates
 
-```sh
-scripts/check.sh
-```
+gate: scripts/check.sh
 
-It must pass before a change is done. It runs `./test.sh`, every `scripts/test-*.sh` and
-`scripts/lint.sh`.
+Run it as `gate`, which runs that line and stamps the tree. It must pass before a change is done.
+It runs `./test.sh`, every `scripts/test-*.sh` and `scripts/lint.sh`.
 
 ## Repo facts
 

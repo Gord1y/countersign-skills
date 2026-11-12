@@ -26,7 +26,7 @@ user relies on, or would be expensive to undo, stops the unit: report it with th
 recommendation.
 
 Work in short loops: typecheck after each file, run the single test file you touched after each
-change, and run the full gate once, last.
+change, and run the full gate once, last, as `gate`, which stamps the tree for the stop hook.
 
 For a bug fix, write the test that reproduces the bug first, run it, and keep its failing output.
 Your report quotes the failing line before the fix and the passing line after it.

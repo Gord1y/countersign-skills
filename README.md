@@ -148,6 +148,8 @@ and sets its own model. Each caps its compaction window at 300K tokens.
   sessions never need `gh auth switch`; see [docs/gh.md](docs/gh.md).
 - **The hook walls:** `bin/harness-hook` runs one policy set for Claude Code and Codex hooks; see
   [docs/hooks.md](docs/hooks.md).
+- **The gate stamp:** `bin/gate` runs the repo's gate line and stamps the tree the stop hooks check;
+  see [docs/hooks.md](docs/hooks.md).
 - **The worktree remover:** `bin/remove-worktree` removes landed builder worktrees instantly, and a
   `SessionEnd` hook sweeps them, clean scratch worktrees and ignored-output folders when a session
   ends. `bin/prune-branches` deletes local branches already merged or squash-merged on the remote;
