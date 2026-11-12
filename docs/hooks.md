@@ -133,6 +133,78 @@ command that runs elsewhere with `cd` or `workdir` is judged against the session
 
 ## Walls
 
+### push
+
+`hooks/policy/push.sh` replaces the blanket `git push` deny rules that `claude/settings.json` used
+to carry. Pushing the current feature branch is free. The policy acts on `shell` calls only.
+
+It first joins a backslash before a newline, cuts each line at an unquoted ` #` (a shell comment)
+and drops the body of a `cat <<'EOF'` heredoc with a quoted delimiter, which is data (a commit
+message that mentions `git push` stays allowed). It then splits the command into simple commands on
+newlines, `;`, `&&`, `||`, `|`, `&` and parentheses, except the `(` of `$(`, so a command
+substitution stays inside its segment. Each segment loses every quote and backslash and is split on
+whitespace, so `feat-x:"main"`, `"ma"in` and `m\ain` all read as `main`.
+
+Leading `VAR=value`, `env` (with no options), `command` and `exec` are skipped. A `GIT_DIR=` or
+`GIT_WORK_TREE=` prefix, or an `env` with options (`-u`, `-C`, `-S`), makes the segment hidden (see
+below). Then the first word decides:
+
+- `git` or a path ending in `/git`: the precise parse. Git's global options (`-C`, `-c`,
+  `--git-dir`, `--work-tree`, `--no-pager`, `-P`) come first, then `push`. `-C` directories and a
+  preceding `cd` resolve against `cwd`. A `-c` whose key is `remote.*.push`, `push.*` or `alias.*`
+  makes the segment hidden.
+- `gh` or a path ending in `/gh`: the precise `gh` parse, below.
+- Anything else: the hidden rule, below.
+
+It denies a push when any of these holds:
+
+- A flag rewrites or removes remote branches: `--force`, `-f` (also inside a cluster such as
+  `-uf`), `--force-with-lease`, `--force-if-includes`, `--delete`, `-d`, `--mirror`, `--all`,
+  `--prune`.
+- A refspec starts with `+` or `:`.
+- A refspec destination matches a protected pattern. The destination is the part after `:`, or the
+  whole refspec, without `refs/heads/`. A destination with a `*` is treated as protected.
+- There is no refspec, or the refspec is `HEAD`, `@`, or holds a `$(` or a backtick (the branch is
+  computed), and the current branch of the target repository
+  (`git symbolic-ref --short -q HEAD`) matches a protected pattern, or HEAD is detached.
+- A refspec holds a shell variable such as `$BRANCH`. Its value is unknown, so the policy denies it.
+
+The protected patterns are `main`, `staging`, `release-*` and `release-hotfix*`. They sit in one
+variable at the top of the policy.
+
+One hidden rule covers every push the parse cannot see. A segment whose first word is not `git` or
+`gh` is denied when it holds the word `git` and the word `push` anywhere, or the word `gh` with
+`merge`, `api`, `auth` or `alias`. The reason names the segment's first word, and the agent is told
+to run the command directly. This one rule covers `sh`, `bash`, `zsh`, `dash` or `ksh` with `-c` in
+any flag order, `echo '...' | sh`, a heredoc into a shell, `xargs`, `find -exec`, `sudo`, `nice`,
+`timeout 10`, `python3 -c`, `node -e`, `perl -e` and `eval`. A `git` segment with a `$(` or a
+backtick keeps the precise parse, so
+`git commit -m "$(cat msg.txt)" && git push` and `echo $(git rev-parse HEAD) && git push` pass.
+
+`gh` runs outside the sandbox and is auto-allowed, so the hook is its only wall. The policy denies:
+
+- `gh pr merge`, and `gh alias set` or `gh alias import` (an alias can rename `pr merge`).
+- `gh auth token`, and `gh auth status` with `--show-token` or a short-flag cluster that holds `t`
+  (`-t`, `-at`, `-ta`).
+- A `gh api` call that writes and whose endpoint matches `rulesets` or `branches/*/protection`, or
+  `git/refs`, `contents/`, `/merges` or `pulls/*/merge`. A call writes when `-X` or `--method` is
+  anything but `GET`, or when it has `-f`, `-F`, `--field`, `--raw-field` or `--input` and no
+  explicit `GET`. A read such as `gh api repos/o/r/rulesets -X GET -f per_page=1` passes.
+- `gh api graphql` whose text holds `mergePullRequest`, `enablePullRequestAutoMerge`,
+  `BranchProtectionRule`, `Ruleset`, `updateRef`, `deleteRef`, `createRef` or `updateRefs`, with any
+  method.
+
+Tags pass. A push of `v*` tags, or `git push --tags`, is not a branch push, and the release flow
+pushes a tag after the release branch merges. A tag name equal to a protected pattern is the one
+case that still denies.
+
+Limits. The policy is a parse of one command string, not a shell. Git aliases defined in config
+files, a script file that pushes, and text built from variables are not seen. The hidden rule
+denies a harmless command that only names a push, such as `grep 'git push' docs`, and a `;` or `|`
+inside a quoted string still splits the command. The sandbox and the repository rulesets stay the
+floor: a force push or a push to a protected branch is still rejected by the rulesets on the
+remote.
+
 ### pr-size
 
 `hooks/policy/pr-size.sh` denies `gh pr create` when the PR changes more than 400 lines against its

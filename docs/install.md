@@ -105,8 +105,9 @@ when that is set, as Countersign does):
   on the next run, and so is a path-bound rule after the repo moves. A value you changed since,
   and one you had before the first install, stay.
 - There is no `ask` list: inside the sandbox nothing prompts, and outside it the auto-mode
-  classifier decides. `deny` blocks `git push` and reading `.env`, `.env.local`, `.env.*.local`, `.env.development`, `.env.production`,
-  `.env.staging` and `.env.test` at any depth, for the Read tool and sandboxed commands alike.
+  classifier decides. `deny` blocks reading `.env`, `.env.local`, `.env.*.local`,
+  `.env.development`, `.env.production`, `.env.staging` and `.env.test` at any depth, for the
+  Read tool and sandboxed commands alike.
   `.env.example` and other templates stay readable and editable. The files are named because a
   deny always beats an allow: `Read(.env.*)` would also hide `.env.example`, and no `allowRead`
   re-opens it for the Read tool. Each rule starts with `**/` because a relative rule such as
@@ -252,7 +253,8 @@ questions.
   ignored. Precedence is deny, then ask, then allow. Never allow an interpreter or a shell by rule
   (`python3`, `node`, `sh -c`, `pnpm exec`) or "anything not denied"; make the narrow safe action
   free instead.
-- **What still stops a run:** `git push` (denied), anything the classifier
+- **What still stops a run:** a push to a protected branch, a force push or a branch delete
+  (denied by the `push` wall in [hooks.md](hooks.md)), anything the classifier
   judges destructive or outside the trust boundary, and a Bash command that can't run in the
   sandbox. A builder that hits one reports it, and the orchestrator parks that unit and finishes
   the rest.

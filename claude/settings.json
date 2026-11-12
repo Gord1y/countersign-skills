@@ -38,10 +38,6 @@
       "Edit(//private/tmp/claude-*/**)"
     ],
     "deny": [
-      "Bash(git push)",
-      "Bash(git push *)",
-      "Bash(git -C * push)",
-      "Bash(git -C * push *)",
       "Read(**/.env)",
       "Read(**/.env.local)",
       "Read(**/.env.*.local)",

@@ -210,10 +210,6 @@ permission lists this repo ships:
   },
   "permissions": {
     "deny": [
-      "Bash(git push)",
-      "Bash(git push *)",
-      "Bash(git -C * push)",
-      "Bash(git -C * push *)",
       "Read(**/.env)",
       "Read(**/.env.local)",
       "Read(**/.env.*.local)",
@@ -238,7 +234,7 @@ The file goes at `/Library/Application Support/ClaudeCode/managed-settings.json`
 `C:\Program Files\ClaudeCode\managed-settings.json` on Windows
 ([managed settings docs](https://code.claude.com/docs/en/managed-settings)). `/status` shows
 `Enterprise managed settings (file)` once it applies. It runs every Bash command in the sandbox
-without a prompt and blocks `git push` and reading `.env` files and credential stores outright. It
+without a prompt and blocks reading `.env` files and credential stores outright. It
 allows no network hosts, and no writes outside the working folder and a per-user temp folder, so
 a sandboxed command that needs either is blocked until it is allowed: add the hosts your builds use under
 `sandbox.network.allowedDomains` and the cache folders they write under
