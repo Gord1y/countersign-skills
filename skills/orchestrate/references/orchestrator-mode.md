@@ -2,6 +2,12 @@
 
 Read this when the plan has 3 or more units and the `builder` agent is installed.
 
+**Under Codex** orchestrator mode does not run, because there is no `Agent` tool and no builder
+agent. Build each unit yourself in the main session, one commit each, and run `gate` before each
+commit. The scripts are in `~/.agents/skills/orchestrate/scripts/`. Review Codex-written code on
+Claude: under T3 Code, call `delegate_task` with `sonnet`, effort `high` and role
+`agents/conformance.md`; without T3, the user runs that review.
+
 ## The division of labour
 
 | Role | Who | Does |

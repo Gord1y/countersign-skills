@@ -73,7 +73,7 @@ has, so those two rules stay out of both. For Codex the installer also writes a 
 
 | Skill | What it does | Agents |
 | --- | --- | --- |
-| `orchestrate` | The entry point for every task: picks one of ten playbooks; at 3 or more commits runs a builder per unit. | Claude Code |
+| `orchestrate` | The entry point for every task: picks one of ten playbooks; at 3 or more commits runs a builder per unit. | Claude Code, Codex |
 | `context-transfer` | Packs a conversation into one self-contained block for a new chat. | Claude Code, Codex, Antigravity |
 | `human-voice-writing` | Drafts and revises longer text so it reads as human, not AI-generated. | Claude Code, Codex, Antigravity |
 | `retro` | Turns a session's mistakes into structure, not notes: each lesson goes to the highest rung that works, and its fix is proven on the real mistake. Orchestrate runs it after a correction, failed gate, revert or parked unit. | Claude Code, Codex, Antigravity |

@@ -46,6 +46,10 @@ lists every reversible call with its default: "OK with these?". After each batch
 answers settled and ask the next. A run with a run folder
 (4 or more units) keeps this file as the folder's `plan.md`.
 
+**Under Codex** there is no `AskUserQuestion`. Put the questions in your reply, numbered, each
+with its recommendation worded so that answering "yes" accepts it, at most four at a time. Write
+each answer back to its `Answer:` line when the user replies.
+
 Run `plan-lint check <plan>` (`scripts/plan-lint`) before the first question and fix every
 problem it prints. The last question asks the user to approve the plan as written. Write the
 user's answers into each `Answer:` line first. On a yes, run `plan-lint approve <plan>`, which

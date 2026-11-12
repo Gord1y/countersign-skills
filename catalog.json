@@ -3,9 +3,10 @@
   "skills": [
     {
       "name": "orchestrate",
-      "version": "2.0.0",
+      "version": "2.1.0",
       "agents": [
-        "claude"
+        "claude",
+        "codex"
       ],
       "description": "Route every task to one playbook (feature, bug-fix, refactor, investigation, prototype, UI change, release, PR triage, knowledge, unattended run); at 3+ commits, brief builders.",
       "whenToUse": "Use for every task that changes, investigates or ships code: a feature, a bug, a refactor, how or why code works, a spike, a UI change, a release, a PR link or its findings, a knowledge-graph update, an unattended run. Not for a question answered without the repo.",

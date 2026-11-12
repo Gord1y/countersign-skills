@@ -51,7 +51,7 @@ for agent in "$root"/agents/*.md; do
   done
 done
 [ -L "$home/.agents/skills/context-transfer" ] || fail "context-transfer is not linked for Codex"
-[ ! -e "$home/.agents/skills/orchestrate" ] || fail "orchestrate was linked for Codex, which skills.tsv excludes"
+[ -L "$home/.agents/skills/orchestrate" ] || fail "orchestrate is not linked for Codex"
 [ ! -e "$home/.gemini" ] || fail "an Antigravity folder was created although Antigravity is not installed"
 ls "$home"/.config/countersign/skills/backups/*/claude/orchestrate/SKILL.md >/dev/null 2>&1 || fail "the existing orchestrate folder was not backed up"
 grep -q "@$root/rules/code.md" "$home/.claude/CLAUDE.md" || fail "CLAUDE.md was not written from claude/CLAUDE.template.md"
@@ -346,6 +346,12 @@ mkdir -p "$extra/skills/how-it-works"
 printf -- '---\nname: how-it-works\n---\n' >"$extra/skills/how-it-works/SKILL.md"
 printf 'how-it-works\t1.0.0\tclaude\n' >>"$extra/skills.tsv"
 HOME=$profhome CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null 2>&1 && fail "an addition's skill that clashes with this repo's was installed"
+
+aghome="$fake/aghome"
+mkdir -p "$aghome/.gemini/antigravity-cli"
+HOME=$aghome CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null
+[ -L "$aghome/.gemini/antigravity-cli/skills/context-transfer" ] || fail "context-transfer is not linked for Antigravity"
+[ ! -e "$aghome/.gemini/antigravity-cli/skills/codebase-research" ] || fail "codebase-research was linked for Antigravity, which skills.tsv excludes"
 
 cxhome="$fake/cxhome"
 cxkeep="$fake/cxkeep"
