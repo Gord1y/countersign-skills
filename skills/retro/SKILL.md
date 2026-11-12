@@ -51,8 +51,10 @@ two quoted lines; what would have prevented it. Never copy a secret.
 `model: "haiku"`, `effort: "low"`, `run_in_background: false`.
 
 **Under Codex** there is no `Agent` tool. Under T3 Code, dispatch each transcript as a
-`delegate_task` child with the same brief and `mode: "wait"`. Without T3 Code, read one transcript
-at a time yourself, keeping only its report before the next.
+`delegate_task` child with `mode: "wait"`, `target: {providerInstanceId: "codex", model:
+"gpt-6.1-terra", options: {reasoningEffort: "low"}}` and the same brief, which starts by telling
+the child to begin with a fresh context. Without T3 Code, read one transcript at a time yourself,
+keeping only its report before the next.
 
 ## Step 2: pick the rung
 

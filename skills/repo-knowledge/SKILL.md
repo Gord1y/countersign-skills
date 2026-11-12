@@ -80,7 +80,9 @@ The five keys are all optional and each is `key: []` or `key:` followed by `  - 
 - `code`: globs from the repo root. `**/` matches zero or more folders, `**` anything, `*` and `?`
   stay inside one folder, `{a,b}` lists alternatives (no nesting), a trailing `/` means the whole
   folder. No `./` or leading `/`, and none of `[`, `]`, `|` or a backtick.
-- `related`: names of other nodes. `decisions`: paths of ADRs from the repo root.
+- `related`: names of other nodes. `decisions`: an ADR as a path from the repo root, a path
+  relative to `docs/features/`, or a bare slug under `docs/adr/` (`0001-numbering` for
+  `docs/adr/0001-numbering.md`).
 - `skills` (repo skills that cover the feature) and `api` (endpoints) are not checked, because a
   global skill is absent in CI.
 
@@ -120,8 +122,10 @@ only, each with a path and range. Never include secrets.
 `model: "haiku"`, `effort: "low"`, `run_in_background: false`.
 
 **Under Codex** there is no `Agent` tool. Under T3 Code, dispatch each area as a `delegate_task`
-child with the same brief and `mode: "wait"`. Without T3 Code, read one area at a time yourself,
-holding only that area's report before the next.
+child with `mode: "wait"`, `target: {providerInstanceId: "codex", model: "gpt-6.1-terra",
+options: {reasoningEffort: "low"}}` and the same brief, which starts by telling the child to
+begin with a fresh context. Without T3 Code, read one area at a time yourself, holding only that
+area's report before the next.
 
 ## Bootstrap
 

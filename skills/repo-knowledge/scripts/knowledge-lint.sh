@@ -40,7 +40,11 @@ finish_if_problems() {
   count=$(wc -l <"$errors" | tr -d ' ')
   if [ "$count" -gt 0 ]; then
     sed 's/^/knowledge-lint: /' "$errors" >&2
-    echo "knowledge-lint: $count problems" >&2
+    if [ "$count" -eq 1 ]; then
+      echo "knowledge-lint: 1 problem" >&2
+    else
+      echo "knowledge-lint: $count problems" >&2
+    fi
     exit 1
   fi
 }
@@ -164,6 +168,9 @@ BEGIN {
     }
   }
   close(path)
+  if (number == 0) {
+    report(path, 1, "no frontmatter")
+  }
   if (state == 1) {
     report(path, 1, "frontmatter is not closed")
   }
@@ -258,10 +265,10 @@ distinct_globs=$(cut -f3 "$work/globs.tsv" | sort -u | wc -l | tr -d ' ')
   printf 'CI runs `scripts/knowledge-lint.sh`, which fails on a code glob that matches no file, '
   printf 'a dead link, or a source area no node covers.\n\n'
   pointers=
-  if [ -f docs/knowledge/GLOSSARY.md ]; then
+  if grep -qxF docs/knowledge/GLOSSARY.md "$work/files"; then
     pointers='Glossary: [GLOSSARY.md](GLOSSARY.md).'
   fi
-  if [ -d docs/adr ]; then
+  if grep -q '^docs/adr/' "$work/files"; then
     pointers="${pointers:+$pointers }Decisions: [docs/adr/](../adr/)."
   fi
   if [ -n "$pointers" ]; then
@@ -362,7 +369,24 @@ awk -v links="$work/links.tsv" '
     rest = line
     while ((at = index(rest, "](")) > 0) {
       rest = substr(rest, at + 2)
-      end = index(rest, ")")
+      end = 0
+      opened = 0
+      for (j = 1; j <= length(rest); j++) {
+        ch = substr(rest, j, 1)
+        if (ch == "(") {
+          if (opened) {
+            break
+          }
+          opened = 1
+        } else if (ch == ")") {
+          if (opened) {
+            opened = 0
+          } else {
+            end = j
+            break
+          }
+        }
+      }
       if (end == 0) {
         break
       }

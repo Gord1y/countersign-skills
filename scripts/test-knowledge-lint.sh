@@ -136,7 +136,7 @@ fixture links
 lint --write
 lint
 expect "case 3 dead link" 1 "dead link ../missing.md"
-if grep -q 'nowhere\|example.com\|#top\|invoices.md\|0001-numbering' "$work/err"; then
+if grep -qE 'nowhere|example.com|#top|invoices.md|0001-numbering' "$work/err"; then
   fail "case 3: a link that resolves, or that is skipped, was reported: $(cat "$work/err")"
 fi
 
@@ -236,7 +236,77 @@ rm "$dir/docs/features/"*.md
 lint
 expect "case 9c no nodes" 1 "no nodes in docs/features/"
 
+fixture parens
+printf '# Parens\n' >"$dir/docs/adr/a_(b).md"
+{
+  echo
+  echo '[p](../adr/a_(b).md) [q](../adr/c_(d).md)'
+} >>"$dir/docs/features/billing.md"
+lint --write
+lint
+expect "case 3b link with parentheses" 1 "dead link ../adr/c_(d).md"
+if grep -qF 'a_(b)' "$work/err"; then
+  fail "case 3b: a link target with a balanced parenthesis pair was reported: $(cat "$work/err")"
+fi
+
+fixture emptynode
+: >"$dir/docs/features/billing.md"
+lint
+expect "case 8e empty node" 1 "docs/features/billing.md:1: no frontmatter"
+expect "case 8e count wording" 1 "knowledge-lint: 1 problem"
+if grep -q '1 problems' "$work/err"; then
+  fail "case 8e: one problem was reported in the plural"
+fi
+
+fixture ignoredadr
+git -C "$dir" rm -rq --cached docs/adr
+printf 'docs/adr/\n' >"$dir/.gitignore"
+git -C "$dir" add .gitignore
+lint --write
+if grep -q '^Decisions:' "$dir/docs/knowledge/index.md"; then
+  fail "case 1c: the index points to an untracked, ignored docs/adr"
+fi
+
+fixture_glob() {
+  fixture "$1"
+  mkdir -p "$(dirname "$dir/$3")"
+  printf 'x\n' >"$dir/$3"
+  node billing Billing "$2" '' ''
+  git -C "$dir" add -A
+  lint --write
+  lint
+}
+
+expect_glob_match() {
+  fixture_glob "$1" "$2" "$3"
+  if grep -qF "$2 matches no file" "$work/err"; then
+    fail "$1: $2 should match $3: $(cat "$work/err")"
+  fi
+}
+
+expect_glob_miss() {
+  fixture_glob "$1" "$2" "$3"
+  expect "$1" 1 "$2 matches no file"
+}
+
+expect_glob_match glob1 'src/*.ts' src/a.ts
+expect_glob_miss glob2 'src/*.ts' src/x/a.ts
+expect_glob_match glob3 'src/?.ts' src/a.ts
+expect_glob_miss glob4 'src/?ts' src/a/ts
+expect_glob_match glob5 'src/deep/' src/deep/x/y.ts
+expect_glob_miss glob6 'src/deep/' src/deeper/y.ts
+
+fixture nestedbrace
+node billing Billing 'src/{a,{b,c}}/**' '' ''
+lint
+expect "case 15 nested brace" 1 "has an unbalanced or nested brace"
+fixture openbrace
+node billing Billing 'src/{a,b/**' '' ''
+lint
+expect "case 15b unbalanced brace" 1 "has an unbalanced or nested brace"
+
 mkdir -p "$work/plain"
+work=$(cd "$work" && pwd -P)
 status=0
 (cd "$work/plain" && GIT_CEILING_DIRECTORIES="$work" "$shipped") >"$work/out" 2>"$work/err" || status=$?
 expect "case 10 outside a work tree" 2 "knowledge-lint: not inside a git work tree"
