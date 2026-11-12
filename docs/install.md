@@ -190,9 +190,12 @@ When `~/.codex` exists, `install.sh` also writes two Codex files. `--no-settings
   are replaced, and a `[` line inside a multi-line array is not taken for a table.
 - `uninstall.sh` puts displaced keys back at the top of the file, not on their original line, and
   normalises the final newline. A CRLF file comes out with mixed line endings, which TOML accepts.
-  The byte-for-byte restore therefore holds for a `config.toml` that ends in a newline: `install.sh`
-  adds a missing final newline and `uninstall.sh` does not take it out again. When you deleted the block yourself, the displaced values stay in
-  `codex-config-displaced.toml` and are copied to the backup folder.
+  TOML reads top-level keys the same in any order, so the restored file means what yours did. It
+  is byte for byte the same only when the displaced keys already sat first, in that order, and the
+  file ended in a newline: `install.sh` adds a missing final newline and `uninstall.sh` does not
+  take it out again. Table keys the profile changed always go back to their own line. When you
+  deleted the block yourself, the displaced values stay in `codex-config-displaced.toml` and are
+  copied to the backup folder.
 - A `hooks.json` that is not an object of event arrays (a JSONC comment, a top-level `[]`) is
   left alone and printed as `skipped ... (not valid JSON)`. A 0-byte file counts as `{}`.
 - The limit is one value for every Codex session, because Codex takes it from the top level and
