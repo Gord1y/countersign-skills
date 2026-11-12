@@ -16,8 +16,19 @@ Antigravity), installed by POSIX `sh` scripts (`install.sh`, `update.sh`, `unins
 - List every skill in `skills.tsv` and every rule in `rules.tsv`. Bump a skill's version there
   with every change to it.
 - Regenerate `catalog.json` with `scripts/catalog.sh`; `./test.sh` fails while it is stale.
+- A skill installed for Codex that the model may invoke names `Agent`, `AskUserQuestion` or
+  `Artifact` only with an `**Under Codex**` paragraph saying what Codex does instead; `./test.sh`
+  checks it.
 - Prose: short declarative sentences, English only.
 - Conventional Commits, one task per commit.
+
+## Writing for agents
+
+- A `SKILL.md` holds the path through the task. Detail goes into `references/` files, named at the
+  step that needs them.
+- Point at context, do not paste it: name the file and the line range.
+- Every session pays for descriptions and rules; every step an agent holds at once costs focus. Cut
+  the first before the second.
 
 ## Gates
 

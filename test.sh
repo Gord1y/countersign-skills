@@ -113,6 +113,25 @@ for skill in "$root"/skills/*/; do
     echo "$skill_frontmatter" | grep -q '^when_to_use: ' || fail "skills/$name/SKILL.md is model-invocable but has no when_to_use"
   fi
 done
+claude_only_tools='AskUserQuestion|subagent_type|the `?Agent`? tool|`Agent`|the `?Artifact`? tool|`Artifact`'
+codex_fallback='^\*\*(Under|On) Codex|without subagents \(Codex'
+check_claude_only_tools() {
+  tools_root=$1
+  tools_tsv=$2
+  for skill in "$tools_root"/skills/*/; do
+    name=$(basename "$skill")
+    awk -F '\t' -v n="$name" '$1 == n { print $3 }' "$tools_tsv" | grep -q 'codex' || continue
+    sed -n '2,/^---$/p' "$skill/SKILL.md" | grep -q '^disable-model-invocation: true' && continue
+    find "$skill" -name '*.md' | sort | while read -r file; do
+      grep -qE "$claude_only_tools" "$file" || continue
+      grep -qE "$codex_fallback" "$file" && continue
+      first_match=$(grep -nE "$claude_only_tools" "$file" | head -n 1)
+      echo "skills/$name/${file#"$skill"}:$first_match: names a Claude-only tool without saying what Codex does instead; add an **Under Codex** paragraph"
+    done
+  done
+}
+claude_only_errors=$(check_claude_only_tools "$root" "$root/skills.tsv")
+[ -z "$claude_only_errors" ] || fail "$claude_only_errors"
 grep -qi 'never start' "$root/skills/qa-tester/SKILL.md" || fail "skills/qa-tester/SKILL.md lost its never-start rule"
 invocable=""
 for skill in "$root"/skills/*/; do
@@ -394,6 +413,11 @@ out=$(echo "$status_input" | HOME=$slhome CLAUDE_CONFIG_DIR=/x/.other "$root/bin
 badcat=$(mktemp -d "${TMPDIR:-/tmp}/countersign-skills.XXXXXX")
 trap 'rm -rf "$home" "$copyhome" "$fake" "$updhome" "$profhome" "$extra" "$unhome" "$land" "$slhome" "$badcat"' EXIT
 mkdir -p "$badcat/skills/bad"
+printf 'bad\t1.0.0\tclaude,codex\n' >"$badcat/skills.tsv"
+printf -- '---\nname: bad\ndescription: one line\nwhen_to_use: x\n---\nAsk with AskUserQuestion.\n' >"$badcat/skills/bad/SKILL.md"
+[ -n "$(check_claude_only_tools "$badcat" "$badcat/skills.tsv")" ] || fail "the Claude-only tool check passed a skill with no Codex paragraph"
+printf '**Under Codex**\n' >>"$badcat/skills/bad/SKILL.md"
+[ -z "$(check_claude_only_tools "$badcat" "$badcat/skills.tsv")" ] || fail "the Claude-only tool check failed a skill with a Codex paragraph"
 printf 'bad\t1.0.0\tclaude\n' >"$badcat/skills.tsv"
 printf -- '---\nname: bad\ndescription: >\n  folded\n---\n' >"$badcat/skills/bad/SKILL.md"
 if badcat_err=$("$root/scripts/catalog.sh" "$badcat" 2>&1 >/dev/null); then
