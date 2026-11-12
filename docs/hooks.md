@@ -379,12 +379,19 @@ checkout), one `allow <ERE>` per `Scope:` glob of the fenced slices and one `nam
 `Sensitive:` glob. `unfence` removes only its own checkout's file, and the folders when they end
 up empty, so two runs from two checkouts do not disturb each other.
 
-The wall reads `paths`, like `write`, and acts only on a path inside the session's top level. It
-reads every file in `scope.d/` and applies the first whose `home` contains the top level under
-`home/.claude/worktrees/agent-*`: a fence reaches the builders of the checkout that fenced, which
-the harness names `agent-*`, and no other linked worktree of the repo, not even one under the same
-`.claude/worktrees/`, which may be a parallel session. A path inside the top level is denied in two
-cases, both with exit 10:
+The wall reads `paths`, like `write`, and fences by target, not by the session's `cwd`. A path that
+resolves (symbolic links followed) to `<home>/.claude/worktrees/agent-*/...` is judged by the
+`scope.d/` file whose `home` is that `<home>`, relative to that worktree. A fence therefore reaches
+the builders of the checkout that fenced, which the harness names `agent-*`, and no other linked
+worktree of the repo, not even one under the same `.claude/worktrees/`, which may be a parallel
+session.
+
+The reason is Codex. It has no `builder` agent, so each unit of an orchestrated run is built in a
+worktree named `agent-codex-<NN>` (`skills/orchestrate/SKILL.md`), and its session runs in the main
+checkout. A wall that judged only paths inside the session's top level would never see those
+writes. Fencing by target holds them to the slice, whatever the `cwd`, while a path outside every
+agent worktree, such as work going on in the main checkout, is never judged by this policy. A path
+inside an agent worktree is denied in two cases, both with exit 10:
 
 - No `allow` or `named` pattern matches its path relative to the top level:
   `scope denied: <path> is outside the approved plan's scope for this batch (<plan>). Return to
@@ -407,19 +414,20 @@ The last three kinds match the file's basename. Every kind matches without regar
 | `env and config` | `.env`, `.env.*`, `*.config.*`, `settings.json`, `settings.local.json` |
 | `API contract` | `openapi.*`, `*.openapi.*`, `swagger.*`, `*.graphql`, `*.gql`, `*.prisma` |
 
-A path outside the top level is `write`'s to judge. The wall allows, and fails open, when `paths`
-is empty, `cwd` is outside git, the session is in the main checkout, no scope file applies, the
-plan file is gone, or the plan's last `Approved:` hash differs from the `approved` line. A plan
+A path outside every agent worktree is `write`'s to judge. The wall allows, and fails open, when
+`paths` is empty, the path is not inside an `agent-*` worktree of a checkout that fenced, the
+folder is not a worktree's top level, no scope file applies, the plan file is gone, or the plan's
+last `Approved:` hash differs from the `approved` line. A plan
 that is approved again after the fence therefore opens it, since the new stamp is no longer the one
 that was fenced. An edit without a new approval keeps the stamp, so the fenced globs still hold.
 
 A target that is a symbolic link is followed (up to 8 links) and its destination is judged, so a
 link inside `src/` that points at `lib/a.ts` is denied as `lib/a.ts`. A link that points outside
-the checkout is left to `write`.
+every agent worktree is left to `write`.
 
 #### Limits
 
 - The fence reads edit tools only. A builder can still write through the shell, and can write the
   scope file itself; the sandbox is the floor.
-- The main checkout is never fenced, so a session there is judged by `write` alone.
+- The main checkout is never fenced, so a path there is judged by `write` alone, from any session.
 - Route-handler types are not globbable. The conformance review covers them.

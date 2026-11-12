@@ -26,3 +26,15 @@ workflow-without-sensitive-line	pre_tool	edit	.github/workflows/ci.yml	fenced-wi
 workflow-with-sensitive-line	pre_tool	edit	.github/workflows/ci.yml	fenced-wide-named	allow
 workflow-sibling-in-named-fence	pre_tool	edit	.github/workflows/other.yml	fenced-wide-named	deny
 non-agent-worktree	pre_tool	edit	lib/a.ts	fenced-other-worktree	allow
+codex-outside-slice	pre_tool	edit	.claude/worktrees/agent-codex-01/lib/a.ts	codex-fenced	deny
+codex-inside-slice	pre_tool	edit	.claude/worktrees/agent-codex-01/src/a.ts	codex-fenced	allow
+codex-main-checkout-write	pre_tool	edit	lib/a.ts	codex-fenced	allow
+codex-main-checkout-src-write	pre_tool	edit	src/a.ts	codex-fenced	allow
+codex-second-path-outside-slice	pre_tool	edit	.claude/worktrees/agent-codex-01/src/a.ts .claude/worktrees/agent-codex-01/lib/b.ts	codex-fenced	deny
+codex-main-write-then-worktree-outside	pre_tool	edit	lib/a.ts .claude/worktrees/agent-codex-01/lib/b.ts	codex-fenced	deny
+codex-sensitive-unnamed	pre_tool	edit	.claude/worktrees/agent-codex-01/src/package.json	codex-fenced	deny
+codex-reapproved	pre_tool	edit	.claude/worktrees/agent-codex-01/lib/a.ts	codex-reapproved	allow
+codex-unfenced	pre_tool	edit	.claude/worktrees/agent-codex-01/lib/a.ts	codex-unfenced	allow
+codex-other-fence-home	pre_tool	edit	.claude/worktrees/agent-codex-01/lib/a.ts	codex-fenced-other-home	allow
+codex-nested-home-outside-slice	pre_tool	edit	.claude/worktrees/agent-o/.claude/worktrees/agent-codex-01/lib/a.ts	codex-fenced-nested	deny
+codex-nested-home-inside-slice	pre_tool	edit	.claude/worktrees/agent-o/.claude/worktrees/agent-codex-01/src/a.ts	codex-fenced-nested	allow

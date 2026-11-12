@@ -65,6 +65,29 @@ case $state in
   main-checkout)
     write_default_fence "$row_dir" abc abc
     ;;
+  codex-fenced)
+    git -C "$row_dir" worktree add -q -b worktree-agent-codex-01 "$row_dir/.claude/worktrees/agent-codex-01"
+    write_default_fence "$row_dir" abc abc
+    mkdir -p "$row_dir/.claude/worktrees/agent-codex-01/src"
+    ;;
+  codex-reapproved)
+    git -C "$row_dir" worktree add -q -b worktree-agent-codex-01 "$row_dir/.claude/worktrees/agent-codex-01"
+    write_default_fence "$row_dir" abc def
+    ;;
+  codex-unfenced)
+    git -C "$row_dir" worktree add -q -b worktree-agent-codex-01 "$row_dir/.claude/worktrees/agent-codex-01"
+    ;;
+  codex-fenced-other-home)
+    git -C "$row_dir" worktree add -q -b worktree-agent-codex-01 "$row_dir/.claude/worktrees/agent-codex-01"
+    git -C "$row_dir" worktree add -q -b agent-o "$row_dir/.claude/worktrees/agent-o"
+    write_default_fence "$row_dir/.claude/worktrees/agent-o" abc abc
+    ;;
+  codex-fenced-nested)
+    git -C "$row_dir" worktree add -q -b agent-o "$row_dir/.claude/worktrees/agent-o"
+    git -C "$row_dir/.claude/worktrees/agent-o" -c user.name=fixture -c user.email=fixture@example.invalid -c commit.gpgsign=false commit -q --allow-empty -m nested
+    git -C "$row_dir/.claude/worktrees/agent-o" worktree add -q -b worktree-agent-codex-01 "$row_dir/.claude/worktrees/agent-o/.claude/worktrees/agent-codex-01"
+    write_default_fence "$row_dir/.claude/worktrees/agent-o" abc abc
+    ;;
   fenced-from-worktree)
     git -C "$row_dir" worktree add -q -b agent-o "$row_dir/.claude/worktrees/agent-o"
     write_default_fence "$row_dir/.claude/worktrees/agent-o" abc abc

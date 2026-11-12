@@ -24,6 +24,15 @@ no playbook. Orchestrator mode engages at 3 or more independently verifiable uni
 that can each be proven green on their own, not files touched. It also engages on request, at any
 size, or on `/orchestrate`.
 
+**Under Codex** there is no `builder` agent, so you are the builder, and every unit gets a worktree
+so the scope fence holds. Per unit: `plan-lint fence` as Step 6 says, then `git worktree add -b
+worktree-agent-codex-<NN> .claude/worktrees/agent-codex-<NN> HEAD`, edit only by absolute path
+inside it, run `gate` there. From the main checkout run `land-worktree --files <brief> <worktree>`,
+commit, then `remove-worktree` by bare name. The scripts are in
+`~/.agents/skills/orchestrate/scripts/`. Codex-written code is reviewed on Claude: under T3 Code,
+`delegate_task` with provider `claudeAgent`, `claude-sonnet-5-5`, effort `high` and role
+`agents/conformance.md`; without T3, the user runs that review.
+
 ## Step 0: route
 
 1. The first output line is `Goal: <one sentence, your words>. Playbook: <name>.`
@@ -87,7 +96,7 @@ to add to CLAUDE.md.
 ## The steps
 
 Steps 1 and 2, research and the approved plan: `references/planning.md`. Steps 3 to 10, builders
-to close: `references/orchestrator-mode.md`. Read the second only in orchestrator mode.
+to close: `references/orchestrator-mode.md`. Read the second in orchestrator mode, and under Codex.
 
 ## Reporting
 

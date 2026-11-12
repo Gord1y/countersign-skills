@@ -153,6 +153,26 @@ elif [ -e "$repo/docs.bak" ]; then
   fail "a refused sibling-prefix landing copied the file"
 fi
 
+codex_worktree="$repo/.claude/worktrees/agent-codex-01"
+git -C "$repo" worktree add -q -b worktree-agent-codex-01 "$codex_worktree" HEAD
+printf 'c\n' >"$codex_worktree/codex-listed.txt"
+printf 'c\n' >"$codex_worktree/codex-unlisted.txt"
+files_brief brief-codex.md '`codex-listed.txt`'
+if (cd "$repo" && "$land" --files "$work/brief-codex.md" "$codex_worktree") >"$work/out" 2>&1; then
+  fail "--files landed an unlisted file from an agent-codex worktree"
+elif ! grep -qx "codex-unlisted.txt" "$work/out"; then
+  fail "--files did not name the unlisted file of an agent-codex worktree: $(cat "$work/out")"
+elif [ -e "$repo/codex-listed.txt" ] || [ -e "$repo/codex-unlisted.txt" ]; then
+  fail "a refused agent-codex landing copied a file"
+fi
+rm "$codex_worktree/codex-unlisted.txt"
+if ! (cd "$repo" && "$land" --files "$work/brief-codex.md" "$codex_worktree") >"$work/out" 2>&1; then
+  fail "--files refused the listed file of an agent-codex worktree: $(cat "$work/out")"
+elif [ "$(cat "$repo/codex-listed.txt")" != c ]; then
+  fail "the listed file of an agent-codex worktree did not land"
+fi
+git -C "$repo" commit -q -m "feat: codex listed"
+
 remove="$root/skills/orchestrate/scripts/remove-worktree"
 builder() {
   git -C "$repo" worktree add -q -b "worktree-agent-$1" "$repo/.claude/worktrees/agent-$1" HEAD

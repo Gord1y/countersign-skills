@@ -1,12 +1,9 @@
 # Orchestrator mode: Steps 3 to 10
 
-Read this when the plan has 3 or more units and the `builder` agent is installed.
+Read this when the plan has 3 or more units and the `builder` agent is installed, and under Codex.
 
-**Under Codex** orchestrator mode does not run, because there is no `Agent` tool and no builder
-agent. Build each unit yourself in the main session, one commit each, and run `gate` before each
-commit. The scripts are in `~/.agents/skills/orchestrate/scripts/`. Review Codex-written code on
-Claude: under T3 Code, call `delegate_task` with `sonnet`, effort `high` and role
-`agents/conformance.md`; without T3, the user runs that review.
+**Under Codex** there is no `Agent` tool, so you build each unit yourself in its own worktree, as
+`SKILL.md` "When this engages" says. Step 6 below holds the fence and the worktree rules.
 
 ## The division of labour
 
@@ -139,8 +136,9 @@ before you hand back; past 20, cut the least useful until it fits.
   tool offers. When `builder` is on it, every unit spawns as `subagent_type: "builder"`
   (`agents/builder.md`), which carries `isolation: worktree`, and always with `model` and
   `effort`. Never cut worktrees by hand with `git worktree add`, let builders commit, or
-  cherry-pick their work: that bypasses Step 8. Only when `builder` is missing (a skills-only
-  install), orchestrator mode does not run: build each unit yourself, one commit each, `gate`
+  cherry-pick their work: that bypasses Step 8. Codex is the one exception: it has no
+  `builder`, so it cuts `agent-codex-<NN>` worktrees by hand. Only when `builder` is missing (a
+  skills-only install), orchestrator mode does not run: build each unit yourself, one commit each, `gate`
   before each, and note that in the plan file. Check `planner`, `reviewer` and `qa` the same way
   for Steps 3, 7 and 9. Where `planner` is missing, write the spec yourself in the main session.
 - The worktree is cut from your `HEAD` only under `worktree.baseRef: "head"`, which the install
