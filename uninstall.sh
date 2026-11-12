@@ -12,7 +12,8 @@ usage() {
   echo "- in ~/.claude/settings.json, puts back or removes each value the last install merged, unless"
   echo "  you changed it since;"
   echo "- removes the block install.sh wrote at the top of ~/.codex/config.toml and its hook entries in"
-  echo "  ~/.codex/hooks.json, and puts back the values the block replaced;"
+  echo "  ~/.codex/hooks.json, and puts back the values the block replaced and the table keys the"
+  echo "  profile's codex/config.toml upserted;"
   echo "- puts back the CLAUDE.md, AGENTS.md and GEMINI.md you had before the first install, or moves"
   echo "  the generated ones to the backup folder."
   echo "Everything it replaces goes to $state/backups/<time>/ first. The profile and the list of"
@@ -109,6 +110,10 @@ if [ -f "$codex_config" ] && grep -qxF "$codex_block_begin" "$codex_config"; the
     cat "$codex_displaced" >>"$work/codex-config.toml"
   fi
   strip_codex_block "$codex_config" "" >>"$work/codex-config.toml"
+  if [ -s "$codex_upserts" ]; then
+    reconcile_codex_tables "$work/codex-config.toml" /dev/null "$codex_upserts" "$work/codex-upserts.tsv" >"$work/codex-config.restored"
+    mv "$work/codex-config.restored" "$work/codex-config.toml"
+  fi
   mkdir -p "$backup/codex"
   cp "$codex_config" "$backup/codex/config.toml"
   if [ -s "$work/codex-config.toml" ]; then
@@ -118,11 +123,26 @@ if [ -f "$codex_config" ] && grep -qxF "$codex_block_begin" "$codex_config"; the
     rm "$codex_config"
     echo "removed $codex_config"
   fi
-  rm -f "$codex_displaced"
-elif [ -f "$codex_displaced" ]; then
-  mkdir -p "$backup/codex"
-  cp "$codex_displaced" "$backup/codex/"
-  echo "kept    $codex_displaced (the managed block was already gone)"
+  rm -f "$codex_displaced" "$codex_upserts"
+else
+  if [ -f "$codex_config" ] && [ -s "$codex_upserts" ]; then
+    reconcile_codex_tables "$codex_config" /dev/null "$codex_upserts" "$work/codex-upserts.tsv" >"$work/codex-config.restored"
+    mkdir -p "$backup/codex"
+    cp "$codex_config" "$backup/codex/config.toml"
+    if [ -s "$work/codex-config.restored" ]; then
+      cp "$work/codex-config.restored" "$codex_config"
+      echo "cleaned $codex_config"
+    else
+      rm "$codex_config"
+      echo "removed $codex_config"
+    fi
+  fi
+  rm -f "$codex_upserts"
+  if [ -f "$codex_displaced" ]; then
+    mkdir -p "$backup/codex"
+    cp "$codex_displaced" "$backup/codex/"
+    echo "kept    $codex_displaced (the managed block was already gone)"
+  fi
 fi
 
 if [ -f "$codex_hooks_record" ] && [ -f "$codex_hooks" ]; then

@@ -66,6 +66,8 @@ when that is set, as Countersign does):
   - `settings.json`: merged over `claude/settings.json`, so your keys win, and the permission,
     sandbox and auto-mode lists add up (see [Settings merge](#settings-merge)).
   - `bin/`: linked into `~/.local/bin` next to this repo's `bin/`.
+  - `codex/config.toml`: your Codex settings, merged into `~/.codex/config.toml` (see
+    [Codex settings](#codex-settings)).
   - `worktree-only.tsv`: the repos whose main checkout the write fence refuses to edit, one
     absolute path per line (`~/` allowed, blank lines and `#` lines skipped). Work on a listed repo
     happens in a worktree under `.claude/worktrees/`. See [Hook walls](hooks.md#write).
@@ -172,7 +174,9 @@ When `~/.codex` exists, `install.sh` also writes two Codex files. `--no-settings
   the lines `# BEGIN countersign-skills: install.sh manages this block` and
   `# END countersign-skills`: `model_auto_compact_token_limit = 200000`,
   `approval_policy = "never"` and `sandbox_mode = "workspace-write"`. A re-run replaces the block
-  in place, so an edit inside it does not survive. Tables below it are never touched. TOML forbids
+  in place: once the `# END` line exists, every line between the two markers goes, comments and
+  lines of your own included, so an edit inside the block does not survive. Without the `# END`
+  line only the block's keys go. Tables below it are never touched. TOML forbids
   a key twice, so a top-level line of your own for one of those three keys moves out of the file
   into `~/.config/countersign/skills/codex-config-displaced.toml`, and `uninstall.sh` puts it back.
   A key written with a quoted name is not detected and Codex then rejects the duplicate. When the
@@ -183,7 +187,8 @@ When `~/.codex` exists, `install.sh` also writes two Codex files. `--no-settings
   are replaced, and a `[` line inside a multi-line array is not taken for a table.
 - `uninstall.sh` puts displaced keys back at the top of the file, not on their original line, and
   normalises the final newline. A CRLF file comes out with mixed line endings, which TOML accepts.
-  When you deleted the block yourself, the displaced values stay in
+  The byte-for-byte restore therefore holds for a `config.toml` that ends in a newline: `install.sh`
+  adds a missing final newline and `uninstall.sh` does not take it out again. When you deleted the block yourself, the displaced values stay in
   `codex-config-displaced.toml` and are copied to the backup folder.
 - A `hooks.json` that is not an object of event arrays (a JSONC comment, a top-level `[]`) is
   left alone and printed as `skipped ... (not valid JSON)`. A 0-byte file counts as `{}`.
@@ -203,6 +208,42 @@ When `~/.codex` exists, `install.sh` also writes two Codex files. `--no-settings
   `trust` line: start `codex` and pick "Review hooks" or "Trust all and continue". The installer
   never writes `trusted_hash`. A tool that rewrites `hooks.json` may drop our entries until the
   next `install.sh` run.
+- `~/.codex/config.toml` also takes your profile's `codex/config.toml`, so a Codex choice such as
+  turning plugins off follows you to every device. The fragment is a TOML subset: comments, blank
+  lines, `[table]` headers (dotted, with quoted segments such as `[plugins."x@y"]`) and
+  single-line `key = value` pairs with bare keys. A value is a string, a number, a boolean, a date
+  or time, or an array or inline table written on one line, followed by nothing but a comment;
+  an array or inline table is checked for balanced brackets, not item by item. Arrays of tables,
+  dotted keys, multi-line values and any other line stop `install.sh` before it changes anything,
+  with the fragment's path and the line number on stderr. `--no-settings` skips the check.
+  - The keys above the first table join the managed block after the three built-in ones. They are
+    displaced and restored like those three. A profile key equal to a built-in key replaces that
+    line, so the block never holds a key twice. A line of yours that the block displaced comes
+    back into the file, right below the block, on the next `install.sh` run after the profile
+    drops that key.
+  - Each key under a table is upserted in place. TOML forbids a repeated table header, so the
+    managed block cannot carry them. An existing key is replaced where it stands, and when its
+    value spans several lines, all of those lines are replaced and recorded. A key the
+    table lacks is inserted right after the table's header. A table the file lacks is appended at
+    the end, after a blank line when the file does not already end in one.
+  - Tables are matched by header, ignoring spaces around dots, quotes around a segment that
+    needs none (`[plugins."a"]` is `[plugins.a]`) and the quote style (`'a@b'` is `"a@b"`). Only
+    the `\\` and `\"` escapes of a quoted segment are decoded. A table that `config.toml` spells with dotted
+    keys under its parent (`"x@y".enabled = true` below `[plugins]`) is not detected, and the
+    appended table then makes the file invalid.
+  - Before the first change, `codex-config-upserts.tsv` in the state folder records for each key
+    the table, the key, whether the table was added (`kept`, `added`, or `added-spaced` when a
+    separating blank line came with it) and the original lines, empty when there was none, with
+    `\` written as `\\` and a line break as `\n`. A key added to a table an earlier run added
+    inherits that table's `added` state. Each
+    run reconciles against that record instead of starting over, so Codex's own additions, such
+    as `[hooks.state."..."]` tables, stay where they are and an unchanged fragment leaves the file
+    byte for byte unchanged (`ok`). A key dropped from the fragment gets its original line back,
+    or is deleted when the install had inserted it. A table the install added goes too once it
+    holds nothing else.
+  - A value you or Codex change by hand under a key the fragment sets is overwritten on the next
+    run, like a settings key the profile sets. The record keeps the original line, not that
+    value, so `uninstall.sh` puts back what was there before the first install.
 
 The previous files go to the backup folder under `codex/`, and an unchanged file prints `ok`.
 
@@ -230,8 +271,9 @@ regenerates the Codex and Antigravity files and installs any skill added since.
   changed since is kept, and so is everything Claude Code wrote. When the install created the file
   and nothing is left in it, the file goes.
 - In `~/.codex`, the block at the top of `config.toml` goes and the lines it displaced come back,
-  and the hook entries this repo added go from `hooks.json`. Each file goes too when nothing else
-  is left in it.
+  and the hook entries this repo added go from `hooks.json`. The table keys your profile's
+  `codex/config.toml` upserted go back to their recorded original lines, and inserted keys and
+  added tables are deleted. Each file goes too when nothing else is left in it.
 - `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` and `~/.gemini/GEMINI.md` go back to the versions you
   had before the first install (`install.sh` keeps them in `originals/`), or move to the backup
   folder if there were none.

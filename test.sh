@@ -437,6 +437,132 @@ out=$(HOME=$cxgone CLAUDE_CONFIG_DIR= "$root/uninstall.sh")
 echo "$out" | grep -q "^kept    .*codex-config-displaced.toml (the managed block was already gone)" || fail "uninstall.sh did not report the displaced values it kept"
 grep -qx 'approval_policy = "on-request"' "$cxgone/.config/countersign/skills/codex-config-displaced.toml" || fail "uninstall.sh deleted the displaced values after the block was already gone"
 
+cxfrag="$fake/cxfrag"
+cxfragfile="$cxfrag/.config/countersign/profile/codex/config.toml"
+cxfragconfig="$cxfrag/.codex/config.toml"
+mkdir -p "$cxfrag/.codex" "$(dirname "$cxfragfile")"
+printf 'approval_policy = "on-request"\nmodel = "m"\n\n[features]\nx = true\n\n[plugins."visualize@openai-bundled"]\nenabled = true\n' >"$cxfragconfig"
+cp "$cxfragconfig" "$cxfrag/config.fixture"
+printf '# profile choices\nmodel = "gpt-6"\n\n[plugins."visualize@openai-bundled"]\nenabled = false\n\n[ plugins . "other@openai-bundled" ]\nenabled = false\n' >"$cxfragfile"
+HOME=$cxfrag CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null
+{
+  printf '%s\n' "$codex_block_begin" 'model_auto_compact_token_limit = 200000' 'approval_policy = "never"' 'sandbox_mode = "workspace-write"' 'model = "gpt-6"' "$codex_block_end"
+  printf '\n[features]\nx = true\n\n[plugins."visualize@openai-bundled"]\nenabled = false\n\n[plugins."other@openai-bundled"]\nenabled = false\n'
+} >"$cxfrag/config.expected"
+cmp -s "$cxfragconfig" "$cxfrag/config.expected" || fail "the profile's codex/config.toml was not merged into config.toml as a block key and two table upserts"
+out=$(HOME=$cxfrag CLAUDE_CONFIG_DIR= "$root/install.sh")
+echo "$out" | grep -q "^ok      $cxfragconfig" || fail "a second run with an unchanged codex fragment rewrote config.toml"
+HOME=$cxfrag CLAUDE_CONFIG_DIR= "$root/uninstall.sh" >/dev/null
+cmp -s "$cxfragconfig" "$cxfrag/config.fixture" || fail "uninstall.sh did not restore config.toml byte for byte after the codex fragment"
+[ ! -e "$cxfrag/.config/countersign/skills/codex-config-upserts.tsv" ] || fail "uninstall.sh left the upsert record behind"
+
+HOME=$cxfrag CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null
+printf '\n[hooks.state."x"]\ntrusted_hash = "sha256:def"\n' >>"$cxfragconfig"
+cp "$cxfragconfig" "$cxfrag/config.codex-written"
+out=$(HOME=$cxfrag CLAUDE_CONFIG_DIR= "$root/install.sh")
+echo "$out" | grep -q "^ok      $cxfragconfig" || fail "a table Codex added between runs made the next run rewrite config.toml"
+cmp -s "$cxfragconfig" "$cxfrag/config.codex-written" || fail "a run changed the table Codex added between runs"
+printf '# profile choices\nmodel = "gpt-6"\n\n[plugins."other@openai-bundled"]\nenabled = false\n' >"$cxfragfile"
+HOME=$cxfrag CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null
+grep -qx 'enabled = true' "$cxfragconfig" || fail "a key dropped from the codex fragment was not restored to the original line"
+grep -qx '\[hooks.state."x"\]' "$cxfragconfig" || fail "a table Codex added between runs did not survive a codex fragment change"
+HOME=$cxfrag CLAUDE_CONFIG_DIR= "$root/uninstall.sh" >/dev/null
+{
+  cat "$cxfrag/config.fixture"
+  printf '\n[hooks.state."x"]\ntrusted_hash = "sha256:def"\n'
+} >"$cxfrag/config.expected"
+cmp -s "$cxfragconfig" "$cxfrag/config.expected" || fail "uninstall.sh did not restore the fixture plus the table Codex added"
+
+cxinsert="$fake/cxinsert"
+cxinsertfile="$cxinsert/.config/countersign/profile/codex/config.toml"
+mkdir -p "$cxinsert/.codex" "$(dirname "$cxinsertfile")"
+printf '[features]\nx = true\ny = 1\n' >"$cxinsert/.codex/config.toml"
+cp "$cxinsert/.codex/config.toml" "$cxinsert/config.fixture"
+printf '[features]\nz = 3\ny = 2\n' >"$cxinsertfile"
+HOME=$cxinsert CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null
+[ "$(sed -n '/^\[features\]/,$p' "$cxinsert/.codex/config.toml")" = "$(printf '[features]\nz = 3\nx = true\ny = 2')" ] || fail "a new table key was not inserted right after its header, or an existing key was not replaced in place"
+HOME=$cxinsert CLAUDE_CONFIG_DIR= "$root/uninstall.sh" >/dev/null
+cmp -s "$cxinsert/.codex/config.toml" "$cxinsert/config.fixture" || fail "uninstall.sh did not delete an inserted key and restore a replaced line"
+
+cxbadfrag="$fake/cxbadfrag"
+cxbadfragfile="$cxbadfrag/.config/countersign/profile/codex/config.toml"
+mkdir -p "$cxbadfrag/.codex" "$(dirname "$cxbadfragfile")"
+printf 'model = "m"\n' >"$cxbadfrag/.codex/config.toml"
+cp "$cxbadfrag/.codex/config.toml" "$cxbadfrag/config.fixture"
+printf '[plugins."a"]\nenabled = false\nnot a key value pair\n' >"$cxbadfragfile"
+if HOME=$cxbadfrag CLAUDE_CONFIG_DIR= "$root/install.sh" >"$cxbadfrag/out" 2>"$cxbadfrag/err"; then
+  fail "install.sh went on with a malformed codex fragment"
+fi
+grep -q "config.toml line 3:" "$cxbadfrag/err" || fail "install.sh did not name the file and line of a malformed codex fragment"
+cmp -s "$cxbadfrag/.codex/config.toml" "$cxbadfrag/config.fixture" || fail "install.sh changed config.toml before it stopped on a malformed codex fragment"
+
+cxsetup() {
+  cxdir="$fake/$1"
+  cxprofilefile="$cxdir/.config/countersign/profile/codex/config.toml"
+  cxtoml="$cxdir/.codex/config.toml"
+  mkdir -p "$cxdir/.codex" "$(dirname "$cxprofilefile")"
+  printf '%b' "$2" >"$cxtoml"
+  cp "$cxtoml" "$cxdir/config.fixture"
+  printf '%b' "$3" >"$cxprofilefile"
+}
+cxinstall() {
+  HOME=$cxdir CLAUDE_CONFIG_DIR= "$root/install.sh"
+}
+cxuninstall() {
+  HOME=$cxdir CLAUDE_CONFIG_DIR= "$root/uninstall.sh" >/dev/null
+}
+
+for cxvalue in 'truex' 'falsey' '"a" junk' '1 2' '[1] x' '-' '+' '[1,' '"open'; do
+  cxsetup cxvalue '[t]\nk = 0\n' "[t]\nk = $cxvalue\n"
+  if cxinstall >/dev/null 2>"$cxdir/err"; then
+    fail "install.sh accepted the codex fragment value: $cxvalue"
+  fi
+  grep -q "config.toml line 2:" "$cxdir/err" || fail "install.sh did not name line 2 for the codex fragment value: $cxvalue"
+  cmp -s "$cxtoml" "$cxdir/config.fixture" || fail "install.sh changed config.toml for the codex fragment value: $cxvalue"
+done
+for cxvalue in 'true' '-1' '0x1F' '1_000' '1.5e3' '-inf' 'nan' '1979-05-27' '1979-05-27T07:32:00Z' '07:32:00' '"a" # note' "'lit'" '[1, 2] # note' '{ a = 1 }' '"""a"""'; do
+  cxsetup cxvalue '[t]\nk = 0\n' "[t]\nk = $cxvalue\n"
+  cxinstall >/dev/null 2>&1 || fail "install.sh rejected the valid codex fragment value: $cxvalue"
+  grep -qxF "k = $cxvalue" "$cxtoml" || fail "install.sh did not write the valid codex fragment value: $cxvalue"
+done
+
+cxsetup cxspan '[t]\nk = [\n  "a\\\\b",\n  2,\n]\nafter = 1\n' '[t]\nk = 5\n'
+cxinstall >/dev/null
+[ "$(sed -n '/^\[t\]/,$p' "$cxtoml")" = "$(printf '[t]\nk = 5\nafter = 1')" ] || fail "replacing a multi-line key left the tail of its old value behind"
+cxuninstall
+cmp -s "$cxtoml" "$cxdir/config.fixture" || fail "uninstall.sh did not restore a multi-line value it replaced"
+
+cxsetup cxinherit '[features]\nx = true\n' '[n]\na = 1\n'
+cxinstall >/dev/null
+printf '[n]\nb = 2\n' >"$cxprofilefile"
+cxinstall >/dev/null
+cxuninstall
+cmp -s "$cxtoml" "$cxdir/config.fixture" || fail "uninstall.sh left an empty table or blank line when the fragment moved its keys inside a table an earlier run added"
+
+cxsetup cxquotes "[plugins.'v@o']\nenabled = true\n" '[plugins."v@o"]\nenabled = false\n'
+cxinstall >/dev/null
+[ "$(grep -c '^\[plugins' "$cxtoml")" -eq 1 ] || fail "a literal-quoted table header and a basic-quoted fragment header were treated as two tables"
+grep -qx 'enabled = false' "$cxtoml" || fail "the fragment value did not reach the literal-quoted table"
+cxuninstall
+cmp -s "$cxtoml" "$cxdir/config.fixture" || fail "uninstall.sh did not restore a literal-quoted table"
+
+cxsetup cxdisplaced 'model = "m"\n\n[features]\nx = 1\n' 'model = "p"\n'
+cxinstall >/dev/null
+rm "$cxprofilefile"
+out=$(cxinstall)
+echo "$out" | grep -q "^restored" || fail "install.sh did not report restoring a displaced key the block no longer holds"
+[ "$(grep -c '^model =' "$cxtoml")" -eq 1 ] && grep -qx 'model = "m"' "$cxtoml" || fail "a displaced key was not put back once the fragment dropped its block key"
+[ ! -s "$cxdir/.config/countersign/skills/codex-config-displaced.toml" ] || fail "a restored displaced line stayed in codex-config-displaced.toml"
+cxuninstall
+cmp -s "$cxtoml" "$cxdir/config.fixture" || fail "uninstall.sh did not restore the config after a displaced key came back early"
+
+cxsetup cxequals '"a=b" = [\n[plugins.zz]\n]\n\n[features]\nx = 1\n' '[plugins.zz]\nenabled = false\n'
+cxinstall >/dev/null
+[ "$(sed -n '/^"a=b"/,/^\]/p' "$cxtoml")" = "$(printf '"a=b" = [\n[plugins.zz]\n]')" ] || fail "a quoted key containing = hid its multi-line array from the table scan"
+[ "$(tail -n 2 "$cxtoml")" = "$(printf '[plugins.zz]\nenabled = false')" ] || fail "the fragment table was not appended after a quoted key containing ="
+cxuninstall
+cmp -s "$cxtoml" "$cxdir/config.fixture" || fail "uninstall.sh did not restore a config with a quoted key containing ="
+
 unhome=$(mktemp -d "${TMPDIR:-/tmp}/countersign-skills.XXXXXX")
 trap 'rm -rf "$home" "$copyhome" "$fake" "$updhome" "$profhome" "$extra" "$unhome"' EXIT
 mkdir -p "$unhome/.claude/skills" "$unhome/.codex"

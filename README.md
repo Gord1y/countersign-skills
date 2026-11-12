@@ -138,8 +138,8 @@ and sets its own model. Each caps its compaction window at 300K tokens.
   never touches it.
 - **Your profile:** `~/.config/countersign/profile/`, usually a link into a private repo. All of it
   is optional. `CLAUDE.md` replaces `claude/CLAUDE.template.md` (your "Who I am" and your list of
-  rule imports), `settings.json` is merged over the repo's so your keys win, and `bin/` is linked
-  into `~/.local/bin`.
+  rule imports), `settings.json` is merged over the repo's so your keys win, `codex/config.toml`
+  is merged into `~/.codex/config.toml`, and `bin/` is linked into `~/.local/bin`.
 - **Additions:** `install.sh --addition <folder>` installs a folder in this repo's layout (skills,
   rules, agents) alongside, on every later run. Good for a private set you don't publish.
 - **The status line:** `bin/statusline` shows the model, the context used and the plan limits left.

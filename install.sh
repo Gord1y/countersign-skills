@@ -23,7 +23,8 @@ usage() {
   echo "Merges claude/settings.json, then the profile's settings.json, into ~/.claude/settings.json,"
   echo "unless --no-settings."
   echo "When ~/.codex exists, also writes a managed block at the top of ~/.codex/config.toml and merges"
-  echo "codex/hooks.json into ~/.codex/hooks.json, unless --no-settings."
+  echo "codex/hooks.json into ~/.codex/hooks.json, unless --no-settings. The profile's codex/config.toml"
+  echo "adds its top-level keys to that block and upserts its table keys into ~/.codex/config.toml."
   echo "The profile is $profile; state, backups and the record of merged settings are in $state."
 }
 
@@ -60,6 +61,15 @@ while [ $# -gt 0 ]; do
   shift
 done
 
+work=$(mktemp -d "${TMPDIR:-/tmp}/countersign-skills.XXXXXX")
+trap 'rm -rf "$work"' EXIT
+codex_fragment="$work/codex-fragment.tsv"
+: >"$codex_fragment"
+if [ "$settings" = yes ] && [ -f "$codex_fragment_file" ]; then
+  parse_codex_fragment "$codex_fragment_file" >"$codex_fragment" || exit 1
+fi
+codex_block_keys="$codex_block_keys$(awk -F "$tab" '$1 == "" { printf "|%s", $2 }' "$codex_fragment")"
+
 mkdir -p "$state"
 
 if [ -n "$new_addition" ]; then
@@ -86,8 +96,6 @@ sources() {
   done <"$additions"
 }
 
-work=$(mktemp -d "${TMPDIR:-/tmp}/countersign-skills.XXXXXX")
-trap 'rm -rf "$work"' EXIT
 sources >"$work/sources"
 : >"$work/links"
 
@@ -320,36 +328,85 @@ write_settings() {
 
 codex_block() {
   echo "$codex_block_begin"
-  echo "model_auto_compact_token_limit = $codex_compact_limit"
-  echo 'approval_policy = "never"'
-  echo 'sandbox_mode = "workspace-write"'
+  printf '%s\n' "model_auto_compact_token_limit = $codex_compact_limit" 'approval_policy = "never"' 'sandbox_mode = "workspace-write"' |
+    awk -v fragment_file="$codex_fragment" '
+      BEGIN {
+        while ((getline row < fragment_file) > 0) {
+          if (substr(row, 1, 1) != "\t") continue
+          row = substr(row, 2)
+          position = index(row, "\t")
+          count++
+          order[count] = substr(row, 1, position - 1)
+          profile[order[count]] = substr(row, position + 1)
+        }
+      }
+      {
+        name = $0
+        sub(/[ \t]*=.*/, "", name)
+        if (name in profile) {
+          print profile[name]
+          used[name] = 1
+        } else {
+          print
+        }
+      }
+      END {
+        for (i = 1; i <= count; i++) {
+          if (!(order[i] in used)) print profile[order[i]]
+        }
+      }
+    '
   echo "$codex_block_end"
 }
 
 write_codex_config() {
   [ -d "$codex_home" ] || return 0
   if [ -f "$codex_config" ] && grep -Eq "^[ $tab]*\[[ $tab]*($codex_block_keys)([].]|[ $tab])" "$codex_config"; then
-    echo "skipped $codex_config (it sets approval_policy, sandbox_mode or model_auto_compact_token_limit as a table)"
+    echo "skipped $codex_config (it sets a key of the managed block as a table)"
     return 0
   fi
   generated="$work/codex-config.toml"
   displaced="$work/codex-displaced"
   : >"$displaced"
+  held="$work/codex-displaced-held"
+  restored="$work/codex-displaced-restored"
+  : >"$held"
+  : >"$restored"
+  if [ -f "$codex_displaced" ]; then
+    awk -v keys="^($codex_block_keys)[ \\t]*=" -v held="$held" -v restored="$restored" '$0 ~ keys { print > held; next } { print > restored }' "$codex_displaced"
+  fi
   codex_block >"$generated"
+  cat "$restored" >>"$generated"
   if [ -f "$codex_config" ]; then
     strip_codex_block "$codex_config" "$displaced" >>"$generated"
   fi
   if ! strip_codex_block "$generated" "" check >/dev/null; then
-    echo "skipped $codex_config (could not place the managed block safely; set approval_policy, sandbox_mode and model_auto_compact_token_limit yourself)"
+    echo "skipped $codex_config (could not place the managed block safely; set the keys of the managed block yourself)"
     return 0
+  fi
+  reconciled="$work/codex-config-reconciled.toml"
+  reconcile_codex_tables "$generated" "$codex_fragment" "$codex_upserts" "$work/codex-upserts.tsv" >"$reconciled"
+  mv "$reconciled" "$generated"
+  if [ -s "$work/codex-upserts.tsv" ]; then
+    cp "$work/codex-upserts.tsv" "$codex_upserts"
+  else
+    rm -f "$codex_upserts"
   fi
   if [ -f "$codex_config" ] && cmp -s "$generated" "$codex_config"; then
     echo "ok      $codex_config"
     return 0
   fi
+  if [ -s "$restored" ]; then
+    echo "restored the values you had in $codex_config for keys the block no longer holds"
+  fi
   if [ -s "$displaced" ]; then
-    cat "$displaced" >>"$codex_displaced"
     echo "kept    your $codex_config values for the block's keys in $codex_displaced"
+  fi
+  cat "$held" "$displaced" >"$work/codex-displaced-next"
+  if [ -s "$work/codex-displaced-next" ]; then
+    cp "$work/codex-displaced-next" "$codex_displaced"
+  else
+    rm -f "$codex_displaced"
   fi
   if [ -e "$codex_config" ]; then
     mkdir -p "$backup/codex"
