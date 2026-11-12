@@ -17,5 +17,5 @@ Copy these steps into the todo list. A skipped step stays as `skip: <reason>`.
 10. **pr**: `skip: prototype`, unless the user asked for that draft PR.
 11. **decide**: state what the prototype decides, and what a real build would need.
 12. **clickup**: `skip: no ClickUp task` until a task id is known.
-13. **retro**: `retro` after a correction, a revert or a parked unit, else `skip: clean run`. A
-    failing gate is expected here and is no trigger.
+13. **retro**: `retro` after a correction, failed gate, revert or parked unit, else
+    `skip: clean run`. When the gate failure was expected, the retro records that and stops.

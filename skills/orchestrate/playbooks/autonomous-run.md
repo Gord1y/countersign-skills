@@ -15,7 +15,7 @@ Copy these steps into the todo list. A skipped step stays as `skip: <reason>`.
    gate stamp, the walkthrough. A deviation parks its slice only.
 7. **knowledge**: `repo-knowledge` "Update and lint"; `skip: no docs/knowledge/index.md`.
 8. **prove**: `gate` passes; `qa-tester` per surface; `walkthrough` on a UI diff.
-9. **review**: `conformance` per the routing table in `rules/orchestration.md`.
+9. **review**: `conformance` per the orchestration rule's routing table.
 10. **pr**: a draft PR body from `feature-pr-description`; pushed only if pre-authorized.
 11. **clickup**: `skip: no ClickUp task` until a task id is known.
 12. **retro**: `retro` after a correction, failed gate, revert or parked unit, else

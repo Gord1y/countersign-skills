@@ -45,7 +45,8 @@ reaches every machine.
 
 Codex and Antigravity don't read `@` imports, so `install.sh` also generates their global
 instructions from your `~/.claude/CLAUDE.md`, with every import expanded and only the rules
-`rules.tsv` marks for that agent (the orchestration rule needs a skill only Claude Code has):
+`rules.tsv` marks for that agent (the orchestration rule needs `orchestrate`, which Antigravity
+does not get):
 
 | Agent | File | When |
 | --- | --- | --- |

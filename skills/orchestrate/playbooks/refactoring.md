@@ -12,7 +12,7 @@ Copy these steps into the todo list. A skipped step stays as `skip: <reason>`.
 6. **build**: orchestrator mode at 3 or more units, else one commit per slice.
 7. **knowledge**: `repo-knowledge` "Update and lint"; `skip: no docs/knowledge/index.md`.
 8. **prove**: `gate` passes with the old tests unedited; QA is `skip: no behaviour change`.
-9. **review**: `conformance` per the routing table in `rules/orchestration.md`; the review
+9. **review**: `conformance` per the orchestration rule's routing table; the review
    flags any behaviour change as a defect.
 10. **pr**: `feature-pr-description` writes `pr.md`; give the push commands.
 11. **clickup**: `skip: no ClickUp task` until a task id is known.

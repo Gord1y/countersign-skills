@@ -3,7 +3,7 @@
   "skills": [
     {
       "name": "orchestrate",
-      "version": "2.2.0",
+      "version": "2.2.1",
       "agents": [
         "claude",
         "codex"
@@ -263,7 +263,8 @@
       "name": "orchestration",
       "title": "Planning and orchestration",
       "agents": [
-        "claude"
+        "claude",
+        "codex"
       ],
       "path": "rules/orchestration.md"
     },

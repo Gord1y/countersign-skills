@@ -58,15 +58,16 @@ Where everything lands, how copies and settings merge, backups and unattended ru
 
 | | Claude Code | Codex | Antigravity | skills.sh |
 | --- | --- | --- | --- | --- |
-| Skills | 17 | 16 | 12 | skills only |
-| Rules | 11 | 9 | 9 | no |
+| Skills | 17 | 17 | 12 | skills only |
+| Rules | 10 | 9 | 8 | no |
 | Subagents | 6 | no | no | no |
 | Settings defaults | yes | no | no | no |
 | Status line | yes | no | no | no |
 
 Codex gets its rules in a generated `~/.codex/AGENTS.md`, Antigravity in `~/.gemini/GEMINI.md`.
-Neither reads `@` imports, and the orchestration and memory rules lean on things only Claude Code
-has, so those two rules stay out of both. For Codex the installer also writes a managed block in
+Neither reads `@` imports. The memory rule leans on Claude Code's auto memory, so it stays out of
+both, and the orchestration rule, which `orchestrate` routes by, goes to Codex but not to
+Antigravity. For Codex the installer also writes a managed block in
 `~/.codex/config.toml` and hook entries in `~/.codex/hooks.json`.
 
 ## Skills

@@ -98,7 +98,8 @@ if user_tmp=$(getconf DARWIN_USER_TEMP_DIR 2>/dev/null); then
   jq -e --arg t "${user_tmp%/}" '.sandbox.filesystem.allowWrite | index($t) != null' "$settings_json" >/dev/null || fail "settings.json does not let the sandbox write the macOS user temp folder"
 fi
 grep -q '^## Code$' "$home/.codex/AGENTS.md" || fail "AGENTS.md does not expand the code rule"
-grep -q '^## Planning and orchestration$' "$home/.codex/AGENTS.md" && fail "AGENTS.md took the orchestration rule, which rules.tsv keeps for Claude Code"
+grep -q '^## Planning and orchestration$' "$home/.codex/AGENTS.md" || fail "AGENTS.md lacks the orchestration rule, which Codex needs for orchestrate's routing table"
+grep -q '^## Memory$' "$home/.codex/AGENTS.md" && fail "AGENTS.md took the memory rule, which rules.tsv keeps for Claude Code"
 grep -q '^@' "$home/.codex/AGENTS.md" && fail "AGENTS.md kept an unexpanded import"
 cut -f1 "$root/rules.tsv" | while read -r rule; do
   [ -f "$root/rules/$rule.md" ] || fail "rules.tsv lists $rule but rules/$rule.md is missing"

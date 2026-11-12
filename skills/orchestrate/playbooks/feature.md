@@ -14,7 +14,7 @@ Copy these steps into the todo list. A skipped step stays as `skip: <reason>`.
    for new strings; `impact-check` on a contract change.
 7. **knowledge**: `repo-knowledge` "Update and lint"; `skip: no docs/knowledge/index.md`.
 8. **prove**: `gate` passes; `qa-tester` per surface; `walkthrough` on a UI diff.
-9. **review**: `conformance` per the routing table in `rules/orchestration.md`.
+9. **review**: `conformance` per the orchestration rule's routing table.
 10. **pr**: `feature-pr-description` writes `pr.md`; give the push commands.
 11. **clickup**: `skip: no ClickUp task` until a task id is known.
 12. **retro**: `retro` after a correction, failed gate, revert or parked unit, else
