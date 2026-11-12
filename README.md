@@ -60,7 +60,7 @@ Where everything lands, how copies and settings merge, backups and unattended ru
 | --- | --- | --- | --- | --- |
 | Skills | 16 | 14 | 10 | skills only |
 | Rules | 11 | 9 | 9 | no |
-| Subagents | 4 | no | no | no |
+| Subagents | 5 | no | no | no |
 | Settings defaults | yes | no | no | no |
 | Status line | yes | no | no | no |
 
@@ -176,8 +176,8 @@ Claude Code 2.1.278 with Opus 5.5, with every rule on, then scaled by size for 1
 | --- | --- |
 | 10 rules | about 2.3K |
 | 14 model-invocable skills (listing) | about 1.3K |
-| 4 subagents | about 0.3K |
-| Total | about 3.9K |
+| 5 subagents | about 0.4K |
+| Total | about 4.0K |
 
 The rules still dominate: `responses` (about 510), `safety` (about 450) and `orchestration`
 (about 350) are the biggest, and the smallest, `commits`, is about 90. A skill's listing costs 70
