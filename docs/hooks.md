@@ -130,3 +130,23 @@ runs. A policy that blocks a stop therefore blocks it once per stop chain and ca
 
 Codex does not pass a tool call's `workdir` to the hook, so `cwd` is the session's directory. A
 command that runs elsewhere with `cd` or `workdir` is judged against the session's directory.
+
+## Walls
+
+### pr-size
+
+`hooks/policy/pr-size.sh` denies `gh pr create` when the PR changes more than 400 lines against its
+base. It counts added plus deleted lines from `git diff --numstat <base>...<head>`. The base is
+`--base`, else the remote default branch, else `main`, and `origin/<base>` is preferred when it
+exists. The head is `--head`, else the current branch. A command that cannot be resolved to a diff
+is allowed.
+
+Excluded from the count, because they are produced or translated, not reviewed line by line:
+lockfiles (any file name containing `lock`), paths with a `generated`, `dist` or `__generated__`
+segment, `.snap` files, binary files, and translated catalogs (`messages/*.json` and
+`locales/*/*.json`). The source locale (`en.json`, `locales/en/`) counts, since a person writes it.
+
+A head named `main`, `staging` or `release-*` is a promotion PR and is never capped.
+
+When denied, split the work into stacked PRs of 400 lines or fewer, each reviewable and green on its
+own, and open the first one.

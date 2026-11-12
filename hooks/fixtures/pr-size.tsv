@@ -1,0 +1,13 @@
+case	event	tool	input	setup	expect
+small-allowed	pre_tool	shell	gh pr create --fill	small	allow
+lock-heavy-allowed	pre_tool	shell	gh pr create --fill	lock-heavy	allow
+generated-heavy-allowed	pre_tool	shell	gh pr create --fill	generated-heavy	allow
+locale-heavy-allowed	pre_tool	shell	gh pr create --fill	locale-heavy	allow
+release-head-allowed	pre_tool	shell	gh pr create --fill	release-head	allow
+base-staging-explicit-allowed	pre_tool	shell	gh pr create --base staging --fill	base-staging	allow
+pr-list-allowed	pre_tool	shell	gh pr list	large	allow
+no-commits-allowed	pre_tool	shell	gh pr create --fill	-	allow
+large-denied	pre_tool	shell	gh pr create --fill	large	deny
+source-locale-denied	pre_tool	shell	gh pr create --fill	source-locale-heavy	deny
+push-then-create-denied	pre_tool	shell	git push -u origin feat-x && gh pr create --fill	large	deny
+base-staging-default-denied	pre_tool	shell	gh pr create --fill	base-staging	deny
