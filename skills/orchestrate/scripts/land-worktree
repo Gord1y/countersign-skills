@@ -2,14 +2,26 @@
 set -eu
 main() {
   ported=0
-  if [ $# -eq 2 ] && [ "$1" = "--ported" ]; then
+  brief=
+  if [ $# -eq 3 ] && [ "$1" = "--files" ]; then
+    brief=$2
+    shift 2
+  elif [ $# -eq 2 ] && [ "$1" = "--ported" ]; then
     ported=1
     shift
   fi
   if [ $# -ne 1 ]; then
     echo "usage: land-worktree <worktree>   copies a builder worktree's uncommitted changes into this checkout and stages them" >&2
+    echo "       land-worktree --files <brief> <worktree>   lands only the files the brief's Files: list names" >&2
     echo "       land-worktree --ported <worktree>   records a worktree whose changes were ported by hand and committed here, so remove-worktree can clear it" >&2
     exit 2
+  fi
+  if [ -n "$brief" ]; then
+    if [ ! -f "$brief" ]; then
+      echo "land-worktree: $brief not found" >&2
+      exit 2
+    fi
+    brief=$(cd "$(dirname "$brief")" && pwd -P)/$(basename "$brief")
   fi
   GIT_LITERAL_PATHSPECS=1
   export GIT_LITERAL_PATHSPECS
@@ -28,7 +40,28 @@ main() {
   list=$(mktemp "${TMPDIR:-/tmp}/land-worktree.XXXXXX")
   todo=$(mktemp "${TMPDIR:-/tmp}/land-worktree.XXXXXX")
   here=$(mktemp "${TMPDIR:-/tmp}/land-worktree.XXXXXX")
-  trap 'rm -f "$list" "$todo" "$here"' EXIT
+  allowed=$(mktemp "${TMPDIR:-/tmp}/land-worktree.XXXXXX")
+  trap 'rm -f "$list" "$todo" "$here" "$allowed"' EXIT
+  if [ -n "$brief" ]; then
+    awk '
+      /^Files:/ { on = 1 }
+      on && /^[ \t]*$/ { exit }
+      on {
+        rest = $0
+        while ((open = index(rest, "`")) > 0) {
+          rest = substr(rest, open + 1)
+          close_at = index(rest, "`")
+          if (close_at == 0) break
+          if (close_at > 1) print substr(rest, 1, close_at - 1)
+          rest = substr(rest, close_at + 1)
+        }
+      }
+    ' "$brief" >"$allowed"
+    if [ ! -s "$allowed" ]; then
+      echo "land-worktree: $brief has no Files: list" >&2
+      exit 2
+    fi
+  fi
   {
     git -C "$worktree" -c core.quotePath=false diff --name-only --no-renames "$base"
     git -C "$worktree" -c core.quotePath=false ls-files --others --exclude-standard
@@ -41,6 +74,24 @@ main() {
     echo "land-worktree: a path needs quoting, land this worktree by hand:" >&2
     grep '^"' "$list" >&2
     exit 1
+  fi
+  if [ -n "$brief" ]; then
+    outside=$(awk '
+      NR == FNR { entry[++count] = $0; next }
+      {
+        for (i = 1; i <= count; i++) {
+          wanted = entry[i]
+          if ($0 == wanted) next
+          if (substr(wanted, length(wanted)) == "/" && substr($0, 1, length(wanted)) == wanted) next
+        }
+        print
+      }
+    ' "$allowed" "$list")
+    if [ -n "$outside" ]; then
+      echo "land-worktree: nothing copied. These files are outside the brief's Files: list ($brief). Return to planning: add each to the plan and the brief, or drop it from the worktree:" >&2
+      echo "$outside" >&2
+      exit 1
+    fi
   fi
   write_record() {
     tab=$(printf '\t')

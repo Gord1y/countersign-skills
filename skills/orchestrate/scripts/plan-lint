@@ -1,0 +1,197 @@
+#!/bin/sh
+set -eu
+
+usage() {
+  echo "usage: plan-lint check <plan> | approve <plan> | verify <plan>" >&2
+  exit 2
+}
+
+hash_stdin() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum | cut -d' ' -f1
+  else
+    shasum -a 256 | cut -d' ' -f1
+  fi
+}
+
+stamp_function='function is_stamp(s) { return match(s, /^Approved: [0-9a-f]+ /) && RLENGTH == 75 }'
+
+check_plan() {
+  PLAN=$1 awk "$stamp_function"'
+    { sub(/\r$/, "") }
+    function report(line, text) {
+      printf "plan-lint: %s:%d: %s\n", ENVIRON["PLAN"], line, text > "/dev/stderr"
+      problems++
+    }
+    function leading(s,   b) {
+      split("", tok)
+      count = 0
+      while (1) {
+        sub(/^[ \t,]+/, "", s)
+        if (substr(s, 1, 1) != "`") break
+        s = substr(s, 2)
+        b = index(s, "`")
+        if (b == 0) break
+        tok[++count] = substr(s, 1, b - 1)
+        s = substr(s, b + 1)
+      }
+      return count
+    }
+    function glob_problem(g,   i, n, parts) {
+      if (g == "" || substr(g, 1, 1) == "/" || substr(g, length(g), 1) == "/") return 1
+      for (i = 1; i <= length(badchars); i++) {
+        if (index(g, substr(badchars, i, 1)) > 0) return 1
+      }
+      n = split(g, parts, "/")
+      for (i = 1; i <= n; i++) {
+        if (parts[i] == "..") return 1
+      }
+      return 0
+    }
+    function check_globs(line, n,   i, globs) {
+      for (i = 1; i <= n; i++) globs[i] = tok[i]
+      for (i = 1; i <= n; i++) {
+        if (glob_problem(globs[i])) {
+          report(line, "bad glob " globs[i] ": use a relative path with *, ** and ?, no brackets, braces, backslashes, .. or trailing /")
+        }
+      }
+    }
+    function flush() {
+      if (id == "") return
+      if (!has_scope) report(head, "slice " id " has no Scope: line with a backticked glob")
+      if (!has_acceptance) report(head, "slice " id " has no Acceptance: line")
+      if (!has_evidence) report(head, "slice " id " has no Evidence: line")
+      if (!has_out_of_scope) report(head, "slice " id " has no Out of scope: line")
+      id = ""
+    }
+    BEGIN { badchars = "[]{}\\" }
+    is_stamp($0) {
+      if (++approved > 1) report(NR, "more than one Approved: line")
+      next
+    }
+    /^(#|##|###) / {
+      flush()
+      if ($0 ~ /^### Slice([^A-Za-z]|$)/ && $0 !~ /^### Slice [0-9][0-9]: [^ \t]/) {
+        report(NR, "bad slice heading: use \"### Slice NN: <commit message>\" with two digits and one space after the colon")
+      }
+      if ($0 ~ /^### Slice [0-9][0-9]: [^ \t]/) {
+        id = substr($0, 11, 2)
+        head = NR
+        if (id in seen) report(NR, "slice " id " is listed twice")
+        seen[id] = 1
+        slices++
+        has_scope = has_acceptance = has_evidence = has_out_of_scope = 0
+      }
+      next
+    }
+    /^- Scope:/ {
+      if (id == "") next
+      n = leading(substr($0, 9))
+      if (n > 0) has_scope = 1
+      check_globs(NR, n)
+      next
+    }
+    /^- Sensitive:/ {
+      if (id == "") {
+        report(NR, "Sensitive: line outside a slice")
+        next
+      }
+      n = leading(substr($0, 13))
+      if (n == 0) {
+        report(NR, "Sensitive: line names no backticked path")
+        next
+      }
+      check_globs(NR, n)
+      next
+    }
+    /^- Acceptance:[ \t]*[^ \t]/ { if (id != "") has_acceptance = 1; next }
+    /^- Evidence:[ \t]*[^ \t]/ { if (id != "") has_evidence = 1; next }
+    /^- Out of scope:[ \t]*[^ \t]/ { if (id != "") has_out_of_scope = 1; next }
+    END {
+      flush()
+      if (slices == 0) report(1, "no slices: add a \"### Slice NN: <commit message>\" heading per unit")
+      if (problems > 0) exit 1
+      printf "plan-lint: ok, %d slices\n", slices
+    }
+  ' "$1"
+}
+
+strip_stamp() {
+  awk "$stamp_function"' { text = $0; sub(/\r$/, "", text) } !is_stamp(text)' "$1"
+}
+
+stamp_count() {
+  awk "$stamp_function"' { text = $0; sub(/\r$/, "", text) } is_stamp(text) { count++ } END { print count + 0 }' "$1"
+}
+
+stamp_hash() {
+  awk "$stamp_function"' { text = $0; sub(/\r$/, "", text) } is_stamp(text) { split(text, fields, " "); print fields[2] }' "$1"
+}
+
+approve_plan() {
+  plan=$1
+  check_plan "$plan" >/dev/null || exit 1
+  unanswered=$(PLAN=$plan awk '
+    {
+      text = tolower($0)
+      sub(/\r$/, "", text)
+    }
+    text ~ /^[ \t>]*([-*] )?(\*\*)?answer(\*\*)?:(\*\*)?[ \t]*(\(pending.*)?$/ {
+      printf "plan-lint: %s:%d: unanswered question\n", ENVIRON["PLAN"], NR
+    }
+  ' "$plan")
+  if [ -n "$unanswered" ]; then
+    echo "$unanswered" >&2
+    exit 1
+  fi
+  stamped=$(mktemp "${TMPDIR:-/tmp}/plan-lint.XXXXXX")
+  trap 'rm -f "$stamped"' EXIT
+  strip_stamp "$plan" >"$stamped"
+  hash=$(hash_stdin <"$stamped")
+  printf 'Approved: %s %s\n' "$hash" "$(date -u +%Y-%m-%d)" >>"$stamped"
+  cat "$stamped" >"$plan"
+  echo "plan-lint: approved $plan at $hash"
+}
+
+verify_plan() {
+  plan=$1
+  stamps=$(stamp_count "$plan")
+  if [ "$stamps" -eq 0 ]; then
+    echo "plan-lint: $plan is not approved. Ask the user to approve it, then run plan-lint approve." >&2
+    exit 1
+  fi
+  if [ "$stamps" -gt 1 ]; then
+    check_plan "$plan" >/dev/null || exit 1
+    exit 1
+  fi
+  stored=$(stamp_hash "$plan")
+  current=$(strip_stamp "$plan" | hash_stdin)
+  if [ "$stored" != "$current" ]; then
+    echo "plan-lint: $plan changed after its approval, so the approval is void. Return to planning: show the user the change and approve again." >&2
+    exit 1
+  fi
+  echo "plan-lint: $plan is approved at $current"
+}
+
+main() {
+  if [ $# -ne 2 ]; then
+    usage
+  fi
+  command=$1
+  plan=$2
+  case "$command" in
+    check | approve | verify) ;;
+    *) usage ;;
+  esac
+  if [ ! -f "$plan" ]; then
+    echo "plan-lint: $plan not found" >&2
+    exit 2
+  fi
+  case "$command" in
+    check) check_plan "$plan" || exit 1 ;;
+    approve) approve_plan "$plan" ;;
+    verify) verify_plan "$plan" ;;
+  esac
+}
+
+main "$@"; exit

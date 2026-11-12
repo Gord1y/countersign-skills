@@ -70,7 +70,7 @@ a contract, behaviour the user would notice or a recorded decision, or is expens
 Write one plan file, `~/.claude/plans/<repo>-<run>.md`, holding:
 
 - the goal, in two lines
-- each unit, as the commit message it will produce
+- each unit as a slice block (`references/plan-contract.md`)
 - what depends on what, so what is parallel and what is sequenced; units that touch the same file
   are sequenced
 - each unit's model and effort, and why
@@ -83,7 +83,6 @@ Write one plan file, `~/.claude/plans/<repo>-<run>.md`, holding:
   otherwise be asked about
 - every load-bearing decision, as a question with its options, your recommendation and an
   `Answer:` line
-- an empty `## Waiting for you` section
 
 Give the user the file's path, then ask the same questions through the forms (AskUserQuestion), at
 most four at a time and the highest-leverage first, and write each answer back to its `Answer:`
@@ -94,10 +93,19 @@ lists every reversible call with its default: "OK with these?". After each batch
 answers settled and ask the next. A run with a run folder
 (4 or more units) keeps this file as the folder's `plan.md`.
 
-During the run, a load-bearing question that turns up goes under `## Waiting for you`, with its
-options and recommendation; only the units it touches park (see "When a builder parks or fails").
+Run `plan-lint check <plan>` (`scripts/plan-lint`) before the first question and fix every
+problem it prints. The last question asks the user to approve the plan as written. Write the
+user's answers into each `Answer:` line first. On a yes, run `plan-lint approve <plan>`, which
+stamps the plan with a hash. A later edit voids the approval: show the user the change and
+approve again.
 
-Resuming an approved plan or a handoff needs no re-approval. Splitting new work does.
+During the run, a load-bearing question that turns up becomes a `parked` row in the decision log
+(`references/plan-contract.md`), with its options and recommendation; only the units it touches
+park (see "When a builder parks or fails").
+
+Resuming an approved plan or a handoff needs no re-approval. Splitting new work does. A plan
+approved before `plan-lint` existed carries no stamp: on the user's yes, run `plan-lint approve`
+again, and `plan-lint verify` passes from then on.
 
 ### Plan in one session, execute in others
 
@@ -144,9 +152,9 @@ back through you, and the research would be paid twice.
   concurrency or cache interaction, anything where a plausible wrong answer still compiles and
   passes. Spawn `planner` with `model: "opus"` and `effort: "high"`, pointing at the unit file. Then
   spawn the builder on `sonnet` with `medium`, or `high` for the hardest units, from the brief plus
-  the spec. Builders never run on opus. Questions the planner writes go under `## Waiting for you`,
-  and only that unit parks. The one-line reason for the planner goes into the split and the unit
-  table. Not "edge-case heavy": list the cases (Step 5) and skip the planner.
+  the spec. Builders never run on opus. Questions the planner writes become `parked` rows in the
+  decision log, and only that unit parks. The one-line reason for the planner goes into the split
+  and the unit table. Not "edge-case heavy": list the cases (Step 5) and skip the planner.
 - **`haiku`** only where a known fan-out skill pins it, such as one translator per locale.
   Under T3 Code that skill routes the fan-out itself, to the cheap ChatGPT model the routing
   table in the orchestration rule names; never re-route it, and never route a builder, planner,
@@ -203,6 +211,8 @@ instead when you can.>
 <numbers, inventories, measurements, decisions already made>
 
 ## The task: one unit, landed as `<exact conventional commit message>`
+Files: `<path>`, `<folder>/`
+
 <what to change, file by file: new types and functions with signatures, exact user-facing
 strings, the docs sections to update and what each must say>
 
@@ -232,7 +242,9 @@ before you hand back; past 20, cut the least useful until it fits.
 - **Name the shape.** Every new type and function with its signature, every user-facing string
   verbatim.
 - **Fence the scope.** List test cases exactly and write "Out of scope". "Handle odd shapes" or
-  "be defensive" with no list is open-ended by construction.
+  "be defensive" with no list is open-ended by construction. Each brief has one `Files:` line
+  inside its slice's globs, and every brief is a file: `units/NN-<slug>.md` in a run folder, else
+  `~/.claude/plans/<repo>-<run>-NN.md`.
 - **Set a budget**, about 20-30 minutes for a `sonnet` unit. Over 45 honest minutes: split it.
 - **One full gate per unit.** Name the fast-loop commands; more than 1 reported gate run is
   flagged in the unit table.
@@ -296,7 +308,8 @@ worktree this session works in), with `land-worktree` from this skill's `scripts
 
 ```bash
 cd <the working branch checkout's top folder>
-"${CLAUDE_SKILL_DIR}/scripts/land-worktree" <worktree>   # copies its changes here and stages them
+"${CLAUDE_SKILL_DIR}/scripts/plan-lint" verify <plan>   # exit 0 only while the approval holds
+"${CLAUDE_SKILL_DIR}/scripts/land-worktree" --files <brief> <worktree>   # copies and stages them
 git commit -m "<the unit's commit message>"
 remove-worktree <worktree>
 ```
@@ -318,6 +331,9 @@ which runs inside the sandbox and can fail on write-protected paths.
   Port its diff by hand with Edit (integration work), or respawn it on the new `HEAD`. After
   committing a hand-port, run `"${CLAUDE_SKILL_DIR}/scripts/land-worktree" --ported <worktree>`,
   which records the landing, then `remove-worktree <worktree>` as usual.
+- **a file is outside the brief's `Files:` list**: unplanned work. Never widen the list to land
+  it. Park the unit. When the slice's globs already cover the file, correct the brief, log a
+  `deviation` row and land again.
 - **the worktree is not on this branch**: the builder committed. Port the diff by hand.
 - **a file is uncommitted in this checkout**: commit or set aside your own edits first; never
   discard the user's.
@@ -428,10 +444,12 @@ under an index plan, described in the same file.
 ## Reporting
 
 One or two lines in the terminal as each unit lands. One closing summary at the end, in the
-session's summary convention. It lists every builder's "Calls made", every parked unit with its
-question, the QA verdict with each FAIL and BLOCKED case, and the commands only the user can run.
-It ends with the path of the walkthrough (of the QA report when the walkthrough is off), or with
-the check the user should do when QA was skipped. Never an artifact page, unless asked.
+session's summary convention. It reads the decision log: each `parked` row is a ❓, each
+`deviation` a ⚠️, and the `call` rows are one line with the file's path. It also lists every
+builder's "Calls made", the QA verdict with each FAIL and BLOCKED case, and the commands only the
+user can run. It ends with the path of the walkthrough (of the QA report when the walkthrough is
+off), or with the check the user should do when QA was skipped. Never an artifact page, unless
+asked.
 
 ## Anti-patterns
 

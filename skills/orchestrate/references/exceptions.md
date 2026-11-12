@@ -6,12 +6,19 @@ Read this when a hand-back reports a gap that stopped the builder, or a unit fai
 
 A parked unit is a brief with a gap, not a failed attempt, and doesn't use the retry. If the
 plan's defaults or the reversible-call rule settle it, decide, fold the answer into the brief and
-respawn. If it is load-bearing, mark it parked and write the question, options and your
-recommendation under the plan file's `## Waiting for you`; units depending on it park too; the
-rest of the run finishes, and it all goes to the user as ❓ in the closing summary.
+respawn. If it is load-bearing, mark it parked and write a `parked` row in the decision log
+(`plan-contract.md`) with the question, options and your recommendation; units depending on it
+park too; the rest of the run finishes, and it all goes to the user as ❓ in the closing summary.
 
 Respawn, don't resume: a builder that stops without changes has its worktree removed by the
 harness, so a resumed one finds none.
+
+## A deviation
+
+A builder that meets a product-visible decision, or needs a file outside its slice, stops and
+reports. You never decide it and never ask the user mid-run: park that slice with a `parked` row,
+land the rest, and put the question in the closing summary. When `land-worktree --files` refuses
+a file, treat it the same way (SKILL.md Step 8).
 
 ## Edits done, tooling blocked
 

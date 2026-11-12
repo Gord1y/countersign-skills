@@ -7,7 +7,8 @@ directory:
 
 ```
 ~/.claude/plans/<repo>-<run>/
-  plan.md              the approved plan: every question with its answer, and "Waiting for you"
+  plan.md              the approved plan: every question with its answer, never edited after it
+  decisions.tsv        the decision log: parked slices, calls made, deviations (plan-contract.md)
   orchestrator.md      the only file you re-read
   common.md            rules every unit shares (setup, standing rules, gate, hand-back), written once
   units/NN-<slug>.md   one per unit: its brief, then its hand-back
@@ -32,7 +33,7 @@ finished units' detail to `log.md` first. It holds:
   | gate runs | the full-gate count the builder reported; more than 1 is flagged |
   | open | anything the builder flagged |
 
-- parked units with their questions, and the calls made
+- parked units and the calls made, each as a pointer to its row in `decisions.tsv`
 - the count of units landed this session, against the limit of 10 or about 300K tokens of context
 
 The first line of the file names the session's landed-unit count, so the 10-unit limit is visible
