@@ -198,3 +198,21 @@ checkout is where its edits take effect.
   into `paths`.
 - A symbolic link as the last path segment is not followed. A link inside the repo that points out
   of it is allowed.
+
+### pr-walkthrough
+
+`hooks/policy/pr-walkthrough.sh` denies `gh pr create` when the PR changes a UI file and its body
+has no walkthrough. UI files are those ending in `.tsx`, `.jsx`, `.vue`, `.svelte`, `.css`, `.scss`
+or `.html`, under any path, found with `git diff --name-only <base>...<head>`. The base and head
+resolve as in `pr-size`, and a command that cannot be resolved to a diff is allowed. Unlike
+`pr-size`, a promotion head is not exempt.
+
+A walkthrough is a section: a line containing `walkthrough` (any case) opens it, a line starting
+with `#` closes it, and an open line with an `http://` or `https://` URL passes. So
+`Walkthrough: <url>` passes, and so does a `## Walkthrough` heading over screenshot lines, which is
+the record of every changed state in light and dark. The test reads the whole command text, then
+the body file named by `-F`, `--body-file` or `--body-file=` (relative to `cwd`, `-` skipped).
+`--fill` alone never passes on a UI change.
+
+When denied, add a `## Walkthrough` section with the screenshots, or a link to a walkthrough that
+shows them (the `walkthrough` skill builds one), then create the PR again.

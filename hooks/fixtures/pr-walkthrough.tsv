@@ -1,0 +1,15 @@
+case	event	tool	input	setup	expect
+fill-no-ui-allowed	pre_tool	shell	gh pr create --fill	no-ui	allow
+fill-no-base-allowed	pre_tool	shell	gh pr create --fill	no-base	allow
+walkthrough-pr-list-allowed	pre_tool	shell	gh pr list	ui	allow
+body-link-allowed	pre_tool	shell	gh pr create --title t --body 'Walkthrough: https://example.com/w'	ui	allow
+absolute-gh-allowed	pre_tool	shell	/opt/homebrew/bin/gh pr create --body 'See the WALKTHROUGH at https://example.com/w'	ui	allow
+body-file-allowed	pre_tool	shell	gh pr create --title t --body-file body.md	ui-body	allow
+short-body-file-allowed	pre_tool	shell	gh pr create -F body.md	ui-body	allow
+fill-ui-denied	pre_tool	shell	gh pr create --fill	ui	deny
+base-fill-ui-denied	pre_tool	shell	gh pr create --base main --fill	ui	deny
+walkthrough-push-then-create-denied	pre_tool	shell	git push -u origin feat-x && gh pr create --fill	ui	deny
+walkthrough-without-link-denied	pre_tool	shell	gh pr create --body 'Walkthrough to follow'	ui	deny
+link-without-walkthrough-denied	pre_tool	shell	gh pr create --body 'Screens: https://example.com/a.png'	ui	deny
+styles-fill-denied	pre_tool	shell	gh pr create --fill	styles	deny
+bare-body-file-denied	pre_tool	shell	gh pr create -F body.md	ui-body-bare	deny
