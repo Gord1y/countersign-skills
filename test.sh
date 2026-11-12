@@ -168,7 +168,8 @@ jq -e \
   --argjson rules "$(wc -l <"$root/rules.tsv" | tr -d ' ')" \
   --argjson agents "$(ls -1 "$root"/agents/*.md | wc -l | tr -d ' ')" \
   '(.skills | length) == $skills and (.rules | length) == $rules and (.agents | length) == $agents
-    and (.skills[] | select(.name == "memory-review") | .invocation) == "manual"
+    and (.skills[] | select(.name == "retro") | .invocation) == "manual"
+    and (.skills[] | select(.name == "repo-knowledge") | .invocation) == "manual"
     and (.skills[] | select(.name == "orchestrate") | .invocation == "model" and .whenToUse != null)
     and (.agents[] | select(.name == "builder") | .model) == "sonnet"' "$root/catalog.json" >/dev/null || fail "catalog.json does not match the skills, rules and agents in the repo"
 git -C "$root" check-ignore -q skills/orchestrate/local.md || fail "a skill's local.md is not gitignored"
@@ -257,7 +258,7 @@ replace_second_to_last() {
 }
 prepend_line "$fake/skills/context-transfer/SKILL.md"
 prepend_line "$fake/skills/orchestrate/SKILL.md"
-replace_second_to_last "$fake/skills/memory-review/SKILL.md" "shipped change"
+replace_second_to_last "$fake/skills/retro/SKILL.md" "shipped change"
 shipped() {
   awk -F "$tab" -v name="$1" '$1 == name { print $2 }' "$root/skills.tsv"
 }
@@ -266,7 +267,7 @@ mv "$fake/skills.tsv.tmp" "$fake/skills.tsv"
 
 installed="$updhome/.claude/skills"
 echo "my edit" >>"$installed/orchestrate/SKILL.md"
-replace_second_to_last "$installed/memory-review/SKILL.md" "my change"
+replace_second_to_last "$installed/retro/SKILL.md" "my change"
 echo mine >"$installed/orchestrate/local.md"
 
 out=$(HOME=$updhome CLAUDE_CONFIG_DIR= "$fake/update.sh") && status=0 || status=$?
@@ -277,7 +278,7 @@ echo "$out" | grep -q "^merged  claude orchestrate $(shipped orchestrate) -> 99.
   && [ "$(tail -n 1 "$installed/orchestrate/SKILL.md")" = "my edit" ] \
   && [ "$(tail -n 1 "$installed/orchestrate/SKILL.md.mine")" = "my edit" ] \
   && [ "$(head -n 1 "$installed/orchestrate/SKILL.md.mine")" != "new first line" ] || fail "an edited copy was not merged cleanly"
-echo "$out" | grep -q "^conflict claude memory-review" && grep -q '^<<<<<<<' "$installed/memory-review/SKILL.md" && [ -f "$installed/memory-review/SKILL.md.mine" ] || fail "a conflicting edit was not marked"
+echo "$out" | grep -q "^conflict claude retro" && grep -q '^<<<<<<<' "$installed/retro/SKILL.md" && [ -f "$installed/retro/SKILL.md.mine" ] || fail "a conflicting edit was not marked"
 [ "$(cat "$installed/orchestrate/local.md")" = mine ] || fail "update.sh touched local.md"
 grep -qF "$(printf 'claude\torchestrate\t99.0.0\tSKILL.md\t%s' "$(sha256_of "$fake/skills/orchestrate/SKILL.md")")" "$updhome/.config/countersign/skills/manifest.tsv" || fail "the manifest was not moved to the new version"
 

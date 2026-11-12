@@ -58,7 +58,7 @@ Where everything lands, how copies and settings merge, backups and unattended ru
 
 | | Claude Code | Codex | Antigravity | skills.sh |
 | --- | --- | --- | --- | --- |
-| Skills | 16 | 14 | 10 | skills only |
+| Skills | 17 | 16 | 12 | skills only |
 | Rules | 11 | 9 | 9 | no |
 | Subagents | 6 | no | no | no |
 | Settings defaults | yes | no | no | no |
@@ -75,7 +75,7 @@ has, so those two rules stay out of both.
 | `orchestrate` | Splits a multi-commit task into units and runs one builder subagent per unit, then QAs every surface the run touched and leaves a local walkthrough. | Claude Code |
 | `context-transfer` | Packs a conversation into one self-contained block for a new chat. | Claude Code, Codex, Antigravity |
 | `human-voice-writing` | Drafts and revises longer text so it reads as human, not AI-generated. | Claude Code, Codex, Antigravity |
-| `memory-review` | Sorts Claude Code's auto memory by the memory rule: preferences into rules, project knowledge into repo docs. Manual: `/memory-review`. | Claude Code |
+| `retro` | Turns a session's mistakes into structure, not notes: each lesson goes to the highest rung that works, and its fix is proven on the real mistake. Manual: `/retro`. | Claude Code, Codex, Antigravity |
 | `codebase-research` | Picks the cheapest way to research code, with an explicit model on any spawn. | Claude Code, Codex |
 | `release-notes` | Writes release note entries, keeps an open note in step with its branch, and keeps the release index current. | Claude Code, Codex, Antigravity |
 | `feature-pr-description` | Writes the body of a feature or fix PR to the repo's description contract. | Claude Code, Codex, Antigravity |
@@ -88,6 +88,7 @@ has, so those two rules stay out of both.
 | `pr-review-triage` | Verifies a PR's AI findings, failed checks and open threads at the PR head, and writes a fix plan that proves each fix safe; starts on a bare PR link. | Claude Code, Codex |
 | `walkthrough` | Walks you through any change with its QA evidence (screenshots, request and response pairs, transcripts), or builds a customer-facing HTML walkthrough of a UI release. | Claude Code, Codex, Antigravity |
 | `writeups-cleanup` | Proposes what in `writeups/` has done its job, with the evidence, and deletes only what you approve. Manual: `/writeups-cleanup`. | Claude Code, Codex, Antigravity |
+| `repo-knowledge` | Sets up a repo's knowledge graph: feature nodes mapped to code paths, a glossary, decision records, and a drift lint the repo runs in CI. Manual: `/repo-knowledge`. | Claude Code, Codex, Antigravity |
 
 Manual skills have `disable-model-invocation: true` and an `agents/openai.yaml` that does the same
 for Codex: their description costs no context, and only you start them, with `/name`.
@@ -182,7 +183,7 @@ Claude Code 2.1.278 with Opus 5.5, with every rule on, then scaled by size for 1
 
 The rules still dominate: `responses` (about 510), `safety` (about 450) and `orchestration`
 (about 350) are the biggest, and the smallest, `commits`, is about 90. A skill's listing costs 70
-to 130 tokens. The 2 manual skills cost nothing until you type them. Dropping a rule's import line
+to 130 tokens. The 3 manual skills cost nothing until you type them. Dropping a rule's import line
 saves its share.
 
 In a 200K context window, Claude Code's default budget for the skill listing is too small for its

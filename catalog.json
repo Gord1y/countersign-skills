@@ -39,15 +39,17 @@
       "path": "skills/human-voice-writing"
     },
     {
-      "name": "memory-review",
-      "version": "1.0.1",
+      "name": "retro",
+      "version": "1.0.0",
       "agents": [
-        "claude"
+        "claude",
+        "codex",
+        "antigravity"
       ],
-      "description": "Sort Claude Code's auto memory by the memory rule - preferences into rules, project knowledge into repo docs, progress deleted. Read-only until approved. Run with /memory-review.",
+      "description": "Turn a session's mistakes and lessons into structure, not notes. Each lesson goes to the highest rung that works, proven to fail on the real mistake first. Run with /retro.",
       "whenToUse": null,
       "invocation": "manual",
-      "path": "skills/memory-review"
+      "path": "skills/retro"
     },
     {
       "name": "codebase-research",
@@ -200,6 +202,19 @@
       "whenToUse": null,
       "invocation": "manual",
       "path": "skills/writeups-cleanup"
+    },
+    {
+      "name": "repo-knowledge",
+      "version": "1.0.0",
+      "agents": [
+        "claude",
+        "codex",
+        "antigravity"
+      ],
+      "description": "Bootstrap, update and lint a repo's knowledge graph (feature nodes in docs/features, a generated path index, glossary, ADRs, a drift lint in its CI). Run with /repo-knowledge.",
+      "whenToUse": null,
+      "invocation": "manual",
+      "path": "skills/repo-knowledge"
     }
   ],
   "rules": [
