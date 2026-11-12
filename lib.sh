@@ -350,10 +350,14 @@ function is_scalar(body) {
   if (body ~ /^[-+]?(0|[1-9][0-9]*(_[0-9]+)*)(\.[0-9]+(_[0-9]+)*)?([eE][-+]?[0-9]+(_[0-9]+)*)?$/) return 1
   return valid_datetime(body)
 }
-function valid_date(text,   month, day) {
+function valid_date(text,   year, month, day, last) {
+  year = substr(text, 1, 4) + 0
   month = substr(text, 6, 2) + 0
   day = substr(text, 9, 2) + 0
-  return month >= 1 && month <= 12 && day >= 1 && day <= 31
+  if (month < 1 || month > 12) return 0
+  last = substr("312831303130313130313031", month * 2 - 1, 2) + 0
+  if (month == 2 && (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0))) last = 29
+  return day >= 1 && day <= last
 }
 function valid_time(text,   hour, minute, second) {
   hour = substr(text, 1, 2) + 0

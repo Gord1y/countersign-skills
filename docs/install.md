@@ -221,7 +221,8 @@ When `~/.codex` exists, `install.sh` also writes two Codex files. `--no-settings
   or time, or an array or inline table written on one line, followed by nothing but a comment;
   an array is checked item by item (comma separated, a trailing comma allowed, no empty item) and
   an inline table pair by pair (`key = value`, bare, quoted or dotted keys, no trailing comma), each
-  value recursively. A date or time needs a month of 01 to 12, a day of 01 to 31, an hour of 00 to
+  value recursively. A date or time needs a month of 01 to 12, a day that exists in that month (leap years
+  included), an hour of 00 to
   23, a minute of 00 to 59, a second of 00 to 60 and an offset hour of 00 to 23. Arrays of tables,
   dotted keys, multi-line values and any other line stop `install.sh` before it changes anything,
   with the fragment's path and the line number on stderr. `--no-settings` skips the check.
