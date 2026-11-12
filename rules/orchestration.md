@@ -23,11 +23,12 @@
 | One translator per locale (`i18n-translate`) | `delegate_task` to `codex`, `gpt-6.1-terra`, `reasoningEffort: low` | `haiku`, `low` |
 | A mechanical build unit (the brief names every change) | `delegate_task` to `codex`, `gpt-6.1-terra`, `reasoningEffort: medium`, `agents/builder.md` as the role | `builder`, `sonnet`, `medium` |
 | Conformance review of Claude-written code | `delegate_task` to `codex`, `gpt-6-sol`, `reasoningEffort: high`, `agents/conformance.md` as the role | `conformance`, `sonnet`, `high`; the report says the review was same-family |
-| Conformance review of Codex-written code | `conformance`, `sonnet`, `high` | `conformance`, `sonnet`, `high` |
+| Conformance review of Codex-written code | `delegate_task` to `claudeAgent`, `claude-sonnet-5-5`, `effort: high`, `agents/conformance.md` as the role | From Claude: `conformance`, `sonnet`, `high`. From Codex: I run it in Claude Code |
 | Everything else: research, judgement builds, standards review, QA, planning | Claude, as above | Claude, as above |
 
 - When one provider's quota or model is unavailable, the same role runs on the other provider and
-  the report says so.
+  the report says so. Outside T3, where the other provider can't be reached, that work waits and
+  the report names it as an action for me.
 
 - Handoffs go through the `context-transfer` skill only. If it isn't offered, the install is
   broken: say so and ask me to re-run `install.sh`.
