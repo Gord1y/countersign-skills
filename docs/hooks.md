@@ -150,3 +150,51 @@ A head named `main`, `staging` or `release-*` is a promotion PR and is never cap
 
 When denied, split the work into stacked PRs of 400 lines or fewer, each reviewable and green on its
 own, and open the first one.
+
+### write
+
+`hooks/policy/write.sh` fences the edit tools (Claude `Edit`, `Write`, `MultiEdit`, `NotebookEdit`,
+Codex `apply_patch` and a patch sent through Codex `Bash`) to the session's own git checkout. It
+reads `paths`, so every tool is judged the same way. It acts only when `paths` is not empty, and it
+allows when `cwd` is not inside a git repository.
+
+Every path is resolved physically before it is compared: the deepest existing ancestor goes through
+`pwd -P` and the missing rest is appended, so `/tmp` and `/private/tmp` (and `/var` and
+`/private/var`) match on macOS. A path is allowed under:
+
+| Place | Why |
+| --- | --- |
+| The checkout's top level (`git rev-parse --show-toplevel` of `cwd`) | The work itself. A builder's worktree is its own top level. |
+| `writeups/` of the main checkout, when `cwd` is in a linked worktree | Evidence files belong in the main checkout, not in a throwaway worktree. |
+| `~/.claude/plans/` and `~/.claude/projects/` | Plans, handoffs and Claude's auto memory. |
+| `/private/tmp/claude-<uid>/` and `/tmp/claude-<uid>/` | Claude's session scratchpad. |
+| `$TMPDIR`, when set | Throwaway files from tools that honour it. |
+
+A place that contains the checkout's top level is not honoured. A session whose repo lives inside
+the scratchpad or `$TMPDIR` (the hook tests do) is fenced to its repo, not to its siblings.
+
+Anything else is denied with `write denied: <path> is outside this repo (<top>). Write inside the
+repo, ~/.claude/plans, the scratchpad or writeups/.`
+
+#### The worktree-only list
+
+A repo can be edited only from a worktree when its main checkout is listed in
+`${XDG_CONFIG_HOME:-$HOME/.config}/countersign/profile/worktree-only.tsv`. The file holds one
+absolute path per line, the repo's main checkout; a leading `~/` is the home directory. Blank lines
+and lines starting with `#` are skipped, and a missing file lists no repo.
+
+When the session's top level is a listed main checkout, every path under it is denied with
+`write denied: <top> is worktree-only. Work in a worktree under .claude/worktrees/.` A linked
+worktree of that repo is not the main checkout, so it is fenced like any other repo. The other
+allowed places stay open.
+
+`countersign-profile` stays off the list: its release branch is the live profile, so its main
+checkout is where its edits take effect.
+
+#### Limits
+
+- The fence reads edit tools only. Shell writes are the sandbox's job, and the wall does not parse
+  shell commands, apart from a patch in a Codex `Bash` command, which the adapter already turns
+  into `paths`.
+- A symbolic link as the last path segment is not followed. A link inside the repo that points out
+  of it is allowed.

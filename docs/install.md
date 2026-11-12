@@ -66,6 +66,9 @@ when that is set, as Countersign does):
   - `settings.json`: merged over `claude/settings.json`, so your keys win, and the permission,
     sandbox and auto-mode lists add up (see [Settings merge](#settings-merge)).
   - `bin/`: linked into `~/.local/bin` next to this repo's `bin/`.
+  - `worktree-only.tsv`: the repos whose main checkout the write fence refuses to edit, one
+    absolute path per line (`~/` allowed, blank lines and `#` lines skipped). Work on a listed repo
+    happens in a worktree under `.claude/worktrees/`. See [Hook walls](hooks.md#write).
 - **Additions**: `install.sh --addition <folder>` records a folder in this repo's layout
   (`skills.tsv` and `skills/`, `rules.tsv` and `rules/`, `agents/`) and installs it alongside on
   every later run: its skills and agents are linked, and its rules are imported into `CLAUDE.md`
