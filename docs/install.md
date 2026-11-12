@@ -249,6 +249,10 @@ questions.
   judges destructive or outside the trust boundary, and a Bash command that can't run in the
   sandbox. A builder that hits one reports it, and the orchestrator parks that unit and finishes
   the rest.
+- **Each subagent compacts at 300K tokens.** `autoCompactWindow: 300000` sits in each
+  `agents/*.md`. It must be a plain integer, since `300k` reads as 300 and is ignored. It can only
+  lower the session's window. The installer never sets `CLAUDE_CODE_AUTO_COMPACT_WINDOW`, which
+  would override every agent's value.
 
 To adjust, use `/sandbox` or the Auto mode tab of `/permissions`, then copy the change into
 `claude/settings.json`.

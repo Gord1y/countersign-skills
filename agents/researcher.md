@@ -3,6 +3,7 @@ name: researcher
 description: Read-only code research for one factual question; reports at most 30 lines of paths, line ranges and facts. Spawned by codebase-research and by orchestrate's fact-gathering step.
 model: haiku
 effort: low
+autoCompactWindow: 300000
 tools: Read, Grep, Glob
 omitClaudeMd: true
 maxTurns: 40

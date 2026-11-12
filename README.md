@@ -120,7 +120,7 @@ and add your own version as a rule in an addition, so `git pull` never fights yo
 ## Subagents
 
 Claude Code only, linked into `~/.claude/agents`. Each is split by what it may do, never by domain,
-and sets its own model.
+and sets its own model. Each caps its compaction window at 300K tokens.
 
 - `builder` (`sonnet`, effort `medium`): implements one orchestrated unit in its own worktree, never committing.
 - `planner` (`opus`, effort `high`): read-only, turns an intricate unit's brief into an exact spec that a sonnet builder implements.

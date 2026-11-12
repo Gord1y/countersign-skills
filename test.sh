@@ -38,6 +38,7 @@ for agent in "$root"/agents/*.md; do
   frontmatter=$(sed -n '2,/^---$/p' "$agent")
   echo "$frontmatter" | grep -q '^model: ' || fail "agents/$name.md does not set a model"
   echo "$frontmatter" | grep -qE '^effort: (low|medium|high|xhigh|max)$' || fail "agents/$name.md does not set an effort of low, medium, high, xhigh or max"
+  echo "$frontmatter" | grep -qE '^autoCompactWindow: [0-9]+$' || fail "agents/$name.md does not set autoCompactWindow as a plain integer of tokens"
   if echo "$frontmatter" | grep -q '^skills: *[^ ]'; then
     fail "agents/$name.md lists its skills inline; write them as a YAML list so this test can check them"
   fi

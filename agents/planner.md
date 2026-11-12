@@ -3,6 +3,7 @@ name: planner
 description: Turns one orchestrated unit's brief into an exact implementation spec, read-only; a sonnet builder implements it. Spawned by orchestrate for intricate units.
 model: opus
 effort: high
+autoCompactWindow: 300000
 disallowedTools: AskUserQuestion, Agent, NotebookEdit
 maxTurns: 40
 ---
