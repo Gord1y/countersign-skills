@@ -312,6 +312,23 @@ if [ -e "$repo/.claude/worktrees/hollow" ]; then
   fail "--landed kept an old empty orphan folder: $(cat "$work/out")"
 fi
 
+cut sealed
+sealed_record="$repo/.git/worktrees/agent-sealed/commondir"
+chmod 444 "$sealed_record"
+if (: >>"$sealed_record") 2>/dev/null; then
+  echo "test-remove-worktree: skipped the sealed-record case: a read-only file is still writable here"
+else
+  run "$(wt sealed)"
+  if [ "$status" -ne 2 ] || ! grep -q "nothing removed: it ran inside the sandbox" "$work/out"; then
+    fail "an undeletable worktree record did not stop the run with exit 2: $status $(cat "$work/out")"
+  elif [ ! -d "$(wt sealed)" ] || ! listed sealed || ! has_branch sealed; then
+    fail "an undeletable worktree record still let the run move or prune something"
+  fi
+fi
+if [ -f "$sealed_record" ]; then
+  chmod 644 "$sealed_record"
+fi
+
 run
 if [ "$status" -ne 2 ]; then
   fail "no arguments exited $status, not 2"

@@ -303,11 +303,21 @@ main() {
     probe_dir="$common/worktrees"
     [ -d "$probe_dir" ] || probe_dir=$common
     probe="$probe_dir/.remove-worktree-probe-$$"
-    if ! touch "$probe" 2>/dev/null; then
-      echo "remove-worktree: cannot write $probe_dir, so it ran inside the sandbox; run it as a Bash call of its own, with no cd, ;, &&, pipe or redirect" >&2
+    sandboxed=0
+    if touch "$probe" 2>/dev/null; then
+      rm -f "$probe"
+    else
+      sandboxed=1
+    fi
+    for record_file in "$common"/worktrees/*/commondir; do
+      if [ -f "$record_file" ] && ! (: >>"$record_file") 2>/dev/null; then
+        sandboxed=1
+      fi
+    done
+    if [ "$sandboxed" -eq 1 ]; then
+      echo "remove-worktree: nothing removed: it ran inside the sandbox, which cannot delete git's worktree records. Run it again by the bare name remove-worktree, as a Bash call of its own with no cd, ;, &&, pipe or redirect: the sandbox excludes that form. It refuses anything not landed, so running it needs no question." >&2
       exit 2
     fi
-    rm -f "$probe"
     git -C "$main" worktree prune
   fi
 

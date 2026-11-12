@@ -314,9 +314,9 @@ git commit -m "<the unit's commit message>"
 remove-worktree <worktree>
 ```
 
-Run every landing from that checkout, and `remove-worktree` as a Bash call of its own, with no
-`cd`, `;`, `&&`, pipe or redirect: chained or piped it runs inside the sandbox, which cannot
-write `.git/worktrees`. `land-worktree` records what it landed, so a commit hook
+Run every landing from that checkout, and `remove-worktree` by its bare name as a Bash call of its
+own, with no `cd`, `;`, `&&`, pipe or redirect: called by a path or chained, it runs inside the
+sandbox, which cannot delete `.git/worktrees` records, and it stops with `nothing removed`. `land-worktree` records what it landed, so a commit hook
 that reformats the files does not keep the worktree alive. `remove-worktree` runs outside the
 sandbox, refuses a worktree whose changes no checkout of the repo has committed, a locked one and
 one outside `.claude/worktrees/`, and removes the rest instantly (renamed into the repo's trash,
