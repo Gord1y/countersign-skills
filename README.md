@@ -60,7 +60,7 @@ Where everything lands, how copies and settings merge, backups and unattended ru
 | --- | --- | --- | --- | --- |
 | Skills | 16 | 14 | 10 | skills only |
 | Rules | 11 | 9 | 9 | no |
-| Subagents | 5 | no | no | no |
+| Subagents | 6 | no | no | no |
 | Settings defaults | yes | no | no | no |
 | Status line | yes | no | no | no |
 
@@ -125,7 +125,8 @@ and sets its own model. Each caps its compaction window at 300K tokens.
 - `builder` (`sonnet`, effort `medium`): implements one orchestrated unit in its own worktree, never committing.
 - `planner` (`opus`, effort `high`): read-only, turns an intricate unit's brief into an exact spec that a sonnet builder implements.
 - `researcher` (`haiku`, effort `low`): read-only lookups, without CLAUDE.md, at most 30 lines back.
-- `reviewer` (`sonnet`, effort `high`): read-only review of a unit's worktree against its brief, with `thorough-diff-review` preloaded.
+- `reviewer` (`sonnet`, effort `high`): read-only standards review of a unit's worktree, with `thorough-diff-review` preloaded.
+- `conformance` (`sonnet`, effort `high`): read-only spec review against the approved plan, every changed file mapped to a slice and every acceptance criterion to evidence; run by the other model family from the author.
 - `qa` (`sonnet`, effort `medium`): QA after each landed batch and at the end of a run, on every surface it touched, then the walkthrough, with `qa-tester` and `walkthrough` preloaded; it writes only into `writeups/`.
 
 ## Customise
@@ -176,8 +177,8 @@ Claude Code 2.1.278 with Opus 5.5, with every rule on, then scaled by size for 1
 | --- | --- |
 | 10 rules | about 2.3K |
 | 14 model-invocable skills (listing) | about 1.3K |
-| 5 subagents | about 0.4K |
-| Total | about 4.0K |
+| 6 subagents | about 0.5K |
+| Total | about 4.1K |
 
 The rules still dominate: `responses` (about 510), `safety` (about 450) and `orchestration`
 (about 350) are the biggest, and the smallest, `commits`, is about 90. A skill's listing costs 70

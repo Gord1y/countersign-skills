@@ -308,6 +308,12 @@
       "path": "agents/builder.md"
     },
     {
+      "name": "conformance",
+      "description": "Read-only spec-axis review of a change against the approved plan, mapping every changed file to a plan slice and every acceptance criterion to evidence, run by the other model family from the author. Spawned by orchestrate.",
+      "model": "sonnet",
+      "path": "agents/conformance.md"
+    },
+    {
       "name": "planner",
       "description": "Turns one orchestrated unit's brief into an exact implementation spec, read-only; a sonnet builder implements it. Spawned by orchestrate for intricate units.",
       "model": "opus",
@@ -327,7 +333,7 @@
     },
     {
       "name": "reviewer",
-      "description": "Read-only review of one orchestrated unit's worktree against its brief, with the thorough-diff-review checklist; reports at most 20 lines. Spawned by orchestrate for large units.",
+      "description": "Read-only standards-axis review of one orchestrated unit's worktree, code quality with the thorough-diff-review checklist; conformance to the plan is the conformance agent's job. Reports at most 20 lines. Spawned by orchestrate for large units.",
       "model": "sonnet",
       "path": "agents/reviewer.md"
     }
