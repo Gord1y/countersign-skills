@@ -3,6 +3,8 @@
 - pnpm, always, for JS/TS.
 - Done means the project's own gates passed (lint, typecheck, tests); with none, a typecheck or
   build. Verify it yourself: never hand me a check you can run.
+- Verify the real artifact (the built output, the installed file, the running app), not a proxy for
+  it. When an observation disagrees with the system, suspect the observation first.
 - Keep output small: run a gate as `set -o pipefail; <cmd> 2>&1 | tail -n 60`, and read big files
   by range.
 - Read an Artifact once: its `read` action saves the page to a file, so work from that file by range
