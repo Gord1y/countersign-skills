@@ -172,17 +172,17 @@ your profile. Everything it replaces is backed up first. Details in
 ## Startup cost
 
 Rules and skill listings sit in every session's context. Measured with `/context` for 1.0.0 in
-Claude Code 2.1.278 with Opus 5.5, with every rule on, then scaled by size for 1.1.0:
+Claude Code 2.1.278 with Opus 5.5, with every rule on, then scaled by size for 1.1.0 and 1.8.0:
 
 | Part | Tokens |
 | --- | --- |
-| 10 rules | about 2.3K |
+| 10 rules | about 2.8K |
 | 14 model-invocable skills (listing) | about 1.3K |
 | 6 subagents | about 0.5K |
-| Total | about 4.1K |
+| Total | about 4.6K |
 
-The rules still dominate: `responses` (about 510), `safety` (about 450) and `orchestration`
-(about 350) are the biggest, and the smallest, `commits`, is about 90. A skill's listing costs 70
+The rules still dominate: `responses` (about 780), `orchestration` (about 480) and `safety`
+(about 450) are the biggest, and the smallest, `commits`, is about 90. A skill's listing costs 70
 to 130 tokens. The 3 manual skills cost nothing until you type them. Dropping a rule's import line
 saves its share.
 
