@@ -22,6 +22,9 @@ first, never deleted; the newest 5 runs' backups are kept. A link to a skill thi
 is removed. Running it again changes nothing.
 `--skills orchestrate,human-voice-writing` installs only the skills you name.
 
+A manual skill ships `agents/openai.yaml`, which turns off implicit invocation in Codex. It
+travels inside the skill folder, so links and copies carry it with no extra step.
+
 ## Link or copy
 
 Plain `install.sh` links, so an edit is a git commit and `git pull` updates the skill.

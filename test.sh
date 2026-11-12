@@ -32,6 +32,7 @@ echo '{"hooks": {"Stop": [], "SessionEnd": [{"hooks": [{"type": "command", "comm
 HOME=$home CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null
 
 [ "$(readlink "$home/.claude/skills/orchestrate")" = "$root/skills/orchestrate" ] || fail "orchestrate is not linked for Claude Code"
+printf 'policy:\n  allow_implicit_invocation: false\n' | cmp -s - "$home/.agents/skills/writeups-cleanup/agents/openai.yaml" || fail "writeups-cleanup reaches Codex without its implicit invocation turned off"
 for agent in "$root"/agents/*.md; do
   name=$(basename "$agent" .md)
   [ "$(readlink "$home/.claude/agents/$name.md")" = "$agent" ] || fail "$name.md is not linked for Claude Code"
@@ -142,7 +143,7 @@ for case_dir in "$root"/evals/*/; do
     *) fail "evals/$case_name does not belong to an existing model-invocable skill" ;;
   esac
 done
-"$root/scripts/catalog.sh" --check >/dev/null || fail "catalog.json is out of date; run scripts/catalog.sh"
+"$root/scripts/catalog.sh" --check >/dev/null || fail "catalog.json or a Codex policy file is out of date; run scripts/catalog.sh"
 jq -e \
   --argjson skills "$(wc -l <"$root/skills.tsv" | tr -d ' ')" \
   --argjson rules "$(wc -l <"$root/rules.tsv" | tr -d ' ')" \
@@ -185,6 +186,7 @@ copied="$copyhome/.claude/skills/orchestrate"
 orchestrate_version=$(awk -F "$(printf '\t')" '$1 == "orchestrate" { print $2 }' "$root/skills.tsv")
 grep -qF "$(printf 'claude\torchestrate\t%s\tSKILL.md\t%s' "$orchestrate_version" "$(sha256_of "$root/skills/orchestrate/SKILL.md")")" "$copyhome/.config/countersign/skills/manifest.tsv" || fail "the manifest does not record orchestrate's SKILL.md"
 cmp -s "$copyhome/.config/countersign/skills/base/claude/orchestrate/SKILL.md" "$root/skills/orchestrate/SKILL.md" || fail "the shipped orchestrate was not kept as the base"
+[ -f "$copyhome/.claude/skills/writeups-cleanup/agents/openai.yaml" ] && grep -q "^claude$(printf '\t')writeups-cleanup$(printf '\t').*$(printf '\t')agents/openai.yaml$(printf '\t')" "$copyhome/.config/countersign/skills/manifest.tsv" || fail "--copy did not copy and record a skill's agents/openai.yaml"
 
 echo edited >>"$copied/SKILL.md"
 third=$(HOME=$copyhome CLAUDE_CONFIG_DIR= "$root/install.sh" --copy)
@@ -412,5 +414,34 @@ if badcat_err=$("$root/scripts/catalog.sh" "$badcat" 2>&1 >/dev/null); then
   fail "catalog.sh accepted a rules.tsv row without agents"
 fi
 echo "$badcat_err" | grep -q 'rules.tsv:1' || fail "catalog.sh did not name the malformed rules.tsv line"
+
+rm -rf "$badcat/rules" "$badcat/rules.tsv" "$badcat/skills" "$badcat/catalog.json"
+mkdir -p "$badcat/skills/slash" "$badcat/skills/open"
+printf -- '---\nname: slash\ndescription: x\ndisable-model-invocation: true\n---\n' >"$badcat/skills/slash/SKILL.md"
+printf -- '---\nname: open\ndescription: y\nwhen_to_use: z\n---\n' >"$badcat/skills/open/SKILL.md"
+printf 'slash\t1.0.0\tclaude,codex\nopen\t1.0.0\tclaude,codex\n' >"$badcat/skills.tsv"
+slash_policy="$badcat/skills/slash/agents/openai.yaml"
+"$root/scripts/catalog.sh" "$badcat" >/dev/null
+printf 'policy:\n  allow_implicit_invocation: false\n' | cmp -s - "$slash_policy" || fail "catalog.sh did not hide a slash-only skill from Codex"
+[ ! -e "$badcat/skills/open/agents" ] || fail "catalog.sh wrote a Codex policy for a model-invocable skill"
+"$root/scripts/catalog.sh" --check "$badcat" >/dev/null || fail "catalog.sh --check failed right after a run"
+rm "$slash_policy"
+if "$root/scripts/catalog.sh" --check "$badcat" >/dev/null 2>&1; then
+  fail "catalog.sh --check passed without a slash-only skill's Codex policy"
+fi
+[ ! -e "$slash_policy" ] || fail "catalog.sh --check wrote a file"
+"$root/scripts/catalog.sh" "$badcat" >/dev/null
+echo 'policy: {}' >"$slash_policy"
+if badcat_err=$("$root/scripts/catalog.sh" --check "$badcat" 2>&1 >/dev/null); then
+  fail "catalog.sh --check passed an edited Codex policy"
+fi
+echo "$badcat_err" | grep -q 'skills/slash/agents/openai.yaml' || fail "catalog.sh --check passed an edited Codex policy"
+"$root/scripts/catalog.sh" "$badcat" >/dev/null
+printf 'policy:\n  allow_implicit_invocation: false\n' | cmp -s - "$slash_policy" || fail "catalog.sh did not restore an edited Codex policy"
+cp -R "$badcat/skills/slash/agents" "$badcat/skills/open/agents"
+if badcat_err=$("$root/scripts/catalog.sh" "$badcat" 2>&1 >/dev/null); then
+  fail "catalog.sh accepted a Codex policy that hides a model-invocable skill"
+fi
+echo "$badcat_err" | grep -q 'skills/open/agents/openai.yaml:1' || fail "catalog.sh did not name the policy file"
 
 echo "test.sh: ok"

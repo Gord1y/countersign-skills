@@ -68,6 +68,16 @@ It stops with exit code 1 and `catalog.sh: <file>:<line>: <what is wrong>` on a 
 (`>` or `|`), a single-quoted value, a missing `description`, or a skill folder that `skills.tsv`
 lists without a `SKILL.md`. For a missing key the line is the closing `---`.
 
+## Codex policy files
+
+For every skill with `disable-model-invocation: true`, the generator also writes
+`skills/<name>/agents/openai.yaml` with `policy: allow_implicit_invocation: false` (the shape
+Codex's own skills ship), so Codex hides the skill from the model too. It owns that file whole. It
+stops with `catalog.sh: skills/<name>/agents/openai.yaml:1: ...` when the file hides a skill whose
+frontmatter lets the model invoke it; delete the file.
+
+Making a skill slash-only is then: set the frontmatter key, run `scripts/catalog.sh`, commit.
+
 ## Regenerating
 
 ```sh
@@ -80,7 +90,8 @@ addition. Each prints `wrote   <path>` or, when nothing changed, `ok      <path>
 
 `scripts/catalog.sh --check [<folder>]` writes nothing. It exits 1 with
 `catalog.sh: <path> is out of date; run scripts/catalog.sh <folder>` when the file is missing or
-differs from what the generator would write.
+differs from what the generator would write. It also exits 1 when a slash-only skill's policy file
+is missing or differs.
 
 `./test.sh` runs the check, so it fails while `catalog.json` is stale and CI enforces it. Run
 `scripts/catalog.sh` and commit the result with any change to a skill, rule or agent listing.

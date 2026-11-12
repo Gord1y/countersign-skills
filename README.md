@@ -89,8 +89,8 @@ has, so those two rules stay out of both.
 | `walkthrough` | Walks you through any change with its QA evidence (screenshots, request and response pairs, transcripts), or builds a customer-facing HTML walkthrough of a UI release. | Claude Code, Codex, Antigravity |
 | `writeups-cleanup` | Proposes what in `writeups/` has done its job, with the evidence, and deletes only what you approve. Manual: `/writeups-cleanup`. | Claude Code, Codex, Antigravity |
 
-Manual skills have `disable-model-invocation: true`: their description costs no context, and only
-you start them, with `/name`.
+Manual skills have `disable-model-invocation: true` and an `agents/openai.yaml` that does the same
+for Codex: their description costs no context, and only you start them, with `/name`.
 
 The process skills (research, PR descriptions, release notes, review, QA, translation) are written
 for any repo. They read the facts they need, such as paths, commands and the branch flow, from your

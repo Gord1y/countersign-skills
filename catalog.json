@@ -40,7 +40,7 @@
     },
     {
       "name": "memory-review",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "agents": [
         "claude"
       ],
@@ -190,7 +190,7 @@
     },
     {
       "name": "writeups-cleanup",
-      "version": "1.0.3",
+      "version": "1.1.0",
       "agents": [
         "claude",
         "codex",
