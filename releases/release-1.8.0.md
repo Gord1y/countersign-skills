@@ -61,7 +61,7 @@ testedWith:
 ## Changed
 
 - **The `orchestration` rule invokes `orchestrate` for every task that changes, investigates or
-  ships code, and routes each role between Claude and Codex.**
+  ships code, routes each role between Claude and Codex, and now installs for Codex too.**
 - **`orchestrate` keeps its step detail in reference files and no longer falls back to
   `general-purpose` subagents.** Without a `builder` agent it builds each unit in the main
   session.
@@ -76,7 +76,8 @@ testedWith:
 
 ## Fixed
 
-- **The README counted four subagents where five ship.**
+- **The README counted four subagents where five ship, and 11, 9 and 9 rules where 10, 8 and 8
+  ship.**
 - **`remove-worktree` called from the sandbox could leave a worktree half removed.** It now
   removes nothing and says to rerun it by its bare name.
 
