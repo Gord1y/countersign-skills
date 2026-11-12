@@ -348,45 +348,154 @@ function is_scalar(body) {
   if (body ~ /^[-+]?(inf|nan)$/) return 1
   if (body ~ /^0x[0-9A-Fa-f]+(_[0-9A-Fa-f]+)*$/ || body ~ /^0o[0-7]+(_[0-7]+)*$/ || body ~ /^0b[01]+(_[01]+)*$/) return 1
   if (body ~ /^[-+]?(0|[1-9][0-9]*(_[0-9]+)*)(\.[0-9]+(_[0-9]+)*)?([eE][-+]?[0-9]+(_[0-9]+)*)?$/) return 1
-  if (body ~ /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]([Tt ][0-9][0-9]:[0-9][0-9]:[0-9][0-9](\.[0-9]+)?([Zz]|[-+][0-9][0-9]:[0-9][0-9])?)?$/) return 1
-  if (body ~ /^[0-9][0-9]:[0-9][0-9]:[0-9][0-9](\.[0-9]+)?$/) return 1
+  return valid_datetime(body)
+}
+function valid_date(text,   month, day) {
+  month = substr(text, 6, 2) + 0
+  day = substr(text, 9, 2) + 0
+  return month >= 1 && month <= 12 && day >= 1 && day <= 31
+}
+function valid_time(text,   hour, minute, second) {
+  hour = substr(text, 1, 2) + 0
+  minute = substr(text, 4, 2) + 0
+  second = substr(text, 7, 2) + 0
+  return hour <= 23 && minute <= 59 && second <= 60
+}
+function valid_datetime(body,   clock) {
+  if (body ~ /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$/) return valid_date(body)
+  if (body ~ /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9][Tt ][0-9][0-9]:[0-9][0-9]:[0-9][0-9](\.[0-9]+)?([Zz]|[-+][0-9][0-9]:[0-9][0-9])?$/) {
+    if (!valid_date(body)) return 0
+    clock = substr(body, 12)
+    if (!valid_time(clock)) return 0
+    if (match(clock, /[-+][0-9][0-9]:[0-9][0-9]$/)) {
+      return substr(clock, RSTART + 1, 2) + 0 <= 23 && substr(clock, RSTART + 4, 2) + 0 <= 59
+    }
+    return 1
+  }
+  if (body ~ /^[0-9][0-9]:[0-9][0-9]:[0-9][0-9](\.[0-9]+)?$/) return valid_time(body)
   return 0
 }
-function value_problem(value,   at, size, c, body, stack, top) {
-  size = length(value)
-  c = substr(value, 1, 1)
-  if (c == "\"" || c == "\047") {
-    at = skip_string(value, 1, size)
-    if (at == 0) return "must be complete on one line"
-  } else if (c == "[" || c == "{") {
-    stack = ""
-    at = 1
-    while (at <= size) {
-      c = substr(value, at, 1)
-      if (c == "\"" || c == "\047") {
-        at = skip_string(value, at, size)
-        if (at == 0) return "must be complete on one line"
-        continue
+function skip_blank(at) {
+  while (substr(vt, at, 1) ~ /^[ \t]$/) at++
+  return at
+}
+function parse_key(at,   c, stop) {
+  while (1) {
+    at = skip_blank(at)
+    c = substr(vt, at, 1)
+    if (c == "\"" || c == "\047") {
+      stop = skip_quoted(vt, at + 1, vn, c)
+      if (stop == 0) {
+        vwhy = "must be complete on one line"
+        return 0
       }
-      if (c == "#") return "must be complete on one line"
-      if (c == "[" || c == "{") {
-        stack = stack c
-      } else if (c == "]" || c == "}") {
-        top = substr(stack, length(stack), 1)
-        if (top == "" || (c == "]") != (top == "[")) return "has mismatched brackets"
-        stack = substr(stack, 1, length(stack) - 1)
-      }
-      at++
-      if (stack == "") break
+      at = stop
+    } else if (match(substr(vt, at), /^[A-Za-z0-9_-]+/)) {
+      at += RLENGTH
+    } else {
+      vwhy = "has an inline table pair without a valid key"
+      return 0
     }
-    if (stack != "") return "must be complete on one line"
-  } else {
-    body = value
-    sub(/#.*/, "", body)
-    if (is_scalar(trim(body))) return ""
-    return "is not a string, number, boolean, date, array or inline table"
+    at = skip_blank(at)
+    if (substr(vt, at, 1) != ".") return at
+    at++
   }
-  if (substr(value, at) !~ /^[ \t]*(#.*)?$/) return "has text after the value"
+}
+function parse_array(at,   c) {
+  at++
+  while (1) {
+    at = skip_blank(at)
+    c = substr(vt, at, 1)
+    if (c == "" || c == "#") {
+      vwhy = "must be complete on one line"
+      return 0
+    }
+    if (c == "}") {
+      vwhy = "has mismatched brackets"
+      return 0
+    }
+    if (c == "]") return at + 1
+    at = parse_value(at)
+    if (at == 0) return 0
+    at = skip_blank(at)
+    c = substr(vt, at, 1)
+    if (c == ",") {
+      at++
+      continue
+    }
+    if (c == "]") return at + 1
+    if (c == "" || c == "#") vwhy = "must be complete on one line"
+    else if (c == "}") vwhy = "has mismatched brackets"
+    else vwhy = "has an array item that is not followed by a comma or ]"
+    return 0
+  }
+}
+function parse_table(at,   c) {
+  at = skip_blank(at + 1)
+  if (substr(vt, at, 1) == "}") return at + 1
+  while (1) {
+    at = skip_blank(at)
+    c = substr(vt, at, 1)
+    if (c == "" || c == "#") {
+      vwhy = "must be complete on one line"
+      return 0
+    }
+    if (c == "]") {
+      vwhy = "has mismatched brackets"
+      return 0
+    }
+    at = parse_key(at)
+    if (at == 0) return 0
+    if (substr(vt, at, 1) != "=") {
+      vwhy = "has an inline table pair without ="
+      return 0
+    }
+    at = parse_value(at + 1)
+    if (at == 0) return 0
+    at = skip_blank(at)
+    c = substr(vt, at, 1)
+    if (c == ",") {
+      at++
+      continue
+    }
+    if (c == "}") return at + 1
+    if (c == "" || c == "#") vwhy = "must be complete on one line"
+    else if (c == "]") vwhy = "has mismatched brackets"
+    else vwhy = "has an inline table pair that is not followed by a comma or }"
+    return 0
+  }
+}
+function parse_value(at,   c, tail, stop) {
+  at = skip_blank(at)
+  c = substr(vt, at, 1)
+  if (c == "\"" || c == "\047") {
+    stop = skip_string(vt, at, vn)
+    if (stop == 0) vwhy = "must be complete on one line"
+    return stop
+  }
+  if (c == "[") return parse_array(at)
+  if (c == "{") return parse_table(at)
+  tail = substr(vt, at)
+  if (tail ~ /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:/) match(tail, /^[^] \t,}#]+ [^] \t,}#]+/)
+  else match(tail, /^[^] \t,}#]+/)
+  stop = RSTART == 0 ? 0 : RLENGTH
+  if (stop == 0) {
+    vwhy = "has an empty item or value"
+    return 0
+  }
+  if (!is_scalar(substr(tail, 1, stop))) {
+    vwhy = "is not a string, number, boolean, date, array or inline table"
+    return 0
+  }
+  return at + stop
+}
+function value_problem(value,   stop) {
+  vt = value
+  vn = length(value)
+  vwhy = ""
+  stop = parse_value(1)
+  if (stop == 0) return vwhy
+  if (substr(value, stop) !~ /^[ \t]*(#.*)?$/) return "has text after the value"
   return ""
 }
 function key_of(line,   text, position, key) {

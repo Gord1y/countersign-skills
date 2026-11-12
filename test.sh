@@ -513,7 +513,7 @@ cxuninstall() {
   HOME=$cxdir CLAUDE_CONFIG_DIR= "$root/uninstall.sh" >/dev/null
 }
 
-for cxvalue in 'truex' 'falsey' '"a" junk' '1 2' '[1] x' '-' '+' '[1,' '"open' '[}' '{]' '[1, {a = 1]}' '{' '0x_' '0o' '01' '00' '1__0'; do
+for cxvalue in 'truex' 'falsey' '"a" junk' '1 2' '[1] x' '-' '+' '[1,' '"open' '[}' '{]' '[1, {a = 1]}' '{' '0x_' '0o' '01' '00' '1__0' '[1,,2]' '[,]' '{a = }' '{a = 1,}' '{= 1}' '2026-99-99' '25:00:00' '2026-11-32' '2026-00-10' '2026-11-13T24:00:00Z' '2026-11-13T01:60:00Z' '2026-11-13T01:02:03+24:00' '{a = 1 b = 2}' '[1 2]' '{a}' '[1, # c'; do
   cxsetup cxvalue '[t]\nk = 0\n' "[t]\nk = $cxvalue\n"
   if cxinstall >/dev/null 2>"$cxdir/err"; then
     fail "install.sh accepted the codex fragment value: $cxvalue"
@@ -521,7 +521,7 @@ for cxvalue in 'truex' 'falsey' '"a" junk' '1 2' '[1] x' '-' '+' '[1,' '"open' '
   grep -q "config.toml line 2:" "$cxdir/err" || fail "install.sh did not name line 2 for the codex fragment value: $cxvalue"
   cmp -s "$cxtoml" "$cxdir/config.fixture" || fail "install.sh changed config.toml for the codex fragment value: $cxvalue"
 done
-for cxvalue in 'true' '-1' '0x1F' '1_000' '1.5e3' '-inf' 'nan' '1979-05-27' '1979-05-27T07:32:00Z' '07:32:00' '"a" # note' "'lit'" '[1, 2] # note' '{ a = 1 }' '"""a"""' '0' '-0' '0b1' '0o7' '0x1_F' '0.5' '[1, {a = [2]}]' '{ a = "]" }'; do
+for cxvalue in 'true' '-1' '0x1F' '1_000' '1.5e3' '-inf' 'nan' '1979-05-27' '1979-05-27T07:32:00Z' '07:32:00' '"a" # note' "'lit'" '[1, 2] # note' '{ a = 1 }' '"""a"""' '0' '-0' '0b1' '0o7' '0x1_F' '0.5' '[1, {a = [2]}]' '{ a = "]" }' '[1, 2,]' '[[1], {a = 1}]' '{a = 1, b.c = "x"}' '2026-11-13T01:02:03Z' '{}' '[]' '[ ]' '{ "q.x" = 1, '"'"'l'"'"'.m = [] }' '[1979-05-27 07:32:00Z, 07:32:00.5]' '2026-11-13T23:59:59-23:59' '[ 1 , 2 ] # c'; do
   cxsetup cxvalue '[t]\nk = 0\n' "[t]\nk = $cxvalue\n"
   cxinstall >/dev/null 2>&1 || fail "install.sh rejected the valid codex fragment value: $cxvalue"
   grep -qxF "k = $cxvalue" "$cxtoml" || fail "install.sh did not write the valid codex fragment value: $cxvalue"
