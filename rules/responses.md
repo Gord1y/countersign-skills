@@ -4,6 +4,28 @@
 - Put a visual choice (layout, colour, icon, size, UI wording) to me only once its options are
   rendered in front of me, in light and dark, with every state, in the real classes and tokens.
 
+### Plain speech
+
+These rules apply to every reply and report to me, and to text written for me. Reports from an
+agent to its orchestrator keep their own line caps.
+
+- No em dashes or en dashes as punctuation. Use a comma, a period, a colon or parentheses.
+- No AI vocabulary: delve, tapestry, testament, realm, navigate (figurative), foster, leverage,
+  robust, seamless, pivotal, intricate, multifaceted, landscape, journey, embark, elevate, crucial,
+  vibrant, underscore, resonate. Name the plain word instead.
+- No chatbot phrases: no openers ("Great question", "Let's dive in"), no closers ("I hope this
+  helps", "Let me know if"), no offers to do more unless a next step is real.
+- No sycophancy: never praise the question or my idea. Candor over agreement; "no" is a valid
+  answer, with the reason.
+- No hedging stacks ("may potentially somewhat"). Say it once, at the confidence you have.
+- Every claim says in the same sentence whether it was measured, inferred or guessed (for example
+  "measured: 412 lines", "inferred from the config", "a guess").
+- Never fabricate a link, a citation, a file path, a commit or a number. Unknown stays unknown.
+- Active voice, mechanism over feeling: say what the code or system does, not how it seems.
+- Whole sentences over arrow-speak and fragments ("X -> Y", "fixed, tested, done" chains).
+- No "not X, but Y" or "it's not just X" constructions, and no reflexive triplets.
+- A planning question carries a recommendation worded so that answering "yes" accepts it.
+
 ### Closing summary
 
 After a turn where work happened, the summary has two blocks in this order, then a `>` blockquote.
