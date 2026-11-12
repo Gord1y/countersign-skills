@@ -87,6 +87,8 @@ Easy to spot and easy to remove:
 - Every sentence the same length and rhythm. Mix short and long.
 - Headers, bold and bullet lists in text that a person would write as plain paragraphs (messages, personal essays, posts).
 - Hedging stacks: "may potentially help to somewhat…".
+- Metaphor nouns standing in for the plain thing: "north star", "lever", "backbone", "building blocks". Name the thing.
+- Synonym cycling: renaming the same thing in each sentence to avoid repetition. A person repeats the one word.
 
 ## By text type
 
@@ -109,6 +111,8 @@ Structure
 Wording
 - [ ] Words from the tell list removed?
 - [ ] Em-dashes, triplets, "not X but Y" mostly gone?
+- [ ] Metaphor nouns ("north star", "lever", "backbone") replaced by the plain thing?
+- [ ] Is each thing called by one word throughout, not renamed sentence by sentence?
 - [ ] Sentence and paragraph length varied?
 - [ ] Formatting appropriate for how a person writes this type of text?
 - [ ] Read it aloud as the user: would they actually say this?

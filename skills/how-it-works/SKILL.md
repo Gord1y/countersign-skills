@@ -29,6 +29,18 @@ Restate the question as one line naming the subsystem and its boundary. When it 
 take the narrowest reading that still answers it, say which in the answer's first line, and go
 on. Do not ask.
 
+## History mode
+
+When the question is why the code is the way it is, not how it works, trace its history before
+explaining:
+
+- `git log -L` or `git log -S` on the lines in question, and `git blame`.
+- The PR that introduced them: `gh pr list --search <sha> --state merged`, run as a command of its
+  own.
+- Any ticket that PR links.
+
+The explanation cites each commit or PR it relies on.
+
 ## Read the docs first
 
 Read what the Repo facts row lists for the area. A doc may answer the question or name the entry

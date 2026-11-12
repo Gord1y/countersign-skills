@@ -55,6 +55,13 @@ Repo facts already exists that the change should have reused.
 A UI change is reviewed in its loading, empty, error and success states; a data-driven screen
 without that state matrix, or tests that skip it, is a finding.
 
+Spec lens: when a plan, brief or ticket is given, flag a change that does something it did not ask
+for, or misses something it asked for, as a finding. The full plan conformance check stays with the
+`conformance` agent.
+
+Reader load: flag code a reader must hold too much in their head to follow. Deep nesting, a name
+that hides what it does, a function doing two jobs and an indirection with one caller all count.
+
 ## 4. Architecture boundary violations
 
 Check that imports respect the layer rules from Repo facts. Flag any upward or cross-slice import
