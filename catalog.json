@@ -40,15 +40,15 @@
     },
     {
       "name": "retro",
-      "version": "1.0.1",
+      "version": "1.1.0",
       "agents": [
         "claude",
         "codex",
         "antigravity"
       ],
-      "description": "Turn a session's mistakes and lessons into structure, not notes. Each lesson goes to the highest rung that works, proven to fail on the real mistake first. Run with /retro.",
-      "whenToUse": null,
-      "invocation": "manual",
+      "description": "Turn a session's or run's mistakes and lessons into structure, not notes. Each lesson goes to the highest rung that works, proven to fail on the real mistake first.",
+      "whenToUse": "Use at the end of a run that had a user correction, a failed gate, a revert or a parked unit, or when asked for a retro or to learn from a session.",
+      "invocation": "model",
       "path": "skills/retro"
     },
     {
@@ -205,15 +205,15 @@
     },
     {
       "name": "repo-knowledge",
-      "version": "1.0.1",
+      "version": "1.1.0",
       "agents": [
         "claude",
         "codex",
         "antigravity"
       ],
-      "description": "Bootstrap, update and lint a repo's knowledge graph (feature nodes in docs/features, a generated path index, glossary, ADRs, a drift lint in its CI). Run with /repo-knowledge.",
-      "whenToUse": null,
-      "invocation": "manual",
+      "description": "Bootstrap, update and lint a repo's knowledge graph (feature nodes in docs/features, a generated path index, glossary, ADRs, a drift lint in its CI).",
+      "whenToUse": "Use after a change to paths the knowledge index maps, to refresh their nodes and run the lint, or when asked to set up or update a repo's knowledge graph.",
+      "invocation": "model",
       "path": "skills/repo-knowledge"
     }
   ],

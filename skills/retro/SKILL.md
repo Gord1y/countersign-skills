@@ -1,7 +1,7 @@
 ---
 name: retro
-description: Turn a session's mistakes and lessons into structure, not notes. Each lesson goes to the highest rung that works, proven to fail on the real mistake first. Run with /retro.
-disable-model-invocation: true
+description: Turn a session's or run's mistakes and lessons into structure, not notes. Each lesson goes to the highest rung that works, proven to fail on the real mistake first.
+when_to_use: "Use at the end of a run that had a user correction, a failed gate, a revert or a parked unit, or when asked for a retro or to learn from a session."
 ---
 
 # Retro
@@ -76,8 +76,11 @@ in memory is never the fix.
 ## Step 3: one proposal
 
 One table, nothing built yet: the lesson, its evidence, the rung, the fix and the proof plan. List
-beside it every memory entry the fixes now cover, proposed for deletion. Ask once: build all, pick
-rows, or nothing.
+beside it every memory entry the fixes now cover, proposed for deletion. In an interactive
+session, ask once: build all, pick rows, or nothing. In a run past plan approval, ask nothing: build
+the rows that stay inside the run's approved scope (a test, a lint rule or a node for paths the
+run touched), and put every other row under the plan's `## Waiting for you` and into the closing
+summary.
 
 ## Step 4: build and prove
 

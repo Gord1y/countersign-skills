@@ -168,8 +168,8 @@ jq -e \
   --argjson rules "$(wc -l <"$root/rules.tsv" | tr -d ' ')" \
   --argjson agents "$(ls -1 "$root"/agents/*.md | wc -l | tr -d ' ')" \
   '(.skills | length) == $skills and (.rules | length) == $rules and (.agents | length) == $agents
-    and (.skills[] | select(.name == "retro") | .invocation) == "manual"
-    and (.skills[] | select(.name == "repo-knowledge") | .invocation) == "manual"
+    and (.skills[] | select(.name == "retro") | .invocation) == "model"
+    and (.skills[] | select(.name == "repo-knowledge") | .invocation) == "model"
     and (.skills[] | select(.name == "orchestrate") | .invocation == "model" and .whenToUse != null)
     and (.agents[] | select(.name == "builder") | .model) == "sonnet"' "$root/catalog.json" >/dev/null || fail "catalog.json does not match the skills, rules and agents in the repo"
 git -C "$root" check-ignore -q skills/orchestrate/local.md || fail "a skill's local.md is not gitignored"

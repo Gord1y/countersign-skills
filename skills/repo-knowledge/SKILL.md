@@ -1,7 +1,7 @@
 ---
 name: repo-knowledge
-description: Bootstrap, update and lint a repo's knowledge graph (feature nodes in docs/features, a generated path index, glossary, ADRs, a drift lint in its CI). Run with /repo-knowledge.
-disable-model-invocation: true
+description: Bootstrap, update and lint a repo's knowledge graph (feature nodes in docs/features, a generated path index, glossary, ADRs, a drift lint in its CI).
+when_to_use: "Use after a change to paths the knowledge index maps, to refresh their nodes and run the lint, or when asked to set up or update a repo's knowledge graph."
 ---
 
 # Repo knowledge
@@ -129,13 +129,16 @@ area's report before the next.
 
 ## Bootstrap
 
-Run it when `docs/features/` has no nodes.
+Run it when `docs/features/` has no nodes. It adds a CI job, so it runs only when the user asks or
+as a slice of an approved plan; an agent that finds no nodes mid-run proposes it under the plan's
+`## Waiting for you` instead.
 
 1. List the areas: the first-level folders under each source root, from `git ls-files`.
 2. Read each area as in Readers.
 3. Propose one plan: the nodes with their names, globs and related nodes, the glossary terms, the
    ADR candidates that pass all three tests, and a `source-roots.txt` when the roots are not
-   `src`. Ask once, through the agent's question tool or in plain text, and wait.
+   `src`. In an interactive session, ask once, through the agent's question tool or in plain text,
+   and wait. In a run, the approved plan slice is the answer.
 4. Write the approved nodes, glossary and records, each claim stamped.
 5. Copy the lint from the folder that holds this SKILL.md:
    `mkdir -p scripts && cp <this folder>/scripts/knowledge-lint.sh scripts/ && chmod +x scripts/knowledge-lint.sh`.
@@ -159,7 +162,7 @@ Run it when `docs/features/` has no nodes.
    nodes for new areas, retire the nodes for deleted ones, and restamp only what you checked.
 4. Compare the repo's script with this skill's: `cmp scripts/knowledge-lint.sh
    <this folder>/scripts/knowledge-lint.sh`. When they differ, show the diff and offer to replace
-   the repo's copy; the user decides.
+   the repo's copy; the user decides. In a run, put the diff in the closing summary instead.
 5. Run `scripts/knowledge-lint.sh --write`, then `scripts/knowledge-lint.sh` until it prints
    `ok`. Make one commit, `docs(knowledge): refresh the nodes`.
 
