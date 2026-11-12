@@ -1,0 +1,132 @@
+# Hook walls
+
+`bin/harness-hook` is the one entry point for every wall that Claude Code and Codex enforce through
+hooks. A wall is a small `sh` policy in `hooks/policy/`. Both providers run the same policies, and
+one fixture table per policy runs every case through both providers' adapters.
+
+`install.sh` links the entry point into `~/.local/bin` and merges the Claude hook entries from
+`claude/settings.json`. The Codex side (`~/.codex/hooks.json`) is installed separately.
+
+## The flow
+
+```
+provider JSON on stdin
+  -> hooks/adapters/<provider>.sh   (provider JSON to the neutral event)
+  -> bin/harness-hook               (resolves paths, then runs hooks/policy/*.sh in name order)
+  -> first policy that exits 10     (deny or block, printed in the provider's JSON)
+```
+
+1. The entry point finds the repo through its own resolved symlink path, so a link in
+   `~/.local/bin` works.
+2. The adapter turns the provider payload into the neutral event below.
+3. The entry point makes every path absolute against `cwd`, normalises it lexically (`.`, empty
+   segments and `..`, no symlinks) and sorts and de-duplicates the list.
+4. Each `hooks/policy/*.sh` reads the event on stdin. The first one that exits 10 wins: its stdout
+   becomes the reason the model sees.
+5. Both providers accept the same deny JSON for a tool call
+   (`hookSpecificOutput.permissionDecision: "deny"`) and the same block JSON for a stop
+   (`decision: "block"`), so the entry point prints them and the adapters only read.
+
+## The neutral event
+
+One JSON object. Every key is always present, as `""`, `[]` or `false` when it has no value.
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `provider` | `claude` or `codex` | Who sent it |
+| `event` | `pre_tool` or `stop` | `SubagentStop` is a `stop` with `subagent` true |
+| `tool` | `shell`, `edit`, `other`, `none` | `none` for a stop |
+| `tool_name` | string | The provider's raw tool name |
+| `command` | string | The shell command, `""` for other tools |
+| `paths` | array of absolute strings | Files an edit writes |
+| `cwd` | absolute string | The session's directory. An event without one is ignored |
+| `session_id` | string | The provider's session id |
+| `subagent` | boolean | The stop comes from a subagent |
+| `stop_hook_active` | boolean | A stop hook already blocked this stop chain |
+
+Claude: `Bash` is `shell` (`tool_input.command`). `Edit`, `Write`, `MultiEdit` and `NotebookEdit` are
+`edit` (`tool_input.file_path`, or `notebook_path`). Any other tool is `other`.
+
+Codex: `Bash` is `shell` (`tool_input.command`, joined with spaces when it is an array).
+`apply_patch` is `edit`, and `tool_input.command` holds the patch: the paths come from its
+`*** Add File:`, `*** Update File:`, `*** Delete File:` and `*** Move to:` lines. A patch sent
+through the shell (`apply_patch <<'EOF'` or `apply_patch '*** Begin Patch ...'`) arrives as `Bash`,
+so a command with `*** Begin Patch` anywhere in a line gets the same paths. Markers may be
+indented, and leading whitespace is trimmed from each path. A write fence therefore reads `paths`
+for every tool.
+
+Sources: the Claude Code hooks reference (code.claude.com/docs/en/hooks) and the Codex source at
+`rust-v0.159.3` (`codex-rs/hooks/schema/generated/`, `hooks/src/events/`,
+`core/src/tools/handlers/`). Unconfirmed: the `notebook_path` and `MultiEdit` field names on
+Claude, and whether Codex caps repeated Stop blocks (Claude caps them at 8).
+
+## Adding a policy
+
+1. Write `hooks/policy/<name>.sh` with `#!/bin/sh`. It reads the event on stdin.
+2. To deny or block, print the reason on stdout and `exit 10`. Any other exit allows.
+3. Write `hooks/fixtures/<name>.tsv`. `scripts/test-hooks.sh` fails for a fixture without a policy.
+4. If a row needs a state, write `hooks/fixtures/<name>.sh` (see below).
+5. Run `scripts/test-hooks.sh`. It sends every row through `bin/harness-hook claude` and
+   `bin/harness-hook codex`, in a fresh git repository named after the case.
+
+Fixture columns, tab separated, with a header line. A row has exactly six fields and none is empty:
+use `-` for none. The test fails a row with any other shape, an unknown `event`, `tool` or `expect`,
+a stop whose `input` is not `active` or `-`, an edit without a path, or a case name used twice.
+
+| Column | Values |
+| --- | --- |
+| `case` | A unique name; the row's directory |
+| `event` | `pre_tool`, `stop` or `subagent_stop` |
+| `tool` | `shell`, `edit` or `-` |
+| `input` | The command; or space-separated paths (relative to the row's cwd, absolute, or `~/` for the row's home); or for a stop, `active` or `-` |
+| `setup` | A state name for the setup script, `-` for none |
+| `expect` | `allow` or `deny` (a deny of a stop means a block) |
+
+A Claude edit with several paths becomes several `Edit` calls, a Codex one becomes one
+`apply_patch`; any deny denies.
+
+Every row gets its own home, `<work>/homes/<case>`, created empty. The hook runs with `HOME` set to
+it and `XDG_CONFIG_HOME` set to `<home>/.config`, for both providers. A path in `input` that starts
+with `~/` expands to that home. A shell command is passed as it is.
+
+The setup script is `hooks/fixtures/<name>.sh`, optional. For a row whose `setup` is not `-`,
+`scripts/test-hooks.sh` runs `sh hooks/fixtures/<name>.sh <state> <row-dir> <row-home>` from the
+row's directory, a fresh git repository. The script builds the state: it may commit, branch and add
+worktrees. A non-zero exit, or no script, fails the row as an unknown or broken state. The script
+may print one line on stdout, the cwd for that row, absolute or relative to the row directory; an
+empty line means the row directory. The test's own state `block-stop` (a file `block-stop` in the
+row directory) is for the frame rows and needs no script.
+
+`HARNESS_HOOK_POLICIES` points the entry point at another policy folder. The tests use it to run a
+policy of their own, so no test-only policy ships in `hooks/policy/`.
+
+## Fail open
+
+A broken wall must never block work. The entry point allows, silently or with one line on stderr,
+when:
+
+- `jq` is missing (one stderr line, `harness-hook: jq not found, walls off`), the provider argument
+  is wrong, or the adapter or policy folder is missing.
+- The payload is not JSON, is not an event it knows, or has a `cwd` that is not absolute.
+- A policy exits with anything but 0 or 10 (it writes `harness-hook: <file> exited <n>, allowed`).
+- The hook entry in `claude/settings.json` finds no executable `~/.local/bin/harness-hook`.
+- The entry point itself fails after its early checks: an exit trap turns any failure, such as a
+  `jq` error while it prints a deny, into exit 0. Claude Code blocks on exit 2, which `jq` returns.
+- A hook times out (a non-blocking error, inferred from the Claude docs).
+
+There is no per-policy timeout. The provider's hook timeout bounds the whole run (15 s for
+`PreToolUse`, 30 s for `Stop` and `SubagentStop`), and a timeout allows. A policy that can run long
+must stay inside that bound by itself.
+
+Exit 10 is the only deny code. It avoids 1, which `set -e` produces by accident, and 2 and 5, which
+`jq` produces. The sandbox and the repository rulesets stay the floor; a wall only adds to them.
+
+## The stop loop
+
+A stop that is already inside a block (`stop_hook_active` true) is always allowed, before any policy
+runs. A policy that blocks a stop therefore blocks it once per stop chain and can never loop.
+
+## Codex limits
+
+Codex does not pass a tool call's `workdir` to the hook, so `cwd` is the session's directory. A
+command that runs elsewhere with `cd` or `workdir` is judged against the session's directory.

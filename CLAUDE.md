@@ -43,7 +43,7 @@ It must pass before a change is done. It runs `./test.sh`, every `scripts/test-*
 
 | Fact | Detail |
 | --- | --- |
-| The surfaces, and how to reach each | `cli`: run `install.sh`, `update.sh` and `uninstall.sh` against a scratch home, `HOME="$(mktemp -d)" CLAUDE_CONFIG_DIR= ./install.sh`, never the real one. `bin/statusline`: reads Claude Code's status line JSON on stdin. `bin/gh`: wraps gh; run it with a stub gh first on PATH, as `scripts/test-gh.sh` does. |
+| The surfaces, and how to reach each | `cli`: run `install.sh`, `update.sh` and `uninstall.sh` against a scratch home, `HOME="$(mktemp -d)" CLAUDE_CONFIG_DIR= ./install.sh`, never the real one. `bin/statusline`: reads Claude Code's status line JSON on stdin. `bin/gh`: wraps gh; run it with a stub gh first on PATH, as `scripts/test-gh.sh` does. `bin/harness-hook`: reads a Claude or Codex hook payload on stdin; run it as `scripts/test-hooks.sh` does. |
 | Branches | One branch per release carries all of its work and its note, and goes into `main` through one pull request. There is no `staging`. |
 | Reviews | No automated review and no required approval; reviews follow `docs/review-checklist.md`. |
 | Release PRs | The release branch goes into `main` as a merge commit titled `chore(release): v<semver>`, with no promotion contract; the note is `releases/release-<semver>.md` (contract in `releases/README.md`) and is committed on that branch, and a `v*` tag on `main` starts the release workflow. No check runs only on release PRs. |

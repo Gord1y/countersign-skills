@@ -20,14 +20,14 @@ sh -n "$root/install.sh"
 sh -n "$root/update.sh"
 sh -n "$root/uninstall.sh"
 sh -n "$root/lib.sh"
-for script in "$root"/bin/* "$root"/skills/*/scripts/*; do
+for script in "$root"/bin/* "$root"/skills/*/scripts/* "$root"/hooks/*/*.sh; do
   [ "$(head -n 1 "$script")" = "#!/bin/sh" ] || continue
   sh -n "$script"
 done
 
 mkdir -p "$home/.codex" "$home/.claude/skills/orchestrate"
 echo old >"$home/.claude/skills/orchestrate/SKILL.md"
-echo '{"hooks": {"Stop": [], "SessionEnd": [{"hooks": [{"type": "command", "command": "mine"}]}]}, "theme": "light", "permissions": {"allow": ["Read(//kept)"], "ask": ["Bash(kept-ask *)"]}}' >"$home/.claude/settings.json"
+echo '{"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "mine-stop"}]}], "SessionEnd": [{"hooks": [{"type": "command", "command": "mine"}]}]}, "theme": "light", "permissions": {"allow": ["Read(//kept)"], "ask": ["Bash(kept-ask *)"]}}' >"$home/.claude/settings.json"
 
 HOME=$home CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null
 
@@ -57,8 +57,9 @@ ls "$home"/.config/countersign/skills/backups/*/claude/orchestrate/SKILL.md >/de
 grep -q "@$root/rules/code.md" "$home/.claude/CLAUDE.md" || fail "CLAUDE.md was not written from claude/CLAUDE.template.md"
 [ "$(readlink "$home/.local/bin/statusline")" = "$root/bin/statusline" ] || fail "statusline is not linked into ~/.local/bin"
 [ "$(readlink "$home/.local/bin/gh")" = "$root/bin/gh" ] || fail "gh is not linked into ~/.local/bin"
+[ "$(readlink "$home/.local/bin/harness-hook")" = "$root/bin/harness-hook" ] || fail "harness-hook is not linked into ~/.local/bin"
 settings_json="$home/.claude/settings.json"
-jq -e '.hooks.Stop == [] and .theme == "light" and .worktree.baseRef == "head" and .sandbox.enabled == true and (.permissions.allow | index("Read(//kept)") != null) and (.permissions.allow | index("mcp__context7") != null) and (.permissions.ask | index("Bash(kept-ask *)") != null) and (.permissions.ask == ["Bash(kept-ask *)"]) and (.permissions.deny | index("Read(~/.ssh/**)") != null) and (.sandbox.filesystem.denyRead | index("~/.ssh") != null)' "$settings_json" >/dev/null || fail "settings.json was not merged from settings/claude.json"
+jq -e '(.hooks.Stop | length) == 2 and (.hooks.Stop | map(.hooks[0].command) | index("mine-stop") != null) and (.hooks.PreToolUse | length) == 1 and (.hooks.SubagentStop | length) == 1 and .theme == "light" and .worktree.baseRef == "head" and .sandbox.enabled == true and (.permissions.allow | index("Read(//kept)") != null) and (.permissions.allow | index("mcp__context7") != null) and (.permissions.ask | index("Bash(kept-ask *)") != null) and (.permissions.ask == ["Bash(kept-ask *)"]) and (.permissions.deny | index("Read(~/.ssh/**)") != null) and (.sandbox.filesystem.denyRead | index("~/.ssh") != null)' "$settings_json" >/dev/null || fail "settings.json was not merged from settings/claude.json"
 jq -e '(.permissions.deny | index("Read(**/.env)") != null) and ([.permissions.deny[] | select(test("^Read\\((\\*\\*/)?\\.env(\\.\\*)?\\)$"))] == ["Read(**/.env)"]) and ([.sandbox.filesystem.allowRead[]? | select(contains(".env"))] == [])' "$settings_json" >/dev/null || fail "settings.json must deny .env at any depth by name, never .env.* (it hides .env.example) or root-only rules, and needs no .env allowRead"
 jq -e '(.hooks.SessionEnd | length) == 3 and (.hooks.SessionEnd | map(.hooks[0].command) | index("mine") != null)' "$settings_json" >/dev/null || fail "settings.json replaced the SessionEnd hook the user had instead of joining it"
 proj="$home/proj"
@@ -343,18 +344,18 @@ unhome=$(mktemp -d "${TMPDIR:-/tmp}/countersign-skills.XXXXXX")
 trap 'rm -rf "$home" "$copyhome" "$fake" "$updhome" "$profhome" "$extra" "$unhome"' EXIT
 mkdir -p "$unhome/.claude/skills" "$unhome/.codex"
 echo 'my own instructions' >"$unhome/.claude/CLAUDE.md"
-echo '{"theme": "light", "worktree": {"baseRef": "mine"}, "permissions": {"allow": ["Read(//mine)"]}, "hooks": {"Stop": []}}' >"$unhome/.claude/settings.json"
+echo '{"theme": "light", "worktree": {"baseRef": "mine"}, "permissions": {"allow": ["Read(//mine)"]}, "hooks": {"Stop": [{"hooks": [{"type": "command", "command": "mine-stop"}]}]}}' >"$unhome/.claude/settings.json"
 ln -s "$fake/elsewhere" "$unhome/.claude/skills/foreign-link"
 HOME=$unhome CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null
 unsettings="$unhome/.claude/settings.json"
 jq '.model = "added-later" | .permissions.defaultMode = "changed-later"' "$unsettings" >"$unsettings.tmp" && mv "$unsettings.tmp" "$unsettings"
 HOME=$unhome CLAUDE_CONFIG_DIR= "$root/uninstall.sh" >/dev/null
 [ ! -e "$unhome/.claude/skills/orchestrate" ] && [ ! -L "$unhome/.claude/skills/orchestrate" ] || fail "uninstall.sh left a skill link"
-[ ! -L "$unhome/.claude/agents/builder.md" ] && [ ! -L "$unhome/.local/bin/statusline" ] && [ ! -L "$unhome/.local/bin/gh" ] || fail "uninstall.sh left an agent or bin link"
+[ ! -L "$unhome/.claude/agents/builder.md" ] && [ ! -L "$unhome/.local/bin/statusline" ] && [ ! -L "$unhome/.local/bin/gh" ] && [ ! -L "$unhome/.local/bin/harness-hook" ] || fail "uninstall.sh left an agent or bin link"
 [ -L "$unhome/.claude/skills/foreign-link" ] || fail "uninstall.sh removed a link it did not make"
 [ "$(cat "$unhome/.claude/CLAUDE.md")" = 'my own instructions' ] || fail "uninstall.sh did not put back the original CLAUDE.md"
 [ ! -e "$unhome/.codex/AGENTS.md" ] || fail "uninstall.sh left a generated AGENTS.md"
-jq -e '.theme == "light" and .worktree.baseRef == "mine" and .permissions.allow == ["Read(//mine)"] and .hooks.Stop == [] and (.hooks | has("SessionEnd") | not) and .model == "added-later" and .permissions.defaultMode == "changed-later" and (has("sandbox") | not) and (.permissions | has("deny") | not)' "$unsettings" >/dev/null || fail "uninstall.sh did not remove exactly the merged settings"
+jq -e '.theme == "light" and .worktree.baseRef == "mine" and .permissions.allow == ["Read(//mine)"] and .hooks.Stop == [{"hooks": [{"type": "command", "command": "mine-stop"}]}] and ((.hooks | has("SessionEnd") or has("PreToolUse") or has("SubagentStop")) | not) and .model == "added-later" and .permissions.defaultMode == "changed-later" and (has("sandbox") | not) and (.permissions | has("deny") | not)' "$unsettings" >/dev/null || fail "uninstall.sh did not remove exactly the merged settings"
 ls "$unhome"/.config/countersign/skills/backups/*/claude-settings/settings.json >/dev/null 2>&1 || fail "uninstall.sh did not back up settings.json first"
 copies_before=$(awk -F "$tab" '!seen[$1 FS $2]++' "$copyhome/.config/countersign/skills/manifest.tsv" | wc -l)
 HOME=$copyhome CLAUDE_CONFIG_DIR= "$root/uninstall.sh" >/dev/null

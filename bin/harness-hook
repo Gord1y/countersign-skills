@@ -1,0 +1,93 @@
+#!/bin/sh
+set -eu
+LC_ALL=C
+export LC_ALL
+
+provider=${1:-}
+case $provider in
+  claude | codex) ;;
+  *)
+    echo "usage: harness-hook <claude|codex>, a hook payload on stdin" >&2
+    exit 0
+    ;;
+esac
+
+if ! command -v jq >/dev/null 2>&1; then
+  echo "harness-hook: jq not found, walls off" >&2
+  exit 0
+fi
+trap 'exit 0' EXIT
+
+self=$0
+while [ -L "$self" ]; do
+  target=$(readlink "$self")
+  case $target in
+    /*) self=$target ;;
+    *) self=$(dirname "$self")/$target ;;
+  esac
+done
+root=$(cd "$(dirname "$self")/.." && pwd -P) || exit 0
+
+adapter=$root/hooks/adapters/$provider.sh
+[ -f "$adapter" ] || exit 0
+policies=${HARNESS_HOOK_POLICIES:-$root/hooks/policy}
+[ -d "$policies" ] || exit 0
+
+raw=$(cat)
+adapted=$(printf '%s' "$raw" | sh "$adapter" 2>/dev/null) || exit 0
+[ -n "$adapted" ] || exit 0
+
+event=$(printf '%s' "$adapted" | jq -c '
+  def text: if type == "string" then . else "" end;
+  def lexical:
+    split("/")
+    | reduce .[] as $part ([];
+        if $part == "" or $part == "." then .
+        elif $part == ".." then .[:-1]
+        else . + [$part] end)
+    | "/" + join("/");
+  (.cwd | text) as $cwd
+  | select((.event | IN("pre_tool", "stop")) and ($cwd | startswith("/")))
+  | {
+      provider: (.provider | text),
+      event: .event,
+      tool: (if (.tool | IN("shell", "edit", "other", "none")) then .tool else "other" end),
+      tool_name: (.tool_name | text),
+      command: (.command | text),
+      paths: ([.paths[]? | select(type == "string" and . != "")
+        | (if startswith("/") then . else $cwd + "/" + . end) | lexical] | unique),
+      cwd: $cwd,
+      session_id: (.session_id | text),
+      subagent: (.subagent == true),
+      stop_hook_active: (.stop_hook_active == true)
+    }' 2>/dev/null) || exit 0
+[ -n "$event" ] || exit 0
+
+if [ "$(printf '%s' "$event" | jq -r '.event == "stop" and .stop_hook_active')" = true ]; then
+  exit 0
+fi
+
+kind=$(printf '%s' "$event" | jq -r '.event')
+
+for policy in "$policies"/*.sh; do
+  [ -f "$policy" ] || continue
+  status=0
+  reason=$(printf '%s\n' "$event" | sh "$policy" 2>/dev/null) || status=$?
+  case $status in
+    0) ;;
+    10)
+      case $reason in
+        *[![:space:]]*) ;;
+        *) reason="blocked by the $(basename "$policy" .sh) hook policy" ;;
+      esac
+      if [ "$kind" = stop ]; then
+        jq -n --arg reason "$reason" '{decision: "block", reason: $reason}'
+      else
+        jq -n --arg reason "$reason" '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $reason}}'
+      fi
+      exit 0
+      ;;
+    *) echo "harness-hook: $(basename "$policy") exited $status, allowed" >&2 ;;
+  esac
+done
+exit 0

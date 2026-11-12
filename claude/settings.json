@@ -5,6 +5,15 @@
     "SessionEnd": [
       { "hooks": [{ "type": "command", "timeout": 5, "command": "[ -n \"${CLAUDE_PROJECT_DIR:-}\" ] || exit 0; find \"$CLAUDE_PROJECT_DIR\" \\( -name node_modules -o -name .git \\) -prune -o -type d -path '*/.claude/.cc-writes' ! -path \"$CLAUDE_PROJECT_DIR/.claude/.cc-writes\" -empty -print 2>/dev/null | while IFS= read -r dir; do rmdir \"$dir\" 2>/dev/null && rmdir \"${dir%/.cc-writes}\" 2>/dev/null; done; exit 0" }] },
       { "hooks": [{ "type": "command", "timeout": 30, "command": "[ -n \"${CLAUDE_PROJECT_DIR:-}\" ] || exit 0; remover=\"$HOME/.local/bin/remove-worktree\"; [ -x \"$remover\" ] || exit 0; cd \"$CLAUDE_PROJECT_DIR\" 2>/dev/null && git rev-parse --git-dir >/dev/null 2>&1 && \"$remover\" --landed >/dev/null 2>&1; exit 0" }] }
+    ],
+    "PreToolUse": [
+      { "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit", "hooks": [{ "type": "command", "timeout": 15, "command": "hook=\"$HOME/.local/bin/harness-hook\"; [ -x \"$hook\" ] || exit 0; exec \"$hook\" claude" }] }
+    ],
+    "Stop": [
+      { "hooks": [{ "type": "command", "timeout": 30, "command": "hook=\"$HOME/.local/bin/harness-hook\"; [ -x \"$hook\" ] || exit 0; exec \"$hook\" claude" }] }
+    ],
+    "SubagentStop": [
+      { "hooks": [{ "type": "command", "timeout": 30, "command": "hook=\"$HOME/.local/bin/harness-hook\"; [ -x \"$hook\" ] || exit 0; exec \"$hook\" claude" }] }
     ]
   },
   "skillOverrides": {

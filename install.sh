@@ -250,7 +250,8 @@ merge_settings='
     ["sandbox", "filesystem", "allowRead"], ["sandbox", "filesystem", "denyRead"],
     ["sandbox", "filesystem", "allowWrite"], ["sandbox", "filesystem", "denyWrite"],
     ["sandbox", "network", "allowedDomains"],
-    ["autoMode", "environment"], ["autoMode", "allow"], ["hooks", "SessionEnd"];
+    ["autoMode", "environment"], ["autoMode", "allow"], ["hooks", "SessionEnd"],
+    ["hooks", "PreToolUse"], ["hooks", "Stop"], ["hooks", "SubagentStop"];
   def lists($a; $b):
     reduce joined as $path (.;
       ([$a, $b] | map((try getpath($path) catch null) // []) | add | unique) as $merged

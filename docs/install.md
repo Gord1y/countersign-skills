@@ -92,7 +92,8 @@ when that is set, as Countersign does):
 - These lists are joined, not replaced, so an entry from any layer survives:
   `permissions.allow`, `ask` and `deny`; the sandbox's `excludedCommands`,
   `filesystem.allowRead`, `denyRead`, `allowWrite` and `denyWrite`, and
-  `network.allowedDomains`; `autoMode.environment` and `allow`; and `hooks.SessionEnd`. So rules
+  `network.allowedDomains`; `autoMode.environment` and `allow`; and `hooks.SessionEnd`,
+  `PreToolUse`, `Stop` and `SubagentStop` (see [docs/hooks.md](hooks.md)). So rules
   Claude Code saved from a "don't ask again" answer survive, a hook you added stays next to the
   repo's, and a profile adds to a list without hiding the repo's entries. No layer can take out another layer's entry: to narrow a joined list, edit the file
   that adds the entry.

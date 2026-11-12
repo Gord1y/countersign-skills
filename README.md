@@ -145,6 +145,8 @@ and sets its own model. Each caps its compaction window at 300K tokens.
   It is off until you turn it on; see [docs/statusline.md](docs/statusline.md).
 - **The gh wrapper:** `bin/gh` picks the GitHub account from the repo's remote owner, so parallel
   sessions never need `gh auth switch`; see [docs/gh.md](docs/gh.md).
+- **The hook walls:** `bin/harness-hook` runs one policy set for Claude Code and Codex hooks; see
+  [docs/hooks.md](docs/hooks.md).
 - **The worktree remover:** `bin/remove-worktree` removes landed builder worktrees instantly, and a
   `SessionEnd` hook sweeps them, clean scratch worktrees and ignored-output folders when a session
   ends. `bin/prune-branches` deletes local branches already merged or squash-merged on the remote;
