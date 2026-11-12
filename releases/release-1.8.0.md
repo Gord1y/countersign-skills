@@ -1,14 +1,14 @@
 ---
 version: 1.8.0
 date: 2026-11-13
-title: "countersign-skills 1.8.0: one entry point, enforced walls, Codex parity"
-summary: "Every coding task now starts from one skill that picks a checklist for the kind of work. Hooks on Claude Code and Codex guard protected branches, keep writes inside the project, cap pull request size and stop an unchecked finish. Codex gets the orchestration skill, the same walls and settings that follow you between devices."
+title: "countersign-skills 1.8.0: guided coding tasks and safeguards for Claude Code and Codex"
+summary: "One skill now guides coding tasks through ten checklists. Hooks check protected-branch pushes, file edits, pull request size and completion on Claude Code and Codex. Codex also gets the shared task checklists and can apply settings from your profile."
 type: major
 breaking: true
 highlights:
-  - "One entry point with ten checklists, from bug fix to release"
-  - "Hooks that block unsafe pushes, stray writes and unchecked finishes"
-  - "Codex shares the checklists, the walls and your profile settings"
+  - "One skill guides ten kinds of coding work"
+  - "Hooks check pushes, file edits and task completion"
+  - "Codex gets the shared checklists and your profile settings"
 tags:
   - claude-code
   - codex
@@ -33,8 +33,9 @@ testedWith:
   questions, deviations and every agent's calls.
 - **Hooks for Claude Code and Codex, from one shared policy.**
   - Pushes to feature branches pass; pushes to `main`, `staging` and `release-*` are denied.
-  - File writes stay inside the session's repo and worktree; `~/.claude/plans`, the session
-    scratchpad, `$TMPDIR` and, from a worktree, the main checkout's `writeups/` stay open.
+  - Edit and patch tools block writes outside the session's repo or worktree, except for plans,
+    Claude memory, scratch and temporary files, and the main checkout's `writeups/` from a
+    worktree. Shell writes follow the configured sandbox.
   - While a batch is fenced, writes into its builder worktrees stay inside the approved plan's
     slices, whichever session makes them.
   - A pull request over 400 changed lines is denied, except from a release or promotion branch.
@@ -60,11 +61,12 @@ testedWith:
 
 ## Changed
 
-- **The `orchestration` rule invokes `orchestrate` for every task that changes, investigates or
-  ships code, routes each role between Claude and Codex, and now installs for Codex too.**
-- **`orchestrate` keeps its step detail in reference files and no longer falls back to
-  `general-purpose` subagents.** Without a `builder` agent it builds each unit in the main
-  session.
+- **The `orchestration` rule invokes `orchestrate` for tasks that change, investigate or ship
+  code, and now installs for Codex.** Under T3 Code it routes work between Claude and Codex, and
+  outside T3 it names the review you run yourself.
+- **`orchestrate` keeps step detail in reference files and no longer uses `general-purpose`
+  subagents as a fallback.** Without a `builder` agent, the current session builds each unit;
+  Codex does that work in a separate worktree.
 - **The agents have sharper briefs.** Every agent starts from a fresh context, compacts at 300K
   tokens, reports the calls it made, and runs without a turn limit.
 - **`writeups-cleanup` stays hidden from agents on Claude Code and Codex**, since only you run it.
@@ -76,8 +78,7 @@ testedWith:
 
 ## Fixed
 
-- **The README counted four subagents where five ship, and 11, 9 and 9 rules where 10, 8 and 8
-  ship.**
+- **The README's counts of subagents and rules did not match what the installer ships.**
 - **`remove-worktree` called from the sandbox could leave a worktree half removed.** It now
   removes nothing and says to rerun it by its bare name.
 
@@ -87,8 +88,8 @@ testedWith:
 
 ## Security
 
-- **Hooks deny pushes to protected branches and file writes outside the session's repo, on both
-  Claude Code and Codex.**
+- **Hooks deny protected-branch pushes and edit-tool writes outside the session's repo or
+  worktree, with the exceptions above, on Claude Code and Codex.**
 - **Hooks deny `gh pr merge`, `gh auth token`, and `gh api` calls that change rulesets, branch
   protection, refs or merges.** A merge stays your action.
 
