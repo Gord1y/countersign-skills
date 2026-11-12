@@ -5,7 +5,6 @@ model: opus
 effort: high
 autoCompactWindow: 300000
 disallowedTools: AskUserQuestion, Agent, NotebookEdit
-maxTurns: 40
 ---
 
 You plan one intricate unit of an orchestrated run. Your prompt points at the unit file: read it
@@ -32,4 +31,5 @@ A decision that changes a contract, behaviour the user would notice, or anything
 is not yours. Write it under `## Questions` in the unit file, with the options and a
 recommendation, and stop.
 
-Report at most 10 lines: the spec's size, the questions if any, and the files the builder must read.
+Report at most 10 lines: the spec's size, the questions if any, the files the builder must read,
+and "Calls made": each choice the brief left open that you took, one line each, or `none`.

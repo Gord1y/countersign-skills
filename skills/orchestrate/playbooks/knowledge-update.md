@@ -13,7 +13,8 @@ Copy these steps into the todo list. A skipped step stays as `skip: <reason>`.
 6. **build**: `repo-knowledge` Bootstrap or "Update and lint".
 7. **knowledge**: `skip: done in build`.
 8. **prove**: `gate` passes, including the knowledge lint.
-9. **review**: `reviewer` checks the nodes against the code.
+9. **review**: `conformance` per the routing table in `rules/orchestration.md`; `reviewer`
+   checks the nodes against the code.
 10. **pr**: `feature-pr-description` writes `pr.md`; give the push commands.
 11. **clickup**: `skip: no ClickUp task` until a task id is known.
 12. **retro**: `retro` after a correction, failed gate, revert or parked unit, else

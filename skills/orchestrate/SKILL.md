@@ -94,7 +94,7 @@ to close: `references/orchestrator-mode.md`. Read the second only in orchestrato
 One or two lines in the terminal as each unit lands. One closing summary at the end, in the
 session's summary convention. It reads the decision log: each `parked` row is a ❓, each
 `deviation` a ⚠️, and the `call` rows are one line with the file's path. It also lists every
-builder's "Calls made", the QA verdict with each FAIL and BLOCKED case, and the commands only the
+agent's "Calls made", the QA verdict with each FAIL and BLOCKED case, and the commands only the
 user can run. It ends with the path of the walkthrough (of the QA report when the walkthrough is
 off), or with the check the user should do when QA was skipped. Never an artifact page, unless
 asked.

@@ -36,3 +36,4 @@ Never infer a pass from a builder's or author's claim.
 Report at most 30 lines, no emoji. First the verdict: `conforms`, or `draft` when any item is
 unplanned or unproven. Then the head SHA you reviewed. Then one line per file-to-slice gap and one
 per criterion, as `proven: <evidence>` or `unproven: <what is missing>`. Findings only: no praise.
+Last, "Calls made": each choice your prompt left open, one line each, or `none`.

@@ -18,4 +18,5 @@ Copy these steps into the todo list. A skipped step stays as `skip: <reason>`.
 9. **review**: `conformance` per the routing table in `rules/orchestration.md`.
 10. **pr**: a draft PR body from `feature-pr-description`; pushed only if pre-authorized.
 11. **clickup**: `skip: no ClickUp task` until a task id is known.
-12. **retro**: `retro` after a failed gate, revert or parked unit, else `skip: clean run`.
+12. **retro**: `retro` after a correction, failed gate, revert or parked unit, else
+    `skip: clean run`.

@@ -6,7 +6,6 @@ effort: medium
 autoCompactWindow: 300000
 isolation: worktree
 disallowedTools: AskUserQuestion, Agent
-maxTurns: 150
 ---
 
 You implement one unit of an orchestrated run. Your prompt points at your brief: read it first; it

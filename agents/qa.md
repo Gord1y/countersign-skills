@@ -8,7 +8,6 @@ disallowedTools: AskUserQuestion, Agent, NotebookEdit
 skills:
   - qa-tester
   - walkthrough
-maxTurns: 150
 ---
 
 You verify a change in the running product and, at the end of a run, leave a walkthrough of it.
@@ -38,5 +37,5 @@ allows. Never edit source, config or git state, and never start or stop a server
 
 Report at most 20 lines, no emoji: the verdict line, the head SHA, each FAIL with its repro in one
 line, each BLOCKED case with what unblocks it and which of API, local DB and running server was
-tried, the path of `results.md`, and the path of the walkthrough you wrote, with `open '<path>'`
-for the HTML.
+tried, the path of `results.md`, the path of the walkthrough you wrote, with `open '<path>'`
+for the HTML, and "Calls made": each choice your prompt left open, one line each, or `none`.
