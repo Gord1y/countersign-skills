@@ -8,6 +8,7 @@ only=
 mode="link"
 settings=yes
 new_addition=
+codex_compact_limit=200000
 
 usage() {
   echo "usage: install.sh [--copy] [--skills name,name,...] [--no-settings] [--addition <folder>]"
@@ -21,6 +22,8 @@ usage() {
   echo "the file ~/.gemini/GEMINI.md from it with the rules each agent takes."
   echo "Merges claude/settings.json, then the profile's settings.json, into ~/.claude/settings.json,"
   echo "unless --no-settings."
+  echo "When ~/.codex exists, also writes a managed block at the top of ~/.codex/config.toml and merges"
+  echo "codex/hooks.json into ~/.codex/hooks.json, unless --no-settings."
   echo "The profile is $profile; state, backups and the record of merged settings are in $state."
 }
 
@@ -315,8 +318,84 @@ write_settings() {
   echo "wrote   $dest"
 }
 
+codex_block() {
+  echo "$codex_block_begin"
+  echo "model_auto_compact_token_limit = $codex_compact_limit"
+  echo 'approval_policy = "never"'
+  echo 'sandbox_mode = "workspace-write"'
+  echo "$codex_block_end"
+}
+
+write_codex_config() {
+  [ -d "$codex_home" ] || return 0
+  if [ -f "$codex_config" ] && grep -Eq "^[ $tab]*\[[ $tab]*($codex_block_keys)([].]|[ $tab])" "$codex_config"; then
+    echo "skipped $codex_config (it sets approval_policy, sandbox_mode or model_auto_compact_token_limit as a table)"
+    return 0
+  fi
+  generated="$work/codex-config.toml"
+  displaced="$work/codex-displaced"
+  : >"$displaced"
+  codex_block >"$generated"
+  if [ -f "$codex_config" ]; then
+    strip_codex_block "$codex_config" "$displaced" >>"$generated"
+  fi
+  if ! strip_codex_block "$generated" "" check >/dev/null; then
+    echo "skipped $codex_config (could not place the managed block safely; set approval_policy, sandbox_mode and model_auto_compact_token_limit yourself)"
+    return 0
+  fi
+  if [ -f "$codex_config" ] && cmp -s "$generated" "$codex_config"; then
+    echo "ok      $codex_config"
+    return 0
+  fi
+  if [ -s "$displaced" ]; then
+    cat "$displaced" >>"$codex_displaced"
+    echo "kept    your $codex_config values for the block's keys in $codex_displaced"
+  fi
+  if [ -e "$codex_config" ]; then
+    mkdir -p "$backup/codex"
+    cp "$codex_config" "$backup/codex/config.toml"
+    echo "saved   $codex_config to $backup/codex/"
+  fi
+  cp "$generated" "$codex_config"
+  echo "wrote   $codex_config"
+}
+
+write_codex_hooks() {
+  [ -d "$codex_home" ] || return 0
+  layer="$root/codex/hooks.json"
+  [ -f "$layer" ] || return 0
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "skipped $codex_hooks (jq not found)"
+    return 0
+  fi
+  current="$work/codex-hooks-current.json"
+  previous="$work/codex-hooks-previous.json"
+  generated="$work/codex-hooks.json"
+  if [ -s "$codex_hooks" ]; then cp "$codex_hooks" "$current"; else echo '{}' >"$current"; fi
+  if [ -s "$codex_hooks_record" ]; then cp "$codex_hooks_record" "$previous"; else echo '{}' >"$previous"; fi
+  if ! jq -s "$merge_codex_hooks" "$current" "$layer" "$previous" >"$generated" 2>/dev/null; then
+    echo "skipped $codex_hooks (not valid JSON)"
+    return 0
+  fi
+  cp "$layer" "$codex_hooks_record"
+  if [ -f "$codex_hooks" ] && cmp -s "$generated" "$codex_hooks"; then
+    echo "ok      $codex_hooks"
+    return 0
+  fi
+  if [ -e "$codex_hooks" ]; then
+    mkdir -p "$backup/codex"
+    cp "$codex_hooks" "$backup/codex/hooks.json"
+    echo "saved   $codex_hooks to $backup/codex/"
+  fi
+  cp "$generated" "$codex_hooks"
+  echo "wrote   $codex_hooks"
+  echo "trust   start codex and pick \"Review hooks\" or \"Trust all and continue\": Codex skips hooks in $codex_hooks until you trust them"
+}
+
 if [ "$settings" = yes ]; then
   write_settings
+  write_codex_config
+  write_codex_hooks
 fi
 
 rule_agents() {

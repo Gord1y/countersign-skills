@@ -11,6 +11,14 @@ originals="$state/originals"
 backup="$state/backups/$stamp"
 backups_kept=5
 claude_home=${CLAUDE_CONFIG_DIR:-$HOME/.claude}
+codex_home="$HOME/.codex"
+codex_config="$codex_home/config.toml"
+codex_hooks="$codex_home/hooks.json"
+codex_hooks_record="$state/codex-hooks-layer.json"
+codex_displaced="$state/codex-config-displaced.toml"
+codex_block_begin='# BEGIN countersign-skills: install.sh manages this block'
+codex_block_end='# END countersign-skills'
+codex_block_keys='model_auto_compact_token_limit|approval_policy|sandbox_mode'
 
 skills_dir() {
   case $1 in
@@ -106,4 +114,67 @@ unmerge_settings='
         else . end)
   | reduce ([$layer | paths(type == "object")] | sort_by(length) | reverse | .[]) as $p (.;
       if at($p) == {} then delpaths([$p]) else . end)
+'
+
+strip_codex_block() {
+  displaced_file=${2:-}
+  [ -z "$displaced_file" ] || : >"$displaced_file"
+  awk -v begin="$codex_block_begin" -v end="$codex_block_end" -v keys="^($codex_block_keys)[ \\t]*=" -v loose="^[ \\t]*($codex_block_keys)[ \\t]*=" -v displaced="$displaced_file" -v check="${3:-}" '
+    function brackets(text,   copy, opens, closes) {
+      copy = text
+      sub(/^[^=]*=/, "", copy)
+      gsub(/"[^"]*"/, "", copy)
+      gsub("\047[^\047]*\047", "", copy)
+      sub(/#.*/, "", copy)
+      opens = gsub(/\[/, "", copy)
+      closes = gsub(/\]/, "", copy)
+      return opens - closes
+    }
+    function emit(text) {
+      if (check == "") print text
+    }
+    tables { emit($0); next }
+    depth > 0 {
+      copy = $0
+      gsub(/"[^"]*"/, "", copy)
+      gsub("\047[^\047]*\047", "", copy)
+      sub(/#.*/, "", copy)
+      depth += gsub(/\[/, "", copy) - gsub(/\]/, "", copy)
+      emit($0)
+      next
+    }
+    /^[ \t]*\[[^[:space:]]/ { tables = 1; emit($0); next }
+    $0 == begin { inside = 1; next }
+    $0 == end { inside = 0; next }
+    $0 ~ keys {
+      if (inside) next
+      if (displaced != "") { print > displaced; next }
+    }
+    $0 ~ loose && !inside { stray = 1 }
+    {
+      if (index($0, "=") > 0) {
+        depth = brackets($0)
+        if (depth < 0) depth = 0
+      }
+      emit($0)
+    }
+    END { if (check != "" && stray) exit 3 }
+  ' "$1"
+}
+
+merge_codex_hooks='
+  (.[0] | if type == "object" and ((.hooks // {}) | type) == "object" and ([(.hooks // {})[] | type] | all(. == "array")) then . else error("not a hooks file") end) as $current
+  | .[1] as $layer | .[2] as $previous
+  | ([$layer, $previous | (.hooks // {})[][] | .hooks[]? | .command] | unique) as $ours
+  | def ours: any(.hooks[]?; .command | IN($ours[]));
+  ([$layer, $previous | (.hooks // {}) | keys[]] | unique) as $events
+  | reduce $events[] as $event ($current;
+      ((.hooks // {})[$event] // []) as $have
+      | ($have | map(select(ours))) as $mine
+      | (($layer.hooks // {})[$event] // []) as $wanted
+      | if $mine == $wanted then .
+        else (($have | map(select(ours | not))) + $wanted) as $next
+          | if $next == [] then del(.hooks[$event]) else .hooks[$event] = $next end
+        end)
+  | if (.hooks // null) == {} then del(.hooks) else . end
 '

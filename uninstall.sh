@@ -11,6 +11,8 @@ usage() {
   echo "- removes every link it made (skills, agents, bin) and moves its copies to the backup folder;"
   echo "- in ~/.claude/settings.json, puts back or removes each value the last install merged, unless"
   echo "  you changed it since;"
+  echo "- removes the block install.sh wrote at the top of ~/.codex/config.toml and its hook entries in"
+  echo "  ~/.codex/hooks.json, and puts back the values the block replaced;"
   echo "- puts back the CLAUDE.md, AGENTS.md and GEMINI.md you had before the first install, or moves"
   echo "  the generated ones to the backup folder."
   echo "Everything it replaces goes to $state/backups/<time>/ first. The profile and the list of"
@@ -98,6 +100,52 @@ if [ -f "$settings_record" ] && [ -f "$settings_file" ]; then
     rm -f "$settings_record" "$originals/settings.json"
   else
     echo "skipped $settings_file (jq not found)"
+  fi
+fi
+
+if [ -f "$codex_config" ] && grep -qxF "$codex_block_begin" "$codex_config"; then
+  : >"$work/codex-config.toml"
+  if [ -f "$codex_displaced" ]; then
+    cat "$codex_displaced" >>"$work/codex-config.toml"
+  fi
+  strip_codex_block "$codex_config" "" >>"$work/codex-config.toml"
+  mkdir -p "$backup/codex"
+  cp "$codex_config" "$backup/codex/config.toml"
+  if [ -s "$work/codex-config.toml" ]; then
+    cp "$work/codex-config.toml" "$codex_config"
+    echo "cleaned $codex_config"
+  else
+    rm "$codex_config"
+    echo "removed $codex_config"
+  fi
+  rm -f "$codex_displaced"
+elif [ -f "$codex_displaced" ]; then
+  mkdir -p "$backup/codex"
+  cp "$codex_displaced" "$backup/codex/"
+  echo "kept    $codex_displaced (the managed block was already gone)"
+fi
+
+if [ -f "$codex_hooks_record" ] && [ -f "$codex_hooks" ]; then
+  if command -v jq >/dev/null 2>&1; then
+    echo '{}' >"$work/codex-empty.json"
+    if [ -s "$codex_hooks" ]; then cp "$codex_hooks" "$work/codex-current.json"; else echo '{}' >"$work/codex-current.json"; fi
+    if [ -s "$codex_hooks_record" ]; then cp "$codex_hooks_record" "$work/codex-record.json"; else echo '{}' >"$work/codex-record.json"; fi
+    if ! jq -s "$merge_codex_hooks" "$work/codex-current.json" "$work/codex-empty.json" "$work/codex-record.json" >"$work/codex-hooks.json" 2>/dev/null; then
+      echo "skipped $codex_hooks (not valid JSON)"
+    else
+      mkdir -p "$backup/codex"
+      cp "$codex_hooks" "$backup/codex/hooks.json"
+      if [ "$(jq -c . "$work/codex-hooks.json")" = "{}" ]; then
+        rm "$codex_hooks"
+        echo "removed $codex_hooks"
+      else
+        cp "$work/codex-hooks.json" "$codex_hooks"
+        echo "cleaned $codex_hooks"
+      fi
+      rm -f "$codex_hooks_record"
+    fi
+  else
+    echo "skipped $codex_hooks (jq not found)"
   fi
 fi
 

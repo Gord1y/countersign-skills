@@ -66,7 +66,8 @@ Where everything lands, how copies and settings merge, backups and unattended ru
 
 Codex gets its rules in a generated `~/.codex/AGENTS.md`, Antigravity in `~/.gemini/GEMINI.md`.
 Neither reads `@` imports, and the orchestration and memory rules lean on things only Claude Code
-has, so those two rules stay out of both.
+has, so those two rules stay out of both. For Codex the installer also writes a managed block in
+`~/.codex/config.toml` and hook entries in `~/.codex/hooks.json`.
 
 ## Skills
 

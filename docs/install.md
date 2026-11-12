@@ -163,6 +163,49 @@ in your profile's `settings.json`, not here.
 The sandbox protects `~/.claude` from sandboxed commands, so run `install.sh` from your own
 terminal, not through an agent.
 
+## Codex settings
+
+When `~/.codex` exists, `install.sh` also writes two Codex files. `--no-settings` skips both, and
+`CODEX_HOME` is not honoured, like the rest of the installer.
+
+- `~/.codex/config.toml` gets a block of three top-level keys at the very top of the file, between
+  the lines `# BEGIN countersign-skills: install.sh manages this block` and
+  `# END countersign-skills`: `model_auto_compact_token_limit = 200000`,
+  `approval_policy = "never"` and `sandbox_mode = "workspace-write"`. A re-run replaces the block
+  in place, so an edit inside it does not survive. Tables below it are never touched. TOML forbids
+  a key twice, so a top-level line of your own for one of those three keys moves out of the file
+  into `~/.config/countersign/skills/codex-config-displaced.toml`, and `uninstall.sh` puts it back.
+  A key written with a quoted name is not detected and Codex then rejects the duplicate. When the
+  file has a table named like one of the keys (`[approval_policy.granular]`), the installer
+  skips the file and prints `skipped`. It skips too when a key of those three stays above the
+  first table after the block is placed, for example an indented one, and tells you to set the
+  three keys yourself. Only column-0 keys above the first table (an indented `[table]` counts)
+  are replaced, and a `[` line inside a multi-line array is not taken for a table.
+- `uninstall.sh` puts displaced keys back at the top of the file, not on their original line, and
+  normalises the final newline. A CRLF file comes out with mixed line endings, which TOML accepts.
+  When you deleted the block yourself, the displaced values stay in
+  `codex-config-displaced.toml` and are copied to the backup folder.
+- A `hooks.json` that is not an object of event arrays (a JSONC comment, a top-level `[]`) is
+  left alone and printed as `skipped ... (not valid JSON)`. A 0-byte file counts as `{}`.
+- The limit is one value for every Codex session, because Codex takes it from the top level and
+  T3 Code's `delegate_task` passes no profile. 200000 tokens is 40% of the 500000 window of the
+  gpt-6.1 models. Codex caps the limit at 90% of the model's window, so on a 272000 window it
+  compacts at 200000 too, later than 40% there.
+- `~/.codex/hooks.json` gets the entries of `codex/hooks.json` (`PreToolUse` for `Bash` and
+  `apply_patch`, `Stop`, `SubagentStop`), each running `bin/harness-hook codex` and failing open
+  without it. They are appended after the entries already there, so the keys Codex stores trust
+  under (event, group index, handler index) keep their positions for entries another tool wrote,
+  such as Countersign's. The merge finds its own entries by their exact command, and the last
+  merged file is recorded in `codex-hooks-layer.json` so a run removes entries the repo dropped.
+  Changing one of our entries moves it to the end of its event once, which shifts the key of an
+  entry that another tool appended after ours.
+- Codex skips an unmanaged hook until you trust it. After the first write the installer prints a
+  `trust` line: start `codex` and pick "Review hooks" or "Trust all and continue". The installer
+  never writes `trusted_hash`. A tool that rewrites `hooks.json` may drop our entries until the
+  next `install.sh` run.
+
+The previous files go to the backup folder under `codex/`, and an unchanged file prints `ok`.
+
 ## Updating copies
 
 Linked skills and imported rules update with `git pull`. Run `install.sh` again afterwards when
@@ -186,6 +229,9 @@ regenerates the Codex and Antigravity files and installs any skill added since.
   back to what you had before the first install, or removed if you had nothing there. A value you
   changed since is kept, and so is everything Claude Code wrote. When the install created the file
   and nothing is left in it, the file goes.
+- In `~/.codex`, the block at the top of `config.toml` goes and the lines it displaced come back,
+  and the hook entries this repo added go from `hooks.json`. Each file goes too when nothing else
+  is left in it.
 - `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` and `~/.gemini/GEMINI.md` go back to the versions you
   had before the first install (`install.sh` keeps them in `originals/`), or move to the backup
   folder if there were none.

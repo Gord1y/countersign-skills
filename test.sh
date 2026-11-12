@@ -58,6 +58,11 @@ grep -q "@$root/rules/code.md" "$home/.claude/CLAUDE.md" || fail "CLAUDE.md was 
 [ "$(readlink "$home/.local/bin/statusline")" = "$root/bin/statusline" ] || fail "statusline is not linked into ~/.local/bin"
 [ "$(readlink "$home/.local/bin/gh")" = "$root/bin/gh" ] || fail "gh is not linked into ~/.local/bin"
 [ "$(readlink "$home/.local/bin/harness-hook")" = "$root/bin/harness-hook" ] || fail "harness-hook is not linked into ~/.local/bin"
+codex_block_expected=$(printf '%s\n' '# BEGIN countersign-skills: install.sh manages this block' 'model_auto_compact_token_limit = 200000' 'approval_policy = "never"' 'sandbox_mode = "workspace-write"' '# END countersign-skills')
+[ "$(cat "$home/.codex/config.toml")" = "$codex_block_expected" ] || fail "a fresh .codex did not get exactly the managed config.toml block"
+codex_hook_command=$(jq -r '.hooks.Stop[0].hooks[0].command' "$root/codex/hooks.json")
+jq -e --arg cmd "$codex_hook_command" '(.hooks | keys) == ["PreToolUse","Stop","SubagentStop"] and ([.hooks[][].hooks[].command] | unique) == [$cmd] and .hooks.PreToolUse[0].matcher == "Bash|apply_patch|Edit|Write"' "$home/.codex/hooks.json" >/dev/null || fail "a fresh .codex did not get the hook entries from codex/hooks.json"
+HOME=$fake sh -c "$codex_hook_command" </dev/null || fail "the Codex hook command did not fail open without harness-hook"
 settings_json="$home/.claude/settings.json"
 jq -e '(.hooks.Stop | length) == 2 and (.hooks.Stop | map(.hooks[0].command) | index("mine-stop") != null) and (.hooks.PreToolUse | length) == 1 and (.hooks.SubagentStop | length) == 1 and .theme == "light" and .worktree.baseRef == "head" and .sandbox.enabled == true and (.permissions.allow | index("Read(//kept)") != null) and (.permissions.allow | index("mcp__context7") != null) and (.permissions.ask | index("Bash(kept-ask *)") != null) and (.permissions.ask == ["Bash(kept-ask *)"]) and (.permissions.deny | index("Read(~/.ssh/**)") != null) and (.sandbox.filesystem.denyRead | index("~/.ssh") != null)' "$settings_json" >/dev/null || fail "settings.json was not merged from settings/claude.json"
 jq -e '(.permissions.deny | index("Read(**/.env)") != null) and ([.permissions.deny[] | select(test("^Read\\((\\*\\*/)?\\.env(\\.\\*)?\\)$"))] == ["Read(**/.env)"]) and ([.sandbox.filesystem.allowRead[]? | select(contains(".env"))] == [])' "$settings_json" >/dev/null || fail "settings.json must deny .env at any depth by name, never .env.* (it hides .env.example) or root-only rules, and needs no .env allowRead"
@@ -185,8 +190,10 @@ echo "$second" | grep -q "^ok      $home/.claude/CLAUDE.md" || fail "a second ru
 echo "$second" | grep -q "^ok      $home/.codex/AGENTS.md" || fail "a second run rewrote an unchanged AGENTS.md"
 echo "$second" | grep -q "^ok      $settings_json" || fail "a second run rewrote an unchanged settings.json"
 jq '.worktree.baseRef = "changed"' "$settings_json" >"$settings_json.tmp" && mv "$settings_json.tmp" "$settings_json"
+rm "$home/.codex/config.toml"
 HOME=$home CLAUDE_CONFIG_DIR= "$root/install.sh" --no-settings >/dev/null
 [ "$(jq -r .worktree.baseRef "$settings_json")" = changed ] || fail "--no-settings changed settings.json"
+[ ! -e "$home/.codex/config.toml" ] || fail "--no-settings wrote the Codex config.toml"
 
 echo edited >"$home/.codex/AGENTS.md"
 out=$(HOME=$home CLAUDE_CONFIG_DIR= "$root/install.sh")
@@ -340,6 +347,90 @@ printf -- '---\nname: how-it-works\n---\n' >"$extra/skills/how-it-works/SKILL.md
 printf 'how-it-works\t1.0.0\tclaude\n' >>"$extra/skills.tsv"
 HOME=$profhome CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null 2>&1 && fail "an addition's skill that clashes with this repo's was installed"
 
+cxhome="$fake/cxhome"
+cxkeep="$fake/cxkeep"
+mkdir -p "$cxhome/.codex"
+printf 'approval_policy = "on-request"\nmodel = "m"\n\n[features]\nx = true\n\n[hooks.state."/p/hooks.json:permission_request:0:0"]\ntrusted_hash = "sha256:abc"\n' >"$cxhome/.codex/config.toml"
+cp "$cxhome/.codex/config.toml" "$cxhome/config.fixture"
+echo '{"hooks": {"PermissionRequest": [{"matcher": "", "hooks": [{"type": "command", "command": "app hook", "timeout": 3600}]}], "PreToolUse": [{"hooks": [{"type": "command", "command": "app pre"}]}]}}' >"$cxhome/.codex/hooks.json"
+cp "$cxhome/.codex/hooks.json" "$cxhome/hooks.fixture"
+HOME=$cxhome CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null
+cxconfig="$cxhome/.codex/config.toml"
+cxhooks="$cxhome/.codex/hooks.json"
+[ "$(head -n 5 "$cxconfig")" = "$codex_block_expected" ] || fail "the managed block is not the first 5 lines of an existing config.toml"
+[ "$(grep -c '^approval_policy' "$cxconfig")" -eq 1 ] || fail "a user's top-level approval_policy was kept next to the block's"
+grep -qx 'model = "m"' "$cxconfig" || fail "the block replaced a key it does not own"
+[ "$(sed -n '/^\[/,$p' "$cxconfig")" = "$(sed -n '/^\[/,$p' "$cxhome/config.fixture")" ] || fail "the managed block changed the tables of config.toml"
+jq -e '.hooks.PermissionRequest == [{"matcher": "", "hooks": [{"type": "command", "command": "app hook", "timeout": 3600}]}] and .hooks.PreToolUse[0].hooks[0].command == "app pre" and .hooks.PreToolUse[1].matcher == "Bash|apply_patch|Edit|Write" and (.hooks.PreToolUse | length) == 2 and (.hooks.Stop | length) == 1 and (.hooks.SubagentStop | length) == 1' "$cxhooks" >/dev/null || fail "the Codex hook entries were not appended after the app's"
+cp "$cxconfig" "$cxhome/config.after"
+cp "$cxhooks" "$cxhome/hooks.after"
+out=$(HOME=$cxhome CLAUDE_CONFIG_DIR= "$root/install.sh")
+echo "$out" | grep -q "^ok      $cxconfig" || fail "a second run rewrote an unchanged Codex config.toml"
+echo "$out" | grep -q "^ok      $cxhooks" || fail "a second run rewrote an unchanged Codex hooks.json"
+cmp -s "$cxconfig" "$cxhome/config.after" && cmp -s "$cxhooks" "$cxhome/hooks.after" || fail "a second run changed the Codex files"
+HOME=$cxhome CLAUDE_CONFIG_DIR= "$root/uninstall.sh" >/dev/null
+cmp -s "$cxconfig" "$cxhome/config.fixture" || fail "uninstall.sh did not put back the config.toml it found"
+[ "$(jq -S . "$cxhooks")" = "$(jq -S . "$cxhome/hooks.fixture")" ] || fail "uninstall.sh did not remove exactly its hook entries"
+mkdir -p "$cxkeep/.codex"
+printf '[approval_policy.granular]\nx = 1\n' >"$cxkeep/.codex/config.toml"
+cp "$cxkeep/.codex/config.toml" "$cxkeep/config.fixture"
+out=$(HOME=$cxkeep CLAUDE_CONFIG_DIR= "$root/install.sh")
+echo "$out" | grep -q "^skipped $cxkeep/.codex/config.toml" || fail "install.sh did not skip a config.toml that sets one of its keys as a table"
+cmp -s "$cxkeep/.codex/config.toml" "$cxkeep/config.fixture" || fail "install.sh changed a config.toml it skipped"
+
+cxcase=0
+for badhooks in '{ // comment
+"hooks": {}}' '[]' '{"hooks": {"Stop": {"a": 1}}}'; do
+  cxcase=$((cxcase + 1))
+  cxbad="$fake/cxbad$cxcase"
+  mkdir -p "$cxbad/.codex"
+  printf '%s\n' "$badhooks" >"$cxbad/.codex/hooks.json"
+  cp "$cxbad/.codex/hooks.json" "$cxbad/hooks.fixture"
+  out=$(HOME=$cxbad CLAUDE_CONFIG_DIR= "$root/install.sh") || fail "install.sh aborted on a hooks.json it cannot merge"
+  echo "$out" | grep -q "^skipped $cxbad/.codex/hooks.json (not valid JSON)" || fail "install.sh did not report a hooks.json it cannot merge"
+  cmp -s "$cxbad/.codex/hooks.json" "$cxbad/hooks.fixture" || fail "install.sh changed a hooks.json it cannot merge"
+  HOME=$cxbad CLAUDE_CONFIG_DIR= "$root/uninstall.sh" >/dev/null || fail "uninstall.sh aborted on a hooks.json it cannot merge"
+  cmp -s "$cxbad/.codex/hooks.json" "$cxbad/hooks.fixture" || fail "uninstall.sh changed a hooks.json it cannot merge"
+done
+cxempty="$fake/cxempty"
+mkdir -p "$cxempty/.codex"
+: >"$cxempty/.codex/hooks.json"
+HOME=$cxempty CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null || fail "install.sh aborted on a 0-byte hooks.json"
+jq -e '(.hooks | keys) == ["PreToolUse","Stop","SubagentStop"]' "$cxempty/.codex/hooks.json" >/dev/null || fail "a 0-byte hooks.json did not get the hook entries"
+
+cxarray="$fake/cxarray"
+mkdir -p "$cxarray/.codex"
+printf 'x = [\n[1,2],\n]\napproval_policy = "on-request"\n\n[features]\ny = 1\n' >"$cxarray/.codex/config.toml"
+HOME=$cxarray CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null
+[ "$(grep -c '^approval_policy' "$cxarray/.codex/config.toml")" -eq 1 ] || fail "a bracket line inside a multi-line array hid a top-level key from the block"
+grep -qx '\[1,2\],' "$cxarray/.codex/config.toml" || fail "the multi-line array was changed"
+HOME=$cxarray CLAUDE_CONFIG_DIR= "$root/uninstall.sh" >/dev/null
+printf 'approval_policy = "on-request"\nx = [\n[1,2],\n]\n\n[features]\ny = 1\n' | cmp -s - "$cxarray/.codex/config.toml" || fail "uninstall.sh did not put the displaced key back above the rest"
+
+cxindent="$fake/cxindent"
+mkdir -p "$cxindent/.codex"
+printf '  [features]\n  approval_policy = "x"\n' >"$cxindent/.codex/config.toml"
+HOME=$cxindent CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null
+[ "$(tail -n 2 "$cxindent/.codex/config.toml")" = "$(printf '  [features]\n  approval_policy = "x"')" ] || fail "a key inside an indented table was stripped"
+[ "$(head -n 1 "$cxindent/.codex/config.toml")" = "$codex_block_begin" ] && [ "$(grep -c 'approval_policy' "$cxindent/.codex/config.toml")" -eq 2 ] || fail "the block was not placed above an indented table"
+
+cxstray="$fake/cxstray"
+mkdir -p "$cxstray/.codex"
+printf '  approval_policy = "x"\n[features]\ny = 1\n' >"$cxstray/.codex/config.toml"
+cp "$cxstray/.codex/config.toml" "$cxstray/config.fixture"
+out=$(HOME=$cxstray CLAUDE_CONFIG_DIR= "$root/install.sh")
+echo "$out" | grep -q "^skipped $cxstray/.codex/config.toml (could not place the managed block safely" || fail "install.sh did not skip a config.toml with an indented top-level key"
+cmp -s "$cxstray/.codex/config.toml" "$cxstray/config.fixture" || fail "install.sh changed a config.toml it could not place the block in"
+
+cxgone="$fake/cxgone"
+mkdir -p "$cxgone/.codex"
+printf 'approval_policy = "on-request"\nmodel = "m"\n' >"$cxgone/.codex/config.toml"
+HOME=$cxgone CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null
+printf 'model = "m"\n' >"$cxgone/.codex/config.toml"
+out=$(HOME=$cxgone CLAUDE_CONFIG_DIR= "$root/uninstall.sh")
+echo "$out" | grep -q "^kept    .*codex-config-displaced.toml (the managed block was already gone)" || fail "uninstall.sh did not report the displaced values it kept"
+grep -qx 'approval_policy = "on-request"' "$cxgone/.config/countersign/skills/codex-config-displaced.toml" || fail "uninstall.sh deleted the displaced values after the block was already gone"
+
 unhome=$(mktemp -d "${TMPDIR:-/tmp}/countersign-skills.XXXXXX")
 trap 'rm -rf "$home" "$copyhome" "$fake" "$updhome" "$profhome" "$extra" "$unhome"' EXIT
 mkdir -p "$unhome/.claude/skills" "$unhome/.codex"
@@ -355,6 +446,7 @@ HOME=$unhome CLAUDE_CONFIG_DIR= "$root/uninstall.sh" >/dev/null
 [ -L "$unhome/.claude/skills/foreign-link" ] || fail "uninstall.sh removed a link it did not make"
 [ "$(cat "$unhome/.claude/CLAUDE.md")" = 'my own instructions' ] || fail "uninstall.sh did not put back the original CLAUDE.md"
 [ ! -e "$unhome/.codex/AGENTS.md" ] || fail "uninstall.sh left a generated AGENTS.md"
+[ ! -e "$unhome/.codex/config.toml" ] && [ ! -e "$unhome/.codex/hooks.json" ] || fail "uninstall.sh left the Codex config.toml or hooks.json that the install had created"
 jq -e '.theme == "light" and .worktree.baseRef == "mine" and .permissions.allow == ["Read(//mine)"] and .hooks.Stop == [{"hooks": [{"type": "command", "command": "mine-stop"}]}] and ((.hooks | has("SessionEnd") or has("PreToolUse") or has("SubagentStop")) | not) and .model == "added-later" and .permissions.defaultMode == "changed-later" and (has("sandbox") | not) and (.permissions | has("deny") | not)' "$unsettings" >/dev/null || fail "uninstall.sh did not remove exactly the merged settings"
 ls "$unhome"/.config/countersign/skills/backups/*/claude-settings/settings.json >/dev/null 2>&1 || fail "uninstall.sh did not back up settings.json first"
 copies_before=$(awk -F "$tab" '!seen[$1 FS $2]++' "$copyhome/.config/countersign/skills/manifest.tsv" | wc -l)

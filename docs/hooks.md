@@ -5,7 +5,10 @@ hooks. A wall is a small `sh` policy in `hooks/policy/`. Both providers run the 
 one fixture table per policy runs every case through both providers' adapters.
 
 `install.sh` links the entry point into `~/.local/bin` and merges the Claude hook entries from
-`claude/settings.json`. The Codex side (`~/.codex/hooks.json`) is installed separately.
+`claude/settings.json`. When `~/.codex` exists it also merges `codex/hooks.json` into
+`~/.codex/hooks.json`, after any entries already there. Codex skips those entries until you trust
+them: start `codex` and pick "Review hooks" or "Trust all and continue". See
+[docs/install.md](install.md#codex-settings).
 
 ## The flow
 
