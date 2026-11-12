@@ -373,12 +373,13 @@ write_codex_config() {
   : >"$held"
   : >"$restored"
   if [ -f "$codex_displaced" ]; then
-    awk -v keys="^($codex_block_keys)[ \\t]*=" -v held="$held" -v restored="$restored" '$0 ~ keys { print > held; next } { print > restored }' "$codex_displaced"
+    split_codex_displaced "$codex_displaced" "$held" "$restored"
   fi
   codex_block >"$generated"
   cat "$restored" >>"$generated"
   if [ -f "$codex_config" ]; then
-    strip_codex_block "$codex_config" "$displaced" >>"$generated"
+    strip_codex_block "$codex_config" "$work/codex-displaced-new" >>"$generated"
+    split_codex_displaced "$work/codex-displaced-new" "$displaced" "$work/codex-displaced-unused" "$held"
   fi
   if ! strip_codex_block "$generated" "" check >/dev/null; then
     echo "skipped $codex_config (could not place the managed block safely; set the keys of the managed block yourself)"

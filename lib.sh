@@ -121,19 +121,19 @@ unmerge_settings='
 strip_codex_block() {
   displaced_file=${2:-}
   [ -z "$displaced_file" ] || : >"$displaced_file"
-  awk -v begin="$codex_block_begin" -v end="$codex_block_end" -v keys="^($codex_block_keys)[ \\t]*=" -v loose="^[ \\t]*($codex_block_keys)[ \\t]*=" -v displaced="$displaced_file" -v check="${3:-}" -v file="$1" '
-    function brackets(text,   copy, opens, closes) {
-      copy = text
-      sub(/^[^=]*=/, "", copy)
-      gsub(/"[^"]*"/, "", copy)
-      gsub("\047[^\047]*\047", "", copy)
-      sub(/#.*/, "", copy)
-      opens = gsub(/\[/, "", copy)
-      closes = gsub(/\]/, "", copy)
-      return opens - closes
-    }
+  awk -v begin="$codex_block_begin" -v end="$codex_block_end" -v keys="^($codex_block_keys)[ \\t]*=" -v loose="^[ \\t]*($codex_block_keys)[ \\t]*=" -v displaced="$displaced_file" -v check="${3:-}" -v file="$1" "$codex_toml_awk"'
     function emit(text) {
       if (check == "") print text
+    }
+    function route(text) {
+      if (diverting) print text > displaced
+      else emit(text)
+    }
+    function track(text) {
+      depth = 0
+      mls = ""
+      advance(value_of(text))
+      if (depth < 0) depth = 0
     }
     BEGIN {
       while ((getline row < file) > 0) {
@@ -141,31 +141,65 @@ strip_codex_block() {
       }
     }
     tables { emit($0); next }
-    depth > 0 {
-      copy = $0
-      gsub(/"[^"]*"/, "", copy)
-      gsub("\047[^\047]*\047", "", copy)
-      sub(/#.*/, "", copy)
-      depth += gsub(/\[/, "", copy) - gsub(/\]/, "", copy)
-      emit($0)
+    depth > 0 || mls != "" {
+      advance($0)
+      route($0)
+      if (depth <= 0 && mls == "") {
+        depth = 0
+        diverting = 0
+      }
       next
     }
     /^[ \t]*\[[^[:space:]]/ { tables = 1; emit($0); next }
     $0 == begin { inside = 1; next }
     $0 == end { inside = 0; next }
     inside && (closed || $0 ~ keys) { next }
-    $0 ~ keys {
-      if (displaced != "") { print > displaced; next }
+    $0 ~ keys && displaced != "" {
+      print > displaced
+      track($0)
+      diverting = depth > 0 || mls != ""
+      next
     }
     $0 ~ loose && !inside { stray = 1 }
     {
-      if (index($0, "=") > 0) {
-        depth = brackets($0)
-        if (depth < 0) depth = 0
-      }
+      if (index($0, "=") > 0) track($0)
       emit($0)
     }
     END { if (check != "" && stray) exit 3 }
+  ' "$1"
+}
+
+split_codex_displaced() {
+  awk -v keys="^($codex_block_keys)[ \\t]*=" -v held="$2" -v restored="$3" -v known_file="${4:-}" "$codex_toml_awk"'
+    function name_of(text) {
+      sub(/[ \t]*=.*/, "", text)
+      return text
+    }
+    BEGIN {
+      printf "" > held
+      printf "" > restored
+      if (known_file != "") {
+        while ((getline row < known_file) > 0) {
+          if (row ~ keys) known[name_of(row)] = 1
+        }
+        close(known_file)
+      }
+    }
+    depth > 0 || mls != "" {
+      advance($0)
+      if (sink != "") print > sink
+      if (depth <= 0 && mls == "") depth = 0
+      next
+    }
+    {
+      sink = restored
+      if ($0 ~ keys) sink = held
+      if ($0 ~ keys && (name_of($0) in known)) sink = ""
+      depth = 0
+      advance(value_of($0))
+      if (depth < 0) depth = 0
+      if (sink != "") print > sink
+    }
   ' "$1"
 }
 
@@ -227,10 +261,7 @@ function advance(text,   at, size, c, three) {
     }
     if (c == "\"" || c == "\047") {
       at = skip_quoted(text, at + 1, size, c)
-      if (at == 0) {
-        unterminated = 1
-        return
-      }
+      if (at == 0) return
       continue
     }
     if (c == "[" || c == "{") depth++
@@ -315,20 +346,20 @@ function skip_string(text, at, size,   three, closing) {
 function is_scalar(body) {
   if (body ~ /^(true|false)$/) return 1
   if (body ~ /^[-+]?(inf|nan)$/) return 1
-  if (body ~ /^0x[0-9A-Fa-f_]+$/ || body ~ /^0o[0-7_]+$/ || body ~ /^0b[01_]+$/) return 1
-  if (body ~ /^[-+]?[0-9]+(_[0-9]+)*(\.[0-9]+(_[0-9]+)*)?([eE][-+]?[0-9]+(_[0-9]+)*)?$/) return 1
+  if (body ~ /^0x[0-9A-Fa-f]+(_[0-9A-Fa-f]+)*$/ || body ~ /^0o[0-7]+(_[0-7]+)*$/ || body ~ /^0b[01]+(_[01]+)*$/) return 1
+  if (body ~ /^[-+]?(0|[1-9][0-9]*(_[0-9]+)*)(\.[0-9]+(_[0-9]+)*)?([eE][-+]?[0-9]+(_[0-9]+)*)?$/) return 1
   if (body ~ /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]([Tt ][0-9][0-9]:[0-9][0-9]:[0-9][0-9](\.[0-9]+)?([Zz]|[-+][0-9][0-9]:[0-9][0-9])?)?$/) return 1
   if (body ~ /^[0-9][0-9]:[0-9][0-9]:[0-9][0-9](\.[0-9]+)?$/) return 1
   return 0
 }
-function value_problem(value,   at, size, c, body) {
+function value_problem(value,   at, size, c, body, stack, top) {
   size = length(value)
   c = substr(value, 1, 1)
   if (c == "\"" || c == "\047") {
     at = skip_string(value, 1, size)
     if (at == 0) return "must be complete on one line"
   } else if (c == "[" || c == "{") {
-    depth = 0
+    stack = ""
     at = 1
     while (at <= size) {
       c = substr(value, at, 1)
@@ -338,12 +369,17 @@ function value_problem(value,   at, size, c, body) {
         continue
       }
       if (c == "#") return "must be complete on one line"
-      if (c == "[" || c == "{") depth++
-      else if (c == "]" || c == "}") depth--
+      if (c == "[" || c == "{") {
+        stack = stack c
+      } else if (c == "]" || c == "}") {
+        top = substr(stack, length(stack), 1)
+        if (top == "" || (c == "]") != (top == "[")) return "has mismatched brackets"
+        stack = substr(stack, 1, length(stack) - 1)
+      }
       at++
-      if (depth == 0) break
+      if (stack == "") break
     }
-    if (depth != 0) return "must be complete on one line"
+    if (stack != "") return "must be complete on one line"
   } else {
     body = value
     sub(/#.*/, "", body)
@@ -495,7 +531,6 @@ reconcile_codex_tables() {
             key_at[span_id] = i
             key_end[span_id] = i
           }
-          unterminated = 0
           advance(value_of(line))
         } else {
           advance(line)

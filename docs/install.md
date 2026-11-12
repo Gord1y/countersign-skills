@@ -179,6 +179,8 @@ When `~/.codex` exists, `install.sh` also writes two Codex files. `--no-settings
   line only the block's keys go. Tables below it are never touched. TOML forbids
   a key twice, so a top-level line of your own for one of those three keys moves out of the file
   into `~/.config/countersign/skills/codex-config-displaced.toml`, and `uninstall.sh` puts it back.
+  A multi-line value moves whole. When you add the same key at the top level again while the
+  displaced file still holds it, the installer drops the new line and keeps the earlier one.
   A key written with a quoted name is not detected and Codex then rejects the duplicate. When the
   file has a table named like one of the keys (`[approval_policy.granular]`), the installer
   skips the file and prints `skipped`. It skips too when a key of those three stays above the
@@ -213,7 +215,7 @@ When `~/.codex` exists, `install.sh` also writes two Codex files. `--no-settings
   lines, `[table]` headers (dotted, with quoted segments such as `[plugins."x@y"]`) and
   single-line `key = value` pairs with bare keys. A value is a string, a number, a boolean, a date
   or time, or an array or inline table written on one line, followed by nothing but a comment;
-  an array or inline table is checked for balanced brackets, not item by item. Arrays of tables,
+  an array or inline table is checked for matching `[` `]` and `{` `}` pairs, not item by item. Arrays of tables,
   dotted keys, multi-line values and any other line stop `install.sh` before it changes anything,
   with the fragment's path and the line number on stderr. `--no-settings` skips the check.
   - The keys above the first table join the managed block after the three built-in ones. They are

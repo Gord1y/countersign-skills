@@ -512,7 +512,7 @@ cxuninstall() {
   HOME=$cxdir CLAUDE_CONFIG_DIR= "$root/uninstall.sh" >/dev/null
 }
 
-for cxvalue in 'truex' 'falsey' '"a" junk' '1 2' '[1] x' '-' '+' '[1,' '"open'; do
+for cxvalue in 'truex' 'falsey' '"a" junk' '1 2' '[1] x' '-' '+' '[1,' '"open' '[}' '{]' '[1, {a = 1]}' '{' '0x_' '0o' '01' '00' '1__0'; do
   cxsetup cxvalue '[t]\nk = 0\n' "[t]\nk = $cxvalue\n"
   if cxinstall >/dev/null 2>"$cxdir/err"; then
     fail "install.sh accepted the codex fragment value: $cxvalue"
@@ -520,7 +520,7 @@ for cxvalue in 'truex' 'falsey' '"a" junk' '1 2' '[1] x' '-' '+' '[1,' '"open'; 
   grep -q "config.toml line 2:" "$cxdir/err" || fail "install.sh did not name line 2 for the codex fragment value: $cxvalue"
   cmp -s "$cxtoml" "$cxdir/config.fixture" || fail "install.sh changed config.toml for the codex fragment value: $cxvalue"
 done
-for cxvalue in 'true' '-1' '0x1F' '1_000' '1.5e3' '-inf' 'nan' '1979-05-27' '1979-05-27T07:32:00Z' '07:32:00' '"a" # note' "'lit'" '[1, 2] # note' '{ a = 1 }' '"""a"""'; do
+for cxvalue in 'true' '-1' '0x1F' '1_000' '1.5e3' '-inf' 'nan' '1979-05-27' '1979-05-27T07:32:00Z' '07:32:00' '"a" # note' "'lit'" '[1, 2] # note' '{ a = 1 }' '"""a"""' '0' '-0' '0b1' '0o7' '0x1_F' '0.5' '[1, {a = [2]}]' '{ a = "]" }'; do
   cxsetup cxvalue '[t]\nk = 0\n' "[t]\nk = $cxvalue\n"
   cxinstall >/dev/null 2>&1 || fail "install.sh rejected the valid codex fragment value: $cxvalue"
   grep -qxF "k = $cxvalue" "$cxtoml" || fail "install.sh did not write the valid codex fragment value: $cxvalue"
@@ -555,6 +555,33 @@ echo "$out" | grep -q "^restored" || fail "install.sh did not report restoring a
 [ ! -s "$cxdir/.config/countersign/skills/codex-config-displaced.toml" ] || fail "a restored displaced line stayed in codex-config-displaced.toml"
 cxuninstall
 cmp -s "$cxtoml" "$cxdir/config.fixture" || fail "uninstall.sh did not restore the config after a displaced key came back early"
+
+cxsetup cxmulti 'notify = [\n  "a",\n  "b",\n]\n\n[features]\nx = 1\n' 'notify = ["x"]\n'
+cxinstall >/dev/null
+! grep -qx '  "a",' "$cxtoml" || fail "a displaced multi-line value left its continuation lines in config.toml"
+[ "$(sed -n "/^$codex_block_end\$/,\$p" "$cxtoml")" = "$(printf '%s\n\n[features]\nx = 1' "$codex_block_end")" ] || fail "a displaced multi-line value left lines below the managed block"
+[ "$(cat "$cxdir/.config/countersign/skills/codex-config-displaced.toml")" = "$(printf 'notify = [\n  "a",\n  "b",\n]')" ] || fail "a displaced multi-line value was not kept whole in codex-config-displaced.toml"
+out=$(cxinstall)
+echo "$out" | grep -q "^ok      $cxtoml" || fail "a second run rewrote config.toml after displacing a multi-line value"
+rm "$cxprofilefile"
+cxinstall >/dev/null
+[ "$(sed -n "/^$codex_block_end\$/,\$p" "$cxtoml")" = "$(printf '%s\nnotify = [\n  "a",\n  "b",\n]\n\n[features]\nx = 1' "$codex_block_end")" ] || fail "a displaced multi-line value was not restored whole once the fragment dropped its key"
+[ ! -s "$cxdir/.config/countersign/skills/codex-config-displaced.toml" ] || fail "a restored multi-line value stayed in codex-config-displaced.toml"
+cxuninstall
+cmp -s "$cxtoml" "$cxdir/config.fixture" || fail "uninstall.sh did not restore a config whose multi-line value was displaced and restored"
+
+cxsetup cxmultiout 'notify = [\n  "a",\n  "b",\n]\n' 'notify = ["x"]\n'
+cxinstall >/dev/null
+cxuninstall
+cmp -s "$cxtoml" "$cxdir/config.fixture" || fail "uninstall.sh did not restore a displaced multi-line value byte for byte"
+
+cxsetup cxreadd 'approval_policy = "on-request"\n' ''
+cxinstall >/dev/null
+printf 'approval_policy = "later"\n' >>"$cxtoml"
+cxinstall >/dev/null
+[ "$(grep -c '^approval_policy' "$cxdir/.config/countersign/skills/codex-config-displaced.toml")" -eq 1 ] || fail "a key re-added at top level was displaced a second time"
+cxuninstall
+cmp -s "$cxtoml" "$cxdir/config.fixture" || fail "uninstall.sh did not restore the original line of a key re-added at top level"
 
 cxsetup cxequals '"a=b" = [\n[plugins.zz]\n]\n\n[features]\nx = 1\n' '[plugins.zz]\nenabled = false\n'
 cxinstall >/dev/null
