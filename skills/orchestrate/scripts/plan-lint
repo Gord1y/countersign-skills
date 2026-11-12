@@ -2,7 +2,7 @@
 set -eu
 
 usage() {
-  echo "usage: plan-lint check <plan> | approve <plan> | verify <plan>" >&2
+  echo "usage: plan-lint check <plan> | approve <plan> | verify <plan> | fence <plan> <slice>... | unfence" >&2
   exit 2
 }
 
@@ -173,16 +173,146 @@ verify_plan() {
   echo "plan-lint: $plan is approved at $current"
 }
 
+fence_patterns() {
+  PLAN=$1 IDS=$2 awk '
+    function pattern(g,   n, i, c, out, body, tail) {
+      if (g == "**") return "^.*$"
+      tail = ""
+      body = g
+      n = length(g)
+      if (n > 3 && substr(g, n - 2) == "/**") {
+        body = substr(g, 1, n - 3)
+        tail = "(/.*)?"
+      }
+      out = ""
+      n = length(body)
+      for (i = 1; i <= n; i++) {
+        c = substr(body, i, 1)
+        if ((i == 1 || substr(body, i - 1, 1) == "/") && substr(body, i, 3) == "**/") {
+          out = out "(.*/)?"
+          i += 2
+        } else if (c == "*") {
+          out = out "[^/]*"
+        } else if (c == "?") {
+          out = out "[^/]"
+        } else if (index(".+()|^$", c) > 0) {
+          out = out "\\" c
+        } else {
+          out = out c
+        }
+      }
+      return "^" out tail "$"
+    }
+    function emit(kind, s,   b, g) {
+      while (1) {
+        sub(/^[ \t,]+/, "", s)
+        if (substr(s, 1, 1) != "`") break
+        s = substr(s, 2)
+        b = index(s, "`")
+        if (b == 0) break
+        g = substr(s, 1, b - 1)
+        s = substr(s, b + 1)
+        printf "%s\t%s\n", kind, pattern(g)
+      }
+    }
+    BEGIN {
+      count = split(ENVIRON["IDS"], wanted, " ")
+      for (i = 1; i <= count; i++) want[wanted[i]] = 1
+    }
+    { sub(/\r$/, "") }
+    /^(#|##|###) / {
+      current = ""
+      if ($0 ~ /^### Slice [0-9][0-9]: [^ \t]/) {
+        current = substr($0, 11, 2)
+        found[current] = 1
+        selected = (current in want)
+      } else {
+        selected = 0
+      }
+      next
+    }
+    selected && /^- Scope:/ { emit("allow", substr($0, 9)); next }
+    selected && /^- Sensitive:/ { emit("named", substr($0, 13)); next }
+    END {
+      for (i = 1; i <= count; i++) {
+        if (!(wanted[i] in found)) {
+          printf "plan-lint: no slice %s in %s\n", wanted[i], ENVIRON["PLAN"] > "/dev/stderr"
+          missing = 1
+        }
+      }
+      if (missing) exit 1
+    }
+  ' "$1"
+}
+
+checkout_scope_file() {
+  common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || common=$(git rev-parse --show-toplevel)/.git
+  home=$(cd "$(git rev-parse --show-toplevel)" && pwd -P)
+  sum=$(printf '%s' "$home" | cksum | cut -d' ' -f1)
+  scope_root=$common/countersign
+  scope_file=$scope_root/scope.d/$sum
+}
+
+fence_plan() {
+  plan=$1
+  shift
+  verify_plan "$plan" >/dev/null || exit 1
+  patterns=$(fence_patterns "$plan" "$*") || exit 1
+  if ! git rev-parse --show-toplevel >/dev/null 2>&1; then
+    echo "plan-lint: fence runs inside the checkout that lands the work" >&2
+    exit 2
+  fi
+  checkout_scope_file
+  plan_path=$(cd "$(dirname "$plan")" && pwd -P)/$(basename "$plan")
+  mkdir -p "$scope_root/scope.d"
+  staged=$(mktemp "$scope_root/scope.XXXXXX")
+  trap 'rm -f "$staged"' EXIT
+  {
+    printf 'plan\t%s\n' "$plan_path"
+    printf 'approved\t%s\n' "$(stamp_hash "$plan")"
+    printf 'home\t%s\n' "$home"
+    if [ -n "$patterns" ]; then
+      printf '%s\n' "$patterns"
+    fi
+  } >"$staged"
+  mv "$staged" "$scope_file"
+  echo "plan-lint: fenced $# slices of $plan"
+}
+
+unfence_checkout() {
+  if git rev-parse --show-toplevel >/dev/null 2>&1; then
+    checkout_scope_file
+    if [ -f "$scope_file" ]; then
+      rm -f "$scope_file"
+      rmdir "$scope_root/scope.d" 2>/dev/null || true
+      rmdir "$scope_root" 2>/dev/null || true
+      echo "plan-lint: unfenced"
+      return 0
+    fi
+  fi
+  echo "plan-lint: no fence for this checkout"
+}
+
 main() {
-  if [ $# -ne 2 ]; then
+  if [ $# -lt 1 ]; then
     usage
   fi
   command=$1
-  plan=$2
   case "$command" in
-    check | approve | verify) ;;
+    check | approve | verify)
+      [ $# -eq 2 ] || usage
+      ;;
+    fence)
+      [ $# -ge 3 ] || usage
+      ;;
+    unfence)
+      [ $# -eq 1 ] || usage
+      unfence_checkout
+      return 0
+      ;;
     *) usage ;;
   esac
+  plan=$2
   if [ ! -f "$plan" ]; then
     echo "plan-lint: $plan not found" >&2
     exit 2
@@ -191,6 +321,10 @@ main() {
     check) check_plan "$plan" || exit 1 ;;
     approve) approve_plan "$plan" ;;
     verify) verify_plan "$plan" ;;
+    fence)
+      shift 2
+      fence_plan "$plan" "$@"
+      ;;
   esac
 }
 

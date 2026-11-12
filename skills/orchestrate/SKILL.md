@@ -269,6 +269,14 @@ before you hand back; past 20, cut the least useful until it fits.
   sets; without it, worktrees start from the remote default branch. Check the worktree, not the
   settings file: right after the first spawn, `git worktree list` must show the new worktree at
   your `HEAD`. If it does not, stop that builder and park the run until the user adds the setting.
+- **Fence the batch.** From the checkout that lands the work, run
+  `"${CLAUDE_SKILL_DIR}/scripts/plan-lint" fence <plan> <batch slice ids>` before the spawn
+  message. It limits that checkout's builders to those slices' globs
+  (`references/plan-contract.md`). A fence denial in a builder's hand-back is a `parked` row, not
+  a reason to widen the fence. The fence holds only worktrees named `agent-*` under
+  `<landing checkout>/.claude/worktrees/`. Confirm that each spawned worktree path starts with
+  `<landing checkout>/.claude/worktrees/agent-`; if it does not, the fence does not hold that
+  unit, so park it.
 - **Spawn with a pointer.** In a run folder the prompt is one line: "Your brief is `<absolute path
   to units/NN-<slug>.md>`. Read it first; it is the whole task." Without a folder, paste the brief.
 - **At most 4 writing builders in flight**, a parallel batch in one message. A unit that touches a
@@ -399,6 +407,7 @@ nothing to QA; the summary says so.
 
 ## Step 10: close the run
 
+- Run `"${CLAUDE_SKILL_DIR}/scripts/plan-lint" unfence` from the landing checkout.
 - **Only your own builders' worktrees.** A worktree this session did not spawn is never yours to
   clear, unless the user names it.
 - If the repo documents a guarded cleanup command, use it (dry run first), and relay every line

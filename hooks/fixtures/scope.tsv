@@ -1,0 +1,28 @@
+case	event	tool	input	setup	expect
+in-scope-file	pre_tool	edit	src/a.ts	fenced	allow
+in-scope-nested	pre_tool	edit	src/x/y/b.ts	fenced	allow
+named-dependency	pre_tool	edit	package.json	fenced	allow
+named-migration	pre_tool	edit	src/db/migrations/001.sql	fenced	allow
+other-locale	pre_tool	edit	src/messages/de.json	fenced	allow
+fenced-home-plans	pre_tool	edit	~/.claude/plans/p.md	fenced	allow
+shell-write	pre_tool	shell	touch lib/a.ts	fenced	allow
+main-checkout	pre_tool	edit	lib/a.ts	main-checkout	allow
+other-fence-owner	pre_tool	edit	lib/a.ts	fenced-from-worktree	allow
+unfenced	pre_tool	edit	lib/a.ts	unfenced	allow
+plan-gone	pre_tool	edit	lib/a.ts	plan-gone	allow
+reapproved	pre_tool	edit	lib/a.ts	reapproved	allow
+outside-scope	pre_tool	edit	lib/a.ts	fenced	deny
+second-path-outside-scope	pre_tool	edit	src/a.ts lib/b.ts	fenced	deny
+nested-dependency	pre_tool	edit	src/package.json	fenced	deny
+env-file	pre_tool	edit	src/.env.local	fenced	deny
+config-file	pre_tool	edit	src/app.config.ts	fenced	deny
+unnamed-migration	pre_tool	edit	src/migrations/001.sql	fenced	deny
+source-locale	pre_tool	edit	src/messages/en.json	fenced	deny
+mixed-case-dependency	pre_tool	edit	src/Package.json	fenced	deny
+upper-case-env-file	pre_tool	edit	src/.ENV	fenced	deny
+sibling-prefix	pre_tool	edit	src2/x	fenced	deny
+symlink-out-of-scope	pre_tool	edit	src/file.ts	fenced	deny
+workflow-without-sensitive-line	pre_tool	edit	.github/workflows/ci.yml	fenced-wide	deny
+workflow-with-sensitive-line	pre_tool	edit	.github/workflows/ci.yml	fenced-wide-named	allow
+workflow-sibling-in-named-fence	pre_tool	edit	.github/workflows/other.yml	fenced-wide-named	deny
+non-agent-worktree	pre_tool	edit	lib/a.ts	fenced-other-worktree	allow

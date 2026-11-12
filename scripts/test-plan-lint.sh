@@ -184,6 +184,109 @@ if [ "$status" -ne 1 ] || ! grep -q "approval is void" "$work/out"; then
   fail "an edit to a prose Approved: line did not void the approval: $status $(cat "$work/out")"
 fi
 
+run_in() {
+  dir=$1
+  shift
+  status=0
+  (cd "$dir" && "$lint" "$@") >"$work/out" 2>&1 || status=$?
+}
+
+scope_files() {
+  ls "$1/.git/countersign/scope.d" 2>/dev/null || true
+}
+
+git init -q "$work/repo"
+git -C "$work/repo" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m base
+repo_home=$(cd "$work/repo" && pwd -P)
+repo_sum=$(printf '%s' "$repo_home" | cksum | cut -d' ' -f1)
+
+sample "$work/fence.md"
+printf '\n### Slice 02: feat(auth): add the logout button\n- Scope: `src/logout/**`\n' >>"$work/fence.md"
+printf -- '- Acceptance: a\n- Evidence: b\n- Out of scope: c\n' >>"$work/fence.md"
+run approve "$work/fence.md"
+
+run_in "$work/repo" fence "$work/fence.md" 01
+scope_file="$work/repo/.git/countersign/scope.d/$repo_sum"
+if [ "$status" -ne 0 ] || ! grep -qx "plan-lint: fenced 1 slices of $work/fence.md" "$work/out"; then
+  fail "fence failed on an approved plan: $status $(cat "$work/out")"
+elif [ "$(scope_files "$work/repo")" != "$repo_sum" ]; then
+  fail "the scope file is not named by the cksum of the checkout: $(scope_files "$work/repo")"
+else
+  plan_physical=$(cd "$work" && pwd -P)/fence.md
+  for line in "plan	$plan_physical" "home	$repo_home" 'allow	^src/auth(/.*)?$' 'allow	^(.*/)?[^/]*\.test\.ts$' 'named	^package\.json$'; do
+    if ! grep -Fxq "$line" "$scope_file"; then
+      fail "the scope file lacks the line: $line"
+    fi
+  done
+  if ! grep -Eq '^approved	[0-9a-f]{64}$' "$scope_file"; then
+    fail "the scope file lacks the approved hash"
+  fi
+  if grep -q 'logout' "$scope_file"; then
+    fail "the scope file carries a line from a slice that was not fenced"
+  fi
+fi
+
+run_in "$work/repo" fence "$work/fence.md" 01 09
+if [ "$status" -ne 1 ] || ! grep -qx "plan-lint: no slice 09 in $work/fence.md" "$work/out"; then
+  fail "an unknown slice was not refused: $status $(cat "$work/out")"
+fi
+
+run_in "$work/repo" unfence
+if [ "$status" -ne 0 ] || ! grep -qx "plan-lint: unfenced" "$work/out" || [ -n "$(scope_files "$work/repo")" ]; then
+  fail "unfence left the scope file: $status $(cat "$work/out")"
+fi
+
+if [ -d "$work/repo/.git/countersign" ]; then
+  fail "unfence left the empty countersign folder behind"
+fi
+
+run_in "$work/repo" unfence
+if [ "$status" -ne 0 ] || ! grep -qx "plan-lint: no fence for this checkout" "$work/out"; then
+  fail "unfence without a fence did not say so: $status $(cat "$work/out")"
+fi
+
+sample "$work/void.md"
+run approve "$work/void.md"
+printf -- '- Acceptance: more\n' >>"$work/void.md"
+run_in "$work/repo" fence "$work/void.md" 01
+if [ "$status" -ne 1 ] || [ -n "$(scope_files "$work/repo")" ]; then
+  fail "a void plan was fenced: $status $(cat "$work/out")"
+fi
+
+mkdir "$work/plain"
+run_in "$work/plain" fence "$work/fence.md" 01
+if [ "$status" -ne 2 ] || ! grep -q "fence runs inside the checkout" "$work/out"; then
+  fail "fence outside git was not refused: $status $(cat "$work/out")"
+fi
+
+printf '# Plan\n\n### Slice 01: feat: globs\n- Scope: `a?.ts`, `src/**/x.ts`, `**`, `a+b.ts`\n' >"$work/globs.md"
+printf -- '- Acceptance: a\n- Evidence: b\n- Out of scope: c\n' >>"$work/globs.md"
+run approve "$work/globs.md"
+run_in "$work/repo" fence "$work/globs.md" 01
+for line in 'allow	^a[^/]\.ts$' 'allow	^src/(.*/)?x\.ts$' 'allow	^.*$' 'allow	^a\+b\.ts$'; do
+  if ! grep -Fxq "$line" "$scope_file"; then
+    fail "the glob did not become the pattern: $line"
+  fi
+done
+run_in "$work/repo" unfence
+
+git -C "$work/repo" worktree add -q -b other "$work/other"
+other_home=$(cd "$work/other" && pwd -P)
+other_sum=$(printf '%s' "$other_home" | cksum | cut -d' ' -f1)
+run_in "$work/repo" fence "$work/fence.md" 01
+run_in "$work/other" fence "$work/fence.md" 02
+if [ "$(scope_files "$work/repo" | wc -l | tr -d ' ')" -ne 2 ]; then
+  fail "two checkouts did not each get a scope file: $(scope_files "$work/repo")"
+fi
+run_in "$work/repo" unfence
+if [ "$(scope_files "$work/repo")" != "$other_sum" ]; then
+  fail "unfence from one checkout touched the other's file: $(scope_files "$work/repo")"
+fi
+run_in "$work/other" unfence
+if [ -n "$(scope_files "$work/repo")" ]; then
+  fail "unfence from the second checkout left a file: $(scope_files "$work/repo")"
+fi
+
 if [ "$failures" -gt 0 ]; then
   exit 1
 fi

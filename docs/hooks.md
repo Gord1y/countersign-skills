@@ -364,3 +364,62 @@ tree, like any block.
 
 Whether a builder's `SubagentStop` payload carries the worktree as `cwd`. If it carries the main
 checkout, builders pass unheld (the wall fails open). Check it once live after install.
+
+### scope
+
+`hooks/policy/scope.sh` fences the edit tools of a builder's worktree to the slices of the approved
+plan that its batch carries. The orchestrator runs `plan-lint fence <plan> <slice>...` from the
+checkout that lands the work, before it spawns the batch, and `plan-lint unfence` at the end of the
+run (`skills/orchestrate/references/plan-contract.md`).
+
+`fence` verifies the plan's approval first, then writes one scope file per fencing checkout:
+`<git-common-dir>/countersign/scope.d/<cksum of the checkout's physical path>`. Its tab separated
+lines are `plan` (the plan's physical path), `approved` (the plan's hash), `home` (the fencing
+checkout), one `allow <ERE>` per `Scope:` glob of the fenced slices and one `named <ERE>` per
+`Sensitive:` glob. `unfence` removes only its own checkout's file, and the folders when they end
+up empty, so two runs from two checkouts do not disturb each other.
+
+The wall reads `paths`, like `write`, and acts only on a path inside the session's top level. It
+reads every file in `scope.d/` and applies the first whose `home` contains the top level under
+`home/.claude/worktrees/agent-*`: a fence reaches the builders of the checkout that fenced, which
+the harness names `agent-*`, and no other linked worktree of the repo, not even one under the same
+`.claude/worktrees/`, which may be a parallel session. A path inside the top level is denied in two
+cases, both with exit 10:
+
+- No `allow` or `named` pattern matches its path relative to the top level:
+  `scope denied: <path> is outside the approved plan's scope for this batch (<plan>). Return to
+  planning: stop, and report the file and why the unit needs it.`
+- It is a sensitive surface that no `named` pattern matches: `scope denied: <path> is a sensitive
+  surface (<kind>) that the approved plan names no line for (<plan>). Return to planning: stop, and
+  report the file and why the unit needs it.` A `Scope:` glob alone never opens a sensitive
+  surface; the slice needs a `Sensitive:` line for it.
+
+The last three kinds match the file's basename. Every kind matches without regard to case, so
+`src/Package.json` and `src/.ENV` are sensitive on a case-insensitive file system too.
+
+| Kind | Matches |
+| --- | --- |
+| `migrations` | `migrations/*`, `*/migrations/*` |
+| `CI workflow` | `.github/workflows/*` |
+| `ruleset` | `.github/rulesets/*` |
+| `i18n source keys` | `messages/en.json`, `locales/en/*`, at any depth |
+| `dependencies` | Manifests and lockfiles, such as `package.json` and `go.mod`; see `scope.sh` |
+| `env and config` | `.env`, `.env.*`, `*.config.*`, `settings.json`, `settings.local.json` |
+| `API contract` | `openapi.*`, `*.openapi.*`, `swagger.*`, `*.graphql`, `*.gql`, `*.prisma` |
+
+A path outside the top level is `write`'s to judge. The wall allows, and fails open, when `paths`
+is empty, `cwd` is outside git, the session is in the main checkout, no scope file applies, the
+plan file is gone, or the plan's last `Approved:` hash differs from the `approved` line. A plan
+that is approved again after the fence therefore opens it, since the new stamp is no longer the one
+that was fenced. An edit without a new approval keeps the stamp, so the fenced globs still hold.
+
+A target that is a symbolic link is followed (up to 8 links) and its destination is judged, so a
+link inside `src/` that points at `lib/a.ts` is denied as `lib/a.ts`. A link that points outside
+the checkout is left to `write`.
+
+#### Limits
+
+- The fence reads edit tools only. A builder can still write through the shell, and can write the
+  scope file itself; the sandbox is the floor.
+- The main checkout is never fenced, so a session there is judged by `write` alone.
+- Route-handler types are not globbable. The conformance review covers them.

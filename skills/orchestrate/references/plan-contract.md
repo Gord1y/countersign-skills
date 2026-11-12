@@ -65,6 +65,18 @@ The hash covers the plan without its `Approved:` line, which is a line of the fo
 Any later edit voids the approval: show the user the change and approve again. Never edit an
 approved plan to make a landing pass.
 
+## Scope fence
+
+`plan-lint fence <plan> <id>...` runs in the landing checkout before each batch spawns, after it
+verifies the approval. From then on, the edit tools of that checkout's builders (the worktrees
+named `agent-*` under its own `.claude/worktrees/`, never another worktree there) can write only
+inside the batch's `Scope:` and `Sensitive:` globs, and a sensitive surface only where a
+`Sensitive:` glob names it. The fence is per batch: a builder can write the globs of any slice in
+the same batch, so the briefs' `Files:` lines keep the units apart. A denial tells the builder
+to stop and report the file; log it as a `parked` row. `plan-lint unfence` removes the fence at
+Step 10. A fence whose plan changed after approval fails open. The rules, the sensitive kinds and
+the limits are in `docs/hooks.md` under `### scope`.
+
 ## The decision log
 
 `decisions.tsv` in the run folder, else `~/.claude/plans/<repo>-<run>.decisions.tsv`. The header
