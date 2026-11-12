@@ -134,11 +134,9 @@ before you hand back; past 20, cut the least useful until it fits.
   (`agents/builder.md`), which carries `isolation: worktree`, and always with `model` and
   `effort`. Never cut worktrees by hand with `git worktree add`, let builders commit, or
   cherry-pick their work: that bypasses Step 8. Only when `builder` is missing (a skills-only
-  install), spawn `general-purpose` with `isolation: "worktree"` and the same `model` and `effort`;
-  the brief's standing rules already forbid committing and asking. Note which path the run uses
-  in the plan file. Check `planner`, `reviewer` and `qa` the same way for Steps 3, 7 and 9. Where
-  `planner` is missing, write the spec yourself in the main session: an `opus` `general-purpose`
-  spawn would re-read everything this session already holds.
+  install), orchestrator mode does not run: build each unit yourself, one commit each, `gate`
+  before each, and note that in the plan file. Check `planner`, `reviewer` and `qa` the same way
+  for Steps 3, 7 and 9. Where `planner` is missing, write the spec yourself in the main session.
 - The worktree is cut from your `HEAD` only under `worktree.baseRef: "head"`, which the install
   sets; without it, worktrees start from the remote default branch. Check the worktree, not the
   settings file: right after the first spawn, `git worktree list` must show the new worktree at
@@ -179,9 +177,8 @@ Every unit over about 300 changed lines, new files included, gets a `reviewer` b
 size it from `git -C <worktree> diff --stat` plus the `??` files. Spawn `reviewer`
 (`agents/reviewer.md`) with `model: "sonnet"` and `effort: "high"`, the worktree path and the
 brief's path. Read its findings and `git -C <worktree> diff --stat` instead of the whole diff, and
-open only the files a finding names. Where no `reviewer` agent is installed, spawn
-`general-purpose` with `sonnet` and `high`, and tell it to change nothing and to review with the
-`thorough-diff-review` skill.
+open only the files a finding names. Where no `reviewer` agent is installed, run
+`thorough-diff-review` yourself on `git -C <worktree> diff` and change nothing.
 
 ## Step 8: land, commit, then gate once
 

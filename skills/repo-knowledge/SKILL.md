@@ -130,8 +130,8 @@ area's report before the next.
 ## Bootstrap
 
 Run it when `docs/features/` has no nodes. It adds a CI job, so it runs only when the user asks or
-as a slice of an approved plan; an agent that finds no nodes mid-run proposes it under the plan's
-`## Waiting for you` instead.
+as a slice of an approved plan; an agent that finds no nodes mid-run proposes it as a `parked`
+row in the run's decision log instead.
 
 1. List the areas: the first-level folders under each source root, from `git ls-files`.
 2. Read each area as in Readers.

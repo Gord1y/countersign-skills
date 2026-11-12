@@ -3,12 +3,12 @@
   "skills": [
     {
       "name": "orchestrate",
-      "version": "1.7.1",
+      "version": "2.0.0",
       "agents": [
         "claude"
       ],
-      "description": "Run work of 3+ independently verifiable commits as an orchestrator: split into units, brief one builder per unit in its own worktree, land and commit each unit, gate once.",
-      "whenToUse": "Use for a task of three or more independently verifiable commits, or on request at any size.",
+      "description": "Route every task to one playbook (feature, bug-fix, refactor, investigation, prototype, UI change, release, PR triage, knowledge, unattended run); at 3+ commits, brief builders.",
+      "whenToUse": "Use for every task that changes, investigates or ships code: a feature, a bug, a refactor, how or why code works, a spike, a UI change, a release, a PR link or its findings, a knowledge-graph update, an unattended run. Not for a question answered without the repo.",
       "invocation": "model",
       "path": "skills/orchestrate"
     },
@@ -40,7 +40,7 @@
     },
     {
       "name": "retro",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "agents": [
         "claude",
         "codex",
@@ -205,7 +205,7 @@
     },
     {
       "name": "repo-knowledge",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "agents": [
         "claude",
         "codex",

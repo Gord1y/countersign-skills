@@ -9,8 +9,8 @@
   change I did not ask for that alters behaviour I would notice, or reverts earlier work, is never
   a reversible call.
 - Once I approve, don't ask again in that task: a surprise parks only its piece and comes back as ❓.
-- 3 or more independently verifiable commits: invoke `orchestrate`. Units of a few dozen lines skip
-  the builders: write them yourself, one commit each.
+- Every task that changes, investigates or ships code: invoke `orchestrate`. Builders start at 3 or
+  more independently verifiable commits.
 - Every Agent spawn names `model` and `effort`: `haiku` with `low` to search and read, `sonnet`
   with `medium` to build and QA and `high` to review, `opus` with `high` for the planner, or
   anything else only with the reason in the prompt.

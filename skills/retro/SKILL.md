@@ -79,8 +79,8 @@ One table, nothing built yet: the lesson, its evidence, the rung, the fix and th
 beside it every memory entry the fixes now cover, proposed for deletion. In an interactive
 session, ask once: build all, pick rows, or nothing. In a run past plan approval, ask nothing: build
 the rows that stay inside the run's approved scope (a test, a lint rule or a node for paths the
-run touched), and put every other row under the plan's `## Waiting for you` and into the closing
-summary.
+run touched), and put every other row into the run's decision log as a `parked` row and into the
+closing summary.
 
 ## Step 4: build and prove
 

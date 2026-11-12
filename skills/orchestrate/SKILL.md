@@ -1,13 +1,14 @@
 ---
 name: orchestrate
-description: "Run work of 3+ independently verifiable commits as an orchestrator: split into units, brief one builder per unit in its own worktree, land and commit each unit, gate once."
-when_to_use: "Use for a task of three or more independently verifiable commits, or on request at any size."
+description: "Route every task to one playbook (feature, bug-fix, refactor, investigation, prototype, UI change, release, PR triage, knowledge, unattended run); at 3+ commits, brief builders."
+when_to_use: "Use for every task that changes, investigates or ships code: a feature, a bug, a refactor, how or why code works, a spike, a UI change, a release, a PR link or its findings, a knowledge-graph update, an unattended run. Not for a question answered without the repo."
 ---
 
 # Orchestrate
 
-You brief, review, verify, land and commit. You do not write the code.
+Every task starts here: pick one playbook, copy its steps into the todo list, work through them.
 
+In orchestrator mode you brief, review, verify, land and commit, and you do not write the code.
 Builders sharing one working tree break each other's gates, and a main session that writes code
 stops reviewing. So each builder edits in its own worktree and never commits; you land its files
 on the working branch and commit them. The evidence behind each rule is in
@@ -17,10 +18,59 @@ on the working branch and commit them. The evidence behind each rule is in
 
 ## When this engages
 
-**3 or more independently verifiable commits.** Count units that can each be proven green on
-their own, not files touched. Below that, there is no orchestrator and no worktrees: do the work
-yourself. The no-writing rule is a property of orchestrator mode, not a standing ban. It also
-engages on request, at any size, or on `/orchestrate`.
+Every task that changes, investigates or ships code. A question answered without the repo needs
+no playbook. Orchestrator mode engages at 3 or more independently verifiable units where the
+`builder` agent is installed; otherwise build each slice yourself, one commit each. Count units
+that can each be proven green on their own, not files touched. It also engages on request, at any
+size, or on `/orchestrate`.
+
+## Step 0: route
+
+1. The first output line is `Goal: <one sentence, your words>. Playbook: <name>.`
+2. The first matching row wins.
+3. Copy `playbooks/<name>.md` into the todo list (TodoWrite, or Codex's plan tool).
+4. Two rows with different steps: attended, ask once and recommend one; unattended, take the
+   first and log a `call` row.
+
+| Playbook | Signals |
+| --- | --- |
+| `autonomous-run` | started unattended: a scheduled or delegated thread, a task marked ready for an agent, "run it without me" |
+| `pr-triage` | a bare PR link, review findings or failing checks on a PR |
+| `release` | cut, prepare or ship a release; a release note; a promotion or hotfix PR |
+| `investigation` | how, why, is it safe, what breaks, about this code or system; ends in a report |
+| `prototype` | a spike, a proof of concept, "try whether"; throwaway |
+| `knowledge-update` | refresh or bootstrap the knowledge graph, a glossary entry, an ADR |
+| `bug-fix` | something fails that should work: an error, a regression, a failing test or check |
+| `refactoring` | structure changes, behaviour stays: rename, extract, move, migrate callers, delete dead code |
+| `ui-change` | the point is what a user sees: layout, styling, copy, a component, a screen |
+| `feature` | new or extended behaviour; the default |
+
+## The shared steps
+
+Each playbook names these steps in this order and adds its own delta.
+
+- **restate**: Step 0's line.
+- **research**: `references/planning.md` Step 1; read `docs/knowledge/index.md` first and put its
+  path in every spawn.
+- **grill**: every open question at once, each with options and a recommended answer.
+- **slice**: vertical, prefactor first, expand then contract, blockers first, at most 400 lines
+  each, stacked PRs past one.
+- **approve**: `plan-lint check`, the user's yes, `plan-lint approve`, and no question after it.
+  One slice with no load-bearing question skips the plan.
+- **build**: per When this engages; fence each batch (`references/orchestrator-mode.md` Step 6).
+- **knowledge**: `repo-knowledge` "Update and lint" for touched paths, before prove so the gate
+  covers it; `skip: no docs/knowledge/index.md`.
+- **prove**: `gate` passes; a fix lands with a test that failed first; `qa` or `qa-tester` per
+  surface; a UI diff gets a `walkthrough`.
+- **review**: `conformance` per the orchestration rule's routing table; an unplanned file keeps
+  the PR in draft.
+- **pr**: `feature-pr-description` writes `pr.md`; give the push commands, never push.
+- **clickup**: `skip: no ClickUp task` until a task id is known.
+- **retro**: `retro` after a user correction, a failed gate, a revert or a parked unit, else
+  `skip: clean run`.
+
+A skipped step stays in the todo list as `skip: <reason>`. The closing report counts steps done
+and skipped.
 
 ## Repo facts
 
@@ -37,7 +87,7 @@ to add to CLAUDE.md.
 ## The steps
 
 Steps 1 and 2, research and the approved plan: `references/planning.md`. Steps 3 to 10, builders
-to close: `references/orchestrator-mode.md`.
+to close: `references/orchestrator-mode.md`. Read the second only in orchestrator mode.
 
 ## Reporting
 

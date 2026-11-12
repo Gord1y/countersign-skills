@@ -43,8 +43,8 @@ npx skills add Gord1y/countersign-skills
 ```
 
 It installs from the default branch, `main`, which moves only at releases. `orchestrate` still
-works this way: it carries `land-worktree` and `remove-worktree` in its own `scripts/`, and falls back to
-`general-purpose` subagents when no `builder` agent is installed.
+works this way: it carries `land-worktree` and `remove-worktree` in its own `scripts/`, and
+builds each unit in the main session when no `builder` agent is installed.
 
 **3. Countersign.** Planned for Countersign 0.3.0, not released yet. Its Skills pane will download
 a pinned release, verify its `.sha256`, and list `catalog.json`.
@@ -73,10 +73,10 @@ has, so those two rules stay out of both. For Codex the installer also writes a 
 
 | Skill | What it does | Agents |
 | --- | --- | --- |
-| `orchestrate` | Splits a multi-commit task into units and runs one builder subagent per unit, then QAs every surface the run touched and leaves a local walkthrough. | Claude Code |
+| `orchestrate` | The entry point for every task: picks one of ten playbooks; at 3 or more commits runs a builder per unit. | Claude Code |
 | `context-transfer` | Packs a conversation into one self-contained block for a new chat. | Claude Code, Codex, Antigravity |
 | `human-voice-writing` | Drafts and revises longer text so it reads as human, not AI-generated. | Claude Code, Codex, Antigravity |
-| `retro` | Turns a session's mistakes into structure, not notes: each lesson goes to the highest rung that works, and its fix is proven on the real mistake. Orchestrate runs it after a run with a correction or a failed gate. | Claude Code, Codex, Antigravity |
+| `retro` | Turns a session's mistakes into structure, not notes: each lesson goes to the highest rung that works, and its fix is proven on the real mistake. Orchestrate runs it after a correction, failed gate, revert or parked unit. | Claude Code, Codex, Antigravity |
 | `codebase-research` | Picks the cheapest way to research code, with an explicit model on any spawn. | Claude Code, Codex |
 | `release-notes` | Writes release note entries, keeps an open note in step with its branch, and keeps the release index current. | Claude Code, Codex, Antigravity |
 | `feature-pr-description` | Writes the body of a feature or fix PR to the repo's description contract. | Claude Code, Codex, Antigravity |

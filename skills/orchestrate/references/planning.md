@@ -5,10 +5,10 @@ Read this at a playbook's plan step.
 ## Step 1: gather facts, cheaply
 
 Fewer than about 3 lookups in files you know: read them yourself. Otherwise spawn `researcher`
-(`agents/researcher.md`, `haiku`, effort `low`) for search, or a read-only `general-purpose` agent
-with `sonnet` and effort `medium` for judgement across many files. Always pass `model` and
-`effort`, and ask for at most 30 lines back: paths with line ranges and the facts, never file
-contents. Where no `researcher` agent is installed, use `Explore` with `haiku` and `low`.
+(`agents/researcher.md`, `haiku`, effort `low`) for search, and do judgement across many files
+yourself, by range. Always pass `model` and `effort`, and ask for at most 30 lines back: paths
+with line ranges and the facts, never file contents. Where no `researcher` agent is installed,
+use `Explore` with `haiku` and `low`.
 
 ## Step 2: one plan file, every question in it, then one approval
 
