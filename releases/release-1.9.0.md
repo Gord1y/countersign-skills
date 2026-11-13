@@ -26,9 +26,13 @@ testedWith:
 - **`gh`, and git through it, uses that app in Claude Code and Codex sessions.** List an owner in
   `agent-gh-apps.tsv` in your profile. Agents then push and open pull requests as the app for every
   call tied to a repo, whether it comes from the checkout, `-R`, `--repo`, `GH_REPO` or a repo
-  argument such as `gh repo clone acme/y`. A repo value it cannot read stops the call instead of
-  running as you. The app has no administration rights and no bypass, so GitHub refuses its pushes
-  to protected branches. Your own terminal keeps your account. See `docs/gh.md`.
+  argument such as `gh repo clone acme/y`. In an agent session the call stops instead of running
+  as you when `-R` or `--repo` is empty or cannot be read, or when a `gh repo` call names two
+  different repos, as in `gh repo edit --homepage https://github.com/other/z acme/y`: pass
+  `-R OWNER/REPO` then. Only a `github.com` repo counts as a repo argument, so a URL on another
+  host, such as a `--homepage` value, is never the target, and nothing after `--` counts. The app
+  has no administration rights and no bypass, so GitHub refuses its pushes to protected branches.
+  Your own terminal keeps your account. See `docs/gh.md`.
 
 ## Changed
 
