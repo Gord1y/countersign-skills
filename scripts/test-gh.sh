@@ -217,6 +217,27 @@ agent_in "$work/plain" gh repo create newname
 agent_in "$work/company" gh repo view other/z
 [ "$(cat "$work/out")" = "token=token-other-user args=repo view other/z" ] || fail "a positional repo did not beat origin: $(cat "$work/out")"
 
+for empty_flag in --repo= -R --repo; do
+  status=0
+  (cd "$work/company" && CLAUDECODE=1 HOME="$work/home" PATH="$work/wrap:$work/app:$work/stub:/usr/bin:/bin" gh pr list "$empty_flag") >"$work/out" 2>"$work/err" || status=$?
+  if [ "$status" -ne 1 ]; then
+    fail "pr list $empty_flag in an agent session exited $status, not 1"
+  elif [ -s "$work/out" ]; then
+    fail "the real gh ran on pr list $empty_flag: $(cat "$work/out")"
+  elif ! grep -qF "gh: cannot read a repo from \"$empty_flag\"" "$work/err"; then
+    fail "pr list $empty_flag was not reported: $(cat "$work/err")"
+  fi
+  run_gh "$work/plain" pr list "$empty_flag" || true
+  [ "$(cat "$work/out")" = "token=none args=pr list $empty_flag" ] || fail "pr list $empty_flag outside an agent session did not pass through: $(cat "$work/out")"
+done
+
+agent_in "$work/plain" gh repo view --json name acme/y
+[ "$(cat "$work/out")" = "token=app-token args=repo view --json name acme/y" ] || fail "repo view --json name acme/y did not use the app: $(cat "$work/out")"
+[ "$(cat "$work/app/repo" 2>/dev/null)" = acme/y ] || fail "repo view --json name acme/y did not pass acme/y to agent-gh-token"
+
+agent_in "$work/plain" gh repo view --json name
+[ "$(cat "$work/out")" = "token=none args=repo view --json name" ] || fail "repo view --json name did not pass through: $(cat "$work/out")"
+
 if [ "$failures" -gt 0 ]; then
   exit 1
 fi

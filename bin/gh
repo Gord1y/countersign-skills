@@ -104,6 +104,7 @@ reject_target() {
 }
 
 explicit=
+flag_seen=
 want_value=
 for arg in "$@"; do
   if [ -n "$want_value" ]; then
@@ -113,11 +114,23 @@ for arg in "$@"; do
   fi
   case $arg in
     --) break ;;
-    -R | --repo) want_value=yes ;;
-    -R?*) explicit=${arg#-R} ;;
-    --repo=*) explicit=${arg#--repo=} ;;
+    -R | --repo)
+      flag_seen=$arg
+      want_value=yes
+      ;;
+    -R?*)
+      flag_seen=$arg
+      explicit=${arg#-R}
+      ;;
+    --repo=*)
+      flag_seen=$arg
+      explicit=${arg#--repo=}
+      ;;
   esac
 done
+if [ -n "$flag_seen" ] && [ -z "$explicit" ]; then
+  reject_target "$flag_seen" "$@"
+fi
 
 positional=
 if [ -z "$explicit" ] && [ "${1:-}" = repo ]; then
@@ -126,10 +139,13 @@ if [ -z "$explicit" ] && [ "${1:-}" = repo ]; then
     position=$((position + 1))
     [ "$position" -gt 2 ] || continue
     case $arg in
+      --) break ;;
       -*) continue ;;
     esac
-    positional=$arg
-    break
+    if parse_positional "$arg"; then
+      positional=$arg
+      break
+    fi
   done
 fi
 
