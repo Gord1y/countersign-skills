@@ -27,7 +27,7 @@ The account must be signed in to `gh` (`gh auth login`). The token comes from
 
 - `GH_TOKEN` is set and not empty.
 - The first argument is `auth`, except `auth git-credential`, which gets the mapped token.
-- The map file is missing.
+- The map file is missing and no app row applies.
 - The current directory is not in a git work tree.
 - `git remote get-url origin` fails.
 - The origin host is not `github.com`.
@@ -61,6 +61,32 @@ done
 git runs the helper in the repo, so it gets the token of the account mapped to `origin`'s owner.
 Running `gh auth setup-git` again puts the real `gh` back.
 
+## Agent sessions and a GitHub App
+
+In a Claude Code or Codex session (`CLAUDECODE` or `CODEX_THREAD_ID` set), an owner listed in the
+profile's `agent-gh-apps.tsv` gets a 1h installation token of that GitHub App instead of the
+account token. `bin/agent-gh-token` signs the app's JWT, asks GitHub for an installation token
+scoped to origin's repo, and runs the real `gh` with it as `GH_TOKEN`. Git's credential helper is
+this wrapper, so pushes use the app too.
+
+Agents therefore push and open PRs as the app. The app has no administration permission and no
+bypass, so GitHub refuses its pushes to protected branches. Your own terminal sets neither
+variable and keeps your account.
+
+`${XDG_CONFIG_HOME:-$HOME/.config}/countersign/profile/agent-gh-apps.tsv`, one line per owner,
+`owner<TAB>app id<TAB>private key path`. A leading `~/` in the path is allowed.
+
+```
+acme	123	~/.config/agent-keys/acme.pem
+```
+
+- The key stays outside every git work tree. `agent-gh-token` refuses a key inside a repo.
+- `agent-gh-token` needs `openssl`, `curl` and `jq`.
+- Where the app is not installed on the repo, `gh` fails in agent sessions. Install the app on
+  every repo agents work in.
+- A preset `GH_TOKEN` and `gh auth` (except `auth git-credential`) stay untouched.
+- If `agent-gh-token` is not on `PATH`, the wrapper exits 1 and tells you to run `install.sh`.
+
 ## Limits
 
 - Inside a sandbox that blocks the keychain, `gh` has no token either way, and the wrapper prints
@@ -71,3 +97,4 @@ Running `gh auth setup-git` again puts the real `gh` back.
 ## Test
 
 `scripts/test-gh.sh` runs the wrapper against a stub `gh` and a scratch home.
+`scripts/test-agent-gh-token.sh` runs `bin/agent-gh-token` against a stub `curl`.
