@@ -532,6 +532,21 @@ for fixture in "$@"; do
   run_fixture "$fixture" "$work/real/$name" "$root/hooks/fixtures"
 done
 
+message_repo=$work/message-repo
+message_home=$work/message-home
+mkdir -p "$message_repo" "$message_home/.config/countersign/profile"
+git init -q "$message_repo"
+message_repo=$(cd "$message_repo" && pwd -P)
+printf '%s\n' "$message_repo" >"$message_home/.config/countersign/profile/worktree-only.tsv"
+write_event=$(jq -nc --arg cwd "$message_repo" --arg path "$message_repo/src/x" '
+  {provider: "claude", event: "pre_tool", tool: "edit", tool_name: "Edit", command: "", paths: [$path],
+   cwd: $cwd, session_id: "s1", subagent: false, stop_hook_active: false}')
+message=$(printf '%s' "$write_event" | HOME=$message_home XDG_CONFIG_HOME=$message_home/.config sh "$root/hooks/policy/write.sh" 2>/dev/null) || true
+case $message in
+  *"git worktree add -b <branch> $message_repo/.claude/worktrees/<name>"*"EnterWorktree"*) ;;
+  *) fail "the worktree-only message does not name the way out: $message" ;;
+esac
+
 if [ "$failures" -gt 0 ]; then
   exit 1
 fi

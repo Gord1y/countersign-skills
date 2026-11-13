@@ -20,5 +20,5 @@ gate-subagent-edited-blocked	subagent_stop	-	-	wt-edited	deny
 gate-deleted-blocked	stop	-	-	deleted	deny
 gate-committed-blocked	stop	-	-	committed	deny
 gate-agents-only-unstamped-blocked	stop	-	-	agents-only-unstamped	deny
-gate-subagent-no-line-blocked	subagent_stop	-	-	wt-no-line	deny
+gate-subagent-no-line-allowed	subagent_stop	-	-	wt-no-line	allow
 gate-repeat-allowed	stop	-	-	blocked-before	allow

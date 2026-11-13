@@ -122,10 +122,9 @@ if [ -n "$instruction_file" ]; then
 fi
 
 if [ -z "$command" ]; then
-  if [ "$subagent" != true ]; then
-    [ ! -f "$told" ] || exit 0
-    mkdir -p "$sessions" && : >"$told"
-  fi
+  [ "$subagent" != true ] || exit 0
+  [ ! -f "$told" ] || exit 0
+  mkdir -p "$sessions" && : >"$told"
   mark_blocked
   printf 'Gate: %s has no gate line. Add one line under "## Gates" in %s, in the form "gate: <command that runs all of the repo'"'"'s gates>". Then run `gate`.\n' "$name" "$name"
   exit 10

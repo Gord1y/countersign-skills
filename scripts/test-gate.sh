@@ -226,11 +226,12 @@ commit_all "$work/sequence" base
 
 policy_session=q1
 policy_repo=$work/sequence
+policy_subagent=false
 
 policy_event() {
-  jq -nc --arg kind "$1" --arg cwd "$policy_repo" --arg id "$policy_session" '
+  jq -nc --arg kind "$1" --arg cwd "$policy_repo" --arg id "$policy_session" --arg subagent "$policy_subagent" '
     {provider: "claude", event: $kind, tool: (if $kind == "stop" then "none" else "shell" end),
-     tool_name: "", command: "", paths: [], cwd: $cwd, session_id: $id, subagent: false,
+     tool_name: "", command: "", paths: [], cwd: $cwd, session_id: $id, subagent: ($subagent == "true"),
      stop_hook_active: false}'
 }
 
@@ -271,6 +272,28 @@ run_policy pre_tool
 echo two >"$work/ignored-worktrees/a.txt"
 run_policy stop
 [ "$policy_status" -eq 10 ] || fail "stop with an ignored .claude/worktrees: expected exit 10, got $policy_status"
+
+new_repo no-gate-line
+printf '## Rules\n\nnothing\n' >"$work/no-gate-line/CLAUDE.md"
+commit_all "$work/no-gate-line" base
+git -C "$work/no-gate-line" worktree add -q -b builder "$work/no-gate-line-wt"
+echo two >"$work/no-gate-line-wt/a.txt"
+policy_session=q3
+policy_repo=$work/no-gate-line-wt
+policy_subagent=true
+run_policy stop
+[ "$policy_status" -eq 0 ] || fail "subagent stop with no gate line: expected exit 0, got $policy_status"
+
+policy_session=q4
+policy_repo=$work/no-gate-line
+policy_subagent=false
+run_policy pre_tool
+echo two >"$work/no-gate-line/a.txt"
+run_policy stop
+[ "$policy_status" -eq 10 ] || fail "main stop with no gate line: expected exit 10, got $policy_status"
+expect_in "main stop with no gate line" "$work/policy-out" "no gate line"
+run_policy stop
+[ "$policy_status" -eq 0 ] || fail "second main stop with no gate line: expected exit 0, got $policy_status"
 
 [ -z "$(ls -A "$work/tmp")" ] || fail "temporary files were left in TMPDIR: $(ls -A "$work/tmp")"
 

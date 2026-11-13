@@ -95,8 +95,8 @@ for path in $paths; do
     continue
   fi
   if within "$target" "$top"; then
-    if [ "$worktree_only" = yes ]; then
-      echo "write denied: $top is worktree-only. Work in a worktree under .claude/worktrees/."
+    if [ "$worktree_only" = yes ] && ! within "$target" "$top/writeups"; then
+      echo "write denied: $top is worktree-only. Make a worktree with \`git worktree add -b <branch> $top/.claude/worktrees/<name>\` or the EnterWorktree tool, then write there by absolute path."
       exit 10
     fi
     continue
