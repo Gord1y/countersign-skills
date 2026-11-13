@@ -33,6 +33,8 @@ testedWith:
 - **Work in another repo you develop starts in a new T3 Code thread in that repo.** The
   `orchestration` rule starts it without asking, and the `issues-found` rule sends a defect found
   there the same way. A repo owned by another team still gets only a note for that team.
+- **Under T3 Code, builders and translators now run on Claude.** Codex only reviews Claude-written
+  code, so every review comes from the other model family.
 - **The write wall tells an agent how to get out.** In a worktree-only repo, a denied write now
   names the `git worktree add` command and the `EnterWorktree` tool.
 - **The main checkout's `writeups/` stays writable in a worktree-only repo.** Evidence and briefs
