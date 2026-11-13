@@ -251,6 +251,11 @@ the scratchpad or `$TMPDIR` (the hook tests do) is fenced to its repo, not to it
 Anything else is denied with `write denied: <path> is outside this repo (<top>). Write inside the
 repo, ~/.claude/plans, the scratchpad or writeups/.`
 
+A path with a `..` component is denied first, with `write denied: <path> has a .. component; write
+by its absolute path without one.` The adapter already folds `..` away, so this only guards a
+policy run on its own. A path that ends in a symlink is followed, with `readlink`, before the check,
+so a link under `writeups/` that points into the checkout is judged by its target.
+
 #### The worktree-only list
 
 A repo can be edited only from a worktree when its main checkout is listed in
@@ -259,12 +264,13 @@ absolute path per line, the repo's main checkout; a leading `~/` is the home dir
 and lines starting with `#` are skipped, and a missing file lists no repo.
 
 When the session's top level is a listed main checkout, every path under it is denied with
-`write denied: <top> is worktree-only. Work in a worktree under .claude/worktrees/.` A linked
-worktree of that repo is not the main checkout, so it is fenced like any other repo. The other
-allowed places stay open.
+``write denied: <top> is worktree-only. Make a worktree with `git worktree add -b <branch> <top>/.claude/worktrees/<name>` or the EnterWorktree tool, then write there by absolute path.`` The
+main checkout's `writeups/` stays writable: it is gitignored, has no worktree copy, and the rules
+send evidence and briefs there. A linked worktree of that repo is not the main checkout, so it is
+fenced like any other repo. The other allowed places stay open.
 
-`countersign-profile` stays off the list: its release branch is the live profile, so its main
-checkout is where its edits take effect.
+A profile repo whose release branch is the live profile stays off the list: its main checkout is
+where its edits take effect.
 
 #### Limits
 
@@ -357,8 +363,8 @@ again passes.
 
 A repo with no gate line is not blocked for good: the main session gets one block per session and
 provider that names the line to add, then passes. The marker is
-`<git-dir>/countersign/sessions/<session_id>.<provider>.told`. A builder gets the message once per
-tree, like any block.
+`<git-dir>/countersign/sessions/<session_id>.<provider>.told`. A `SubagentStop` never blocks on a
+missing gate line: a builder cannot edit `CLAUDE.md`, which is outside its unit.
 
 #### Unverified
 

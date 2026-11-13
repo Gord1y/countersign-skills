@@ -59,30 +59,7 @@ repairing drift the checks found, and the check output names the locales it is u
 dispatching the others spends a full context each to confirm there is nothing to do. Never dispatch
 a locale you cannot name a reason for.
 
-Pick the route once per run, before the first dispatch, and name it in the report.
-
-**Under T3 Code, a codex model.** The model is the translation row of the routing table in the
-global rules (`rules/orchestration.md`) when that rule is installed, and `gpt-6.1-terra` with
-`reasoningEffort: "low"` otherwise. Detect T3 at runtime; never assume it:
-
-1. Load `mcp__t3-code__orchestrator_capabilities` and `mcp__t3-code__delegate_task` with
-   ToolSearch (`select:` and both names). If either does not load, take the Claude Code route.
-2. Call `orchestrator_capabilities` once, with `search` set to the model id. Take this route only
-   when `providers` holds `providerInstanceId: "codex"` with `canRunChildTask: true`, an empty
-   `constraints` list, and the model in its `models`.
-3. Dispatch every locale in one message, one `delegate_task` each: `mode: "wait"`,
-   `isolation: "shared"`, `role: "implementation"`, a `title` naming the locale, and
-   `target: {providerInstanceId: "codex", model: "<model>", options: {reasoningEffort: "low"}}`.
-   The `task` is the whole per-locale brief from section 3. The child sees only that text: no
-   history and no skill folder.
-4. A locale whose `delegate_task` errors, or returns before its child finished, goes to the
-   Claude Code route. `task_cancel` a child still running first, so two translators never write
-   one file.
-
-T3 tools that load while codex is disabled or the model is missing are not an error: take the
-Claude Code route and report `T3 route unavailable: <reason>`.
-
-**Claude Code, outside T3 or on fallback.** Spawn one subagent per locale with the `Agent` tool,
+**Claude Code.** Spawn one subagent per locale with the `Agent` tool,
 all in one message: `subagent_type: "general-purpose"`, `model: "haiku"`, `effort: "low"`. Every
 `Agent` call MUST pass `run_in_background: false`. Subagents run in the background by default,
 and a backgrounded subagent reports back only on a later turn.
@@ -106,8 +83,7 @@ wrong checkout from a relative path, and every one of them reported success.
 Tell each subagent it may read exactly these, each named absolutely:
 
 - the translation and JSON rules, read first: on the Claude Code route the file
-  `${CLAUDE_SKILL_DIR}/references/subagent-rules.md`; on the T3 route that file's full text, pasted
-  into the task under a "## Rules" heading, because a T3 child has no skill folder
+  `${CLAUDE_SKILL_DIR}/references/subagent-rules.md`
 - `<root>/<source-folder>/<file>`: the English source
 - `<root>/<messages-folder>/<its-locale>/<file>`: its own current translations
 - `<root>/<glossary-file>`: terminology, never-translate list, typography
@@ -151,8 +127,7 @@ that is a human's call: the glossary and the script are edited together, never o
 
 ## 5. Report
 
-Say which route ran (the T3 model, or Haiku and why T3 was not used), which locales you
-dispatched and why, what the translation check finally reported, and every remaining failure you
+Say which locales you dispatched and why, what the translation check finally reported, and every remaining failure you
 chose not to force. A locale nobody can read is only as trustworthy as the account you give of it.
 
 If `local.md` exists next to this file, read it; where it disagrees with this file, it wins.

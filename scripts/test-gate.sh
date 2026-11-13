@@ -196,16 +196,58 @@ run_gate "$work/nested"
 expect_status "nested worktree" 0
 [ "$(stamp_names "$work/nested")" = "$(tree_of_head "$work/nested")" ] || fail "nested worktree: it changed the hash"
 
+new_repo ignored-worktrees
+write_gates "$work/ignored-worktrees" true
+printf '.claude/worktrees/\n' >"$work/ignored-worktrees/.gitignore"
+commit_all "$work/ignored-worktrees" base
+mkdir -p "$work/ignored-worktrees/.claude/worktrees/agent-x"
+echo x >"$work/ignored-worktrees/.claude/worktrees/agent-x/f"
+run_gate "$work/ignored-worktrees"
+expect_status "ignored .claude/worktrees" 0
+[ "$(stamp_names "$work/ignored-worktrees")" = "$(tree_of_head "$work/ignored-worktrees")" ] || fail "ignored .claude/worktrees: the stamp is not HEAD^{tree}"
+
+new_repo tracked-worktrees
+write_gates "$work/tracked-worktrees" true
+commit_all "$work/tracked-worktrees" base
+mkdir -p "$work/tracked-worktrees/.claude/worktrees/agent-x"
+echo x >"$work/tracked-worktrees/.claude/worktrees/agent-x/f"
+run_gate "$work/tracked-worktrees"
+expect_status "unignored .claude/worktrees" 0
+stamp_before=$(stamp_names "$work/tracked-worktrees")
+[ "$stamp_before" = "$(tree_of_head "$work/tracked-worktrees")" ] || fail "unignored .claude/worktrees: the stamp is not HEAD^{tree}"
+echo y >"$work/tracked-worktrees/.claude/worktrees/agent-x/f"
+run_gate "$work/tracked-worktrees"
+expect_status "unignored .claude/worktrees, changed" 0
+[ "$(stamp_names "$work/tracked-worktrees")" = "$stamp_before" ] || fail "unignored .claude/worktrees: a change inside it changed the stamped tree"
+
+for ignored in yes no; do
+  repo=$work/real-worktree-$ignored
+  new_repo "real-worktree-$ignored"
+  write_gates "$repo" true
+  [ "$ignored" = no ] || printf '.claude/worktrees/\n' >"$repo/.gitignore"
+  commit_all "$repo" base
+  git -C "$repo" worktree add -q .claude/worktrees/w1 -b w1
+  echo more >"$repo/.claude/worktrees/w1/b.txt"
+  git -C "$repo/.claude/worktrees/w1" add b.txt
+  git -C "$repo/.claude/worktrees/w1" commit -q -m inner
+  echo dirty >"$repo/.claude/worktrees/w1/untracked.txt"
+  run_gate "$repo"
+  expect_status "real linked worktree, ignored=$ignored" 0
+  [ "$(stamp_names "$repo")" = "$(tree_of_head "$repo")" ] || fail "real linked worktree, ignored=$ignored: the stamp is not the tree without .claude/worktrees"
+done
+
 new_repo sequence
 write_gates "$work/sequence" true
 commit_all "$work/sequence" base
 
 policy_session=q1
+policy_repo=$work/sequence
+policy_subagent=false
 
 policy_event() {
-  jq -nc --arg kind "$1" --arg cwd "$work/sequence" --arg id "$policy_session" '
+  jq -nc --arg kind "$1" --arg cwd "$policy_repo" --arg id "$policy_session" --arg subagent "$policy_subagent" '
     {provider: "claude", event: $kind, tool: (if $kind == "stop" then "none" else "shell" end),
-     tool_name: "", command: "", paths: [], cwd: $cwd, session_id: $id, subagent: false,
+     tool_name: "", command: "", paths: [], cwd: $cwd, session_id: $id, subagent: ($subagent == "true"),
      stop_hook_active: false}'
 }
 
@@ -239,6 +281,47 @@ run_policy pre_tool
 run_policy stop
 [ "$policy_status" -eq 0 ] || fail "unsafe session id: expected exit 0, got $policy_status"
 [ ! -e "$work/sequence/.git/countersign/x" ] || fail "unsafe session id: a file escaped the sessions folder"
+
+policy_session=q2
+policy_repo=$work/ignored-worktrees
+run_policy pre_tool
+echo two >"$work/ignored-worktrees/a.txt"
+run_policy stop
+[ "$policy_status" -eq 10 ] || fail "stop with an ignored .claude/worktrees: expected exit 10, got $policy_status"
+
+new_repo no-gate-line
+printf '## Rules\n\nnothing\n' >"$work/no-gate-line/CLAUDE.md"
+commit_all "$work/no-gate-line" base
+git -C "$work/no-gate-line" worktree add -q -b builder "$work/no-gate-line-wt"
+echo two >"$work/no-gate-line-wt/a.txt"
+policy_session=q3
+policy_repo=$work/no-gate-line-wt
+policy_subagent=true
+run_policy stop
+[ "$policy_status" -eq 0 ] || fail "subagent stop with no gate line: expected exit 0, got $policy_status"
+
+policy_session=q4
+policy_repo=$work/no-gate-line
+policy_subagent=false
+run_policy pre_tool
+echo two >"$work/no-gate-line/a.txt"
+run_policy stop
+[ "$policy_status" -eq 10 ] || fail "main stop with no gate line: expected exit 10, got $policy_status"
+expect_in "main stop with no gate line" "$work/policy-out" "no gate line"
+run_policy stop
+[ "$policy_status" -eq 0 ] || fail "second main stop with no gate line: expected exit 0, got $policy_status"
+
+new_repo policy-real-worktree
+write_gates "$work/policy-real-worktree" true
+commit_all "$work/policy-real-worktree" base
+git -C "$work/policy-real-worktree" worktree add -q .claude/worktrees/w1 -b w1
+echo dirty >"$work/policy-real-worktree/.claude/worktrees/w1/untracked.txt"
+policy_session=q5
+policy_repo=$work/policy-real-worktree
+run_policy pre_tool
+echo two >"$work/policy-real-worktree/a.txt"
+run_policy stop
+[ "$policy_status" -eq 10 ] || fail "stop with a real linked worktree under .claude/worktrees: expected exit 10, got $policy_status"
 
 [ -z "$(ls -A "$work/tmp")" ] || fail "temporary files were left in TMPDIR: $(ls -A "$work/tmp")"
 

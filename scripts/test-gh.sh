@@ -6,7 +6,7 @@ work=$(mktemp -d "${TMPDIR:-/tmp}/test-gh.XXXXXX")
 trap 'rm -rf "$work"' EXIT
 failures=0
 
-unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GH_TOKEN XDG_CONFIG_HOME
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GH_TOKEN XDG_CONFIG_HOME CLAUDECODE CODEX_THREAD_ID
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 export GIT_AUTHOR_NAME=Test GIT_AUTHOR_EMAIL=test@example.com
 export GIT_COMMITTER_NAME=Test GIT_COMMITTER_EMAIL=test@example.com
@@ -16,7 +16,7 @@ fail() {
   failures=$((failures + 1))
 }
 
-mkdir -p "$work/wrap" "$work/stub" "$work/home/.config/countersign/profile" "$work/plain"
+mkdir -p "$work/app" "$work/wrap" "$work/stub" "$work/home/.config/countersign/profile" "$work/plain"
 ln -s "$root/bin/gh" "$work/wrap/gh"
 cat >"$work/stub/gh" <<'STUB'
 #!/bin/sh
@@ -25,20 +25,40 @@ if [ "${1:-}" = auth ] && [ "${2:-}" = token ] && [ "${3:-}" = -u ]; then
   echo "token-$4"
   exit 0
 fi
+if [ "${1:-}" = auth ] && [ "${2:-}" = git-credential ]; then
+  read -r first || first=
+  echo "token=${GH_TOKEN:-none} args=$* stdin=$first"
+  exit 0
+fi
 echo "token=${GH_TOKEN:-none} args=$*"
 STUB
 chmod 755 "$work/stub/gh"
 
+cat >"$work/app/agent-gh-token" <<'STUB'
+#!/bin/sh
+if [ "${1:-}" = --repo ]; then
+  printf '%s\n' "$2" >"$(dirname "$0")/repo"
+  shift 2
+fi
+GH_TOKEN=app-token
+export GH_TOKEN
+exec "$@"
+STUB
+chmod 755 "$work/app/agent-gh-token"
+
+apps_file="$work/home/.config/countersign/profile/agent-gh-apps.tsv"
+printf 'acme\t1\t/nonexistent.pem\n' >"$apps_file"
+
 map_file="$work/home/.config/countersign/profile/gh-accounts.tsv"
-printf 'Gord1y\tGord1y\nfreedomseeker-ai\tdanylo-freedomseeker\n\ngone\tmissing\n' >"$map_file"
+printf 'solo\tsolo-user\nother\tother-user\nacme\tacme-bot\n\ngone\tmissing\n' >"$map_file"
 
 make_repo() {
   git init -q -b main "$work/$1"
   git -C "$work/$1" remote add origin "$2"
 }
 
-make_repo mine git@github.com:Gord1y/x.git
-make_repo company https://github.com/Freedomseeker-AI/y.git
+make_repo mine git@github.com:solo/x.git
+make_repo company https://github.com/Acme/y.git
 make_repo other https://github.com/someone-else/z
 make_repo gone https://github.com/gone/w.git
 
@@ -48,14 +68,20 @@ run_gh() {
   (cd "$dir" && HOME="$work/home" PATH="$work/wrap:$work/stub:/usr/bin:/bin" gh "$@") >"$work/out" 2>"$work/err"
 }
 
+run_agent_gh() {
+  dir=$1
+  shift
+  (cd "$dir" && CLAUDECODE=1 HOME="$work/home" PATH="$work/wrap:$work/app:$work/stub:/usr/bin:/bin" gh "$@") >"$work/out" 2>"$work/err"
+}
+
 if ! run_gh "$work/mine" pr list --limit 1; then
   fail "an ssh origin failed: $(cat "$work/err")"
-elif [ "$(cat "$work/out")" != "token=token-Gord1y args=pr list --limit 1" ]; then
-  fail "an ssh origin did not pick the Gord1y token: $(cat "$work/out")"
+elif [ "$(cat "$work/out")" != "token=token-solo-user args=pr list --limit 1" ]; then
+  fail "an ssh origin did not pick the solo-user token: $(cat "$work/out")"
 fi
 
 run_gh "$work/company" pr list || true
-[ "$(cat "$work/out")" = "token=token-danylo-freedomseeker args=pr list" ] || fail "an https origin did not match its owner case-insensitively: $(cat "$work/out")"
+[ "$(cat "$work/out")" = "token=token-acme-bot args=pr list" ] || fail "an https origin did not match its owner case-insensitively: $(cat "$work/out")"
 
 run_gh "$work/other" pr list || true
 [ "$(cat "$work/out")" = "token=none args=pr list" ] || fail "an owner outside the map did not pass through: $(cat "$work/out")"
@@ -71,8 +97,8 @@ mv "$map_file.off" "$map_file"
 run_gh "$work/mine" auth status || true
 [ "$(cat "$work/out")" = "token=none args=auth status" ] || fail "gh auth did not pass through untouched: $(cat "$work/out")"
 
-run_gh "$work/mine" auth git-credential get || true
-[ "$(cat "$work/out")" = "token=token-Gord1y args=auth git-credential get" ] || fail "gh auth git-credential did not get the mapped token: $(cat "$work/out")"
+printf 'protocol=https\nhost=github.com\n\n' | run_gh "$work/mine" auth git-credential get || true
+[ "$(cat "$work/out")" = "token=token-solo-user args=auth git-credential get stdin=protocol=https" ] || fail "gh auth git-credential did not get the mapped token: $(cat "$work/out")"
 
 run_gh "$work/plain" pr list || true
 [ "$(cat "$work/out")" = "token=none args=pr list" ] || fail "a directory outside git did not pass through: $(cat "$work/out")"
@@ -92,6 +118,148 @@ if [ "$status" -ne 127 ]; then
 elif ! grep -q "no gh found on PATH besides this wrapper" "$work/err"; then
   fail "the missing gh was not reported: $(cat "$work/err")"
 fi
+
+run_agent_gh "$work/company" pr list || true
+[ "$(cat "$work/out")" = "token=app-token args=pr list" ] || fail "an agent session did not get the app token: $(cat "$work/out")"
+
+(cd "$work/company" && CODEX_THREAD_ID=t1 HOME="$work/home" PATH="$work/wrap:$work/app:$work/stub:/usr/bin:/bin" gh pr list) >"$work/out" 2>"$work/err" || true
+[ "$(cat "$work/out")" = "token=app-token args=pr list" ] || fail "a Codex session did not get the app token: $(cat "$work/out")"
+
+(cd "$work/company" && HOME="$work/home" PATH="$work/wrap:$work/app:$work/stub:/usr/bin:/bin" gh pr list) >"$work/out" 2>"$work/err" || true
+[ "$(cat "$work/out")" = "token=token-acme-bot args=pr list" ] || fail "a session without an agent marker did not keep the account token: $(cat "$work/out")"
+
+run_agent_gh "$work/mine" pr list || true
+[ "$(cat "$work/out")" = "token=token-solo-user args=pr list" ] || fail "an owner without an app row did not keep the account token: $(cat "$work/out")"
+
+printf 'protocol=https\nhost=github.com\n\n' | run_agent_gh "$work/company" auth git-credential get || true
+[ "$(cat "$work/out")" = "token=app-token args=auth git-credential get stdin=protocol=https" ] || fail "the credential helper did not get the app token: $(cat "$work/out")"
+
+mv "$map_file" "$map_file.off"
+run_agent_gh "$work/company" pr list || true
+[ "$(cat "$work/out")" = "token=app-token args=pr list" ] || fail "an app row did not work without the account map: $(cat "$work/out")"
+mv "$map_file.off" "$map_file"
+
+status=0
+(cd "$work/company" && CLAUDECODE=1 HOME="$work/home" PATH="$work/wrap:$work/stub:/usr/bin:/bin" gh pr list) >"$work/out" 2>"$work/err" || status=$?
+if [ "$status" -eq 0 ]; then
+  fail "an app row without agent-gh-token on PATH did not fail"
+elif [ -s "$work/out" ]; then
+  fail "the real gh ran although agent-gh-token is missing: $(cat "$work/out")"
+elif ! grep -q "agent-gh-token is not on PATH" "$work/err"; then
+  fail "the missing agent-gh-token was not reported: $(cat "$work/err")"
+fi
+
+(cd "$work/company" && CLAUDECODE=1 GH_TOKEN=preset HOME="$work/home" PATH="$work/wrap:$work/app:$work/stub:/usr/bin:/bin" gh pr list) >"$work/out" 2>"$work/err" || true
+[ "$(cat "$work/out")" = "token=preset args=pr list" ] || fail "a preset GH_TOKEN was replaced in an agent session: $(cat "$work/out")"
+
+agent_in() {
+  agent_dir=$1
+  shift
+  rm -f "$work/app/repo"
+  (cd "$agent_dir" && CLAUDECODE=1 HOME="$work/home" PATH="$work/wrap:$work/app:$work/stub:/usr/bin:/bin" "$@") >"$work/out" 2>"$work/err" || true
+}
+
+agent_in "$work/plain" gh pr list -R acme/y
+[ "$(cat "$work/out")" = "token=app-token args=pr list -R acme/y" ] || fail "-R acme/y outside a repo did not use the app: $(cat "$work/out")"
+[ "$(cat "$work/app/repo" 2>/dev/null)" = acme/y ] || fail "-R acme/y was not passed to agent-gh-token as --repo"
+
+agent_in "$work/plain" gh pr list -Racme/y
+[ "$(cat "$work/out")" = "token=app-token args=pr list -Racme/y" ] || fail "-Racme/y outside a repo did not use the app: $(cat "$work/out")"
+
+agent_in "$work/plain" gh pr list --repo=acme/y
+[ "$(cat "$work/out")" = "token=app-token args=pr list --repo=acme/y" ] || fail "--repo=acme/y outside a repo did not use the app: $(cat "$work/out")"
+
+agent_in "$work/plain" gh pr list --repo github.com/acme/y
+[ "$(cat "$work/out")" = "token=app-token args=pr list --repo github.com/acme/y" ] || fail "--repo HOST/OWNER/REPO outside a repo did not use the app: $(cat "$work/out")"
+[ "$(cat "$work/app/repo" 2>/dev/null)" = acme/y ] || fail "HOST/OWNER/REPO was not reduced to OWNER/REPO"
+
+(cd "$work/plain" && CLAUDECODE=1 GH_REPO=acme/y HOME="$work/home" PATH="$work/wrap:$work/app:$work/stub:/usr/bin:/bin" gh pr list) >"$work/out" 2>"$work/err" || true
+[ "$(cat "$work/out")" = "token=app-token args=pr list" ] || fail "GH_REPO=acme/y outside a repo did not use the app: $(cat "$work/out")"
+
+agent_in "$work/company" gh pr list -R other/z
+[ "$(cat "$work/out")" = "token=token-other-user args=pr list -R other/z" ] || fail "-R other/z from an acme checkout did not use the other mapping: $(cat "$work/out")"
+
+run_gh "$work/plain" pr list -R acme/y || true
+[ "$(cat "$work/out")" = "token=token-acme-bot args=pr list -R acme/y" ] || fail "-R acme/y outside an agent session did not use the account map: $(cat "$work/out")"
+
+agent_in "$work/plain" gh pr list
+[ "$(cat "$work/out")" = "token=none args=pr list" ] || fail "a call tied to no repo did not run as the default account: $(cat "$work/out")"
+
+status=0
+(cd "$work/plain" && CLAUDECODE=1 HOME="$work/home" PATH="$work/wrap:$work/app:$work/stub:/usr/bin:/bin" gh issue create --repo acme/y --title -R --body x) >"$work/out" 2>"$work/err" || status=$?
+if [ "$status" -ne 1 ]; then
+  fail "a malformed -R target in an agent session exited $status, not 1"
+elif [ -s "$work/out" ]; then
+  fail "the real gh ran on a malformed -R target: $(cat "$work/out")"
+elif ! grep -qF 'gh: cannot read a repo from "--body"; pass -R OWNER/REPO' "$work/err"; then
+  fail "the malformed target was not reported: $(cat "$work/err")"
+fi
+
+run_gh "$work/plain" issue create --repo acme/y --title -R --body x || true
+[ "$(cat "$work/out")" = "token=none args=issue create --repo acme/y --title -R --body x" ] || fail "a malformed -R target outside an agent session did not pass through: $(cat "$work/out")"
+
+agent_in "$work/plain" gh issue create --repo acme/y -- -R other/z
+[ "$(cat "$work/out")" = "token=app-token args=issue create --repo acme/y -- -R other/z" ] || fail "a -R after -- overrode the target: $(cat "$work/out")"
+[ "$(cat "$work/app/repo" 2>/dev/null)" = acme/y ] || fail "a -R after -- changed the repo passed to agent-gh-token"
+
+for positional in acme/y https://github.com/acme/y.git git@github.com:acme/y.git github.com/acme/y; do
+  agent_in "$work/plain" gh repo clone "$positional"
+  [ "$(cat "$work/out")" = "token=app-token args=repo clone $positional" ] || fail "repo clone $positional did not use the app: $(cat "$work/out")"
+  [ "$(cat "$work/app/repo" 2>/dev/null)" = acme/y ] || fail "repo clone $positional did not pass acme/y to agent-gh-token"
+done
+
+agent_in "$work/plain" gh repo view acme/y
+[ "$(cat "$work/out")" = "token=app-token args=repo view acme/y" ] || fail "repo view acme/y did not use the app: $(cat "$work/out")"
+
+agent_in "$work/plain" gh repo create newname
+[ "$(cat "$work/out")" = "token=none args=repo create newname" ] || fail "repo create newname did not pass through: $(cat "$work/out")"
+
+agent_in "$work/company" gh repo view other/z
+[ "$(cat "$work/out")" = "token=token-other-user args=repo view other/z" ] || fail "a positional repo did not beat origin: $(cat "$work/out")"
+
+for empty_flag in --repo= -R --repo; do
+  status=0
+  (cd "$work/company" && CLAUDECODE=1 HOME="$work/home" PATH="$work/wrap:$work/app:$work/stub:/usr/bin:/bin" gh pr list "$empty_flag") >"$work/out" 2>"$work/err" || status=$?
+  if [ "$status" -ne 1 ]; then
+    fail "pr list $empty_flag in an agent session exited $status, not 1"
+  elif [ -s "$work/out" ]; then
+    fail "the real gh ran on pr list $empty_flag: $(cat "$work/out")"
+  elif ! grep -qF "gh: cannot read a repo from \"$empty_flag\"" "$work/err"; then
+    fail "pr list $empty_flag was not reported: $(cat "$work/err")"
+  fi
+  run_gh "$work/plain" pr list "$empty_flag" || true
+  [ "$(cat "$work/out")" = "token=none args=pr list $empty_flag" ] || fail "pr list $empty_flag outside an agent session did not pass through: $(cat "$work/out")"
+done
+
+agent_in "$work/plain" gh repo view --json name acme/y
+[ "$(cat "$work/out")" = "token=app-token args=repo view --json name acme/y" ] || fail "repo view --json name acme/y did not use the app: $(cat "$work/out")"
+[ "$(cat "$work/app/repo" 2>/dev/null)" = acme/y ] || fail "repo view --json name acme/y did not pass acme/y to agent-gh-token"
+
+agent_in "$work/plain" gh repo view --json name
+[ "$(cat "$work/out")" = "token=none args=repo view --json name" ] || fail "repo view --json name did not pass through: $(cat "$work/out")"
+
+agent_in "$work/plain" gh repo edit --homepage https://example.com/docs/site acme/y
+[ "$(cat "$work/out")" = "token=app-token args=repo edit --homepage https://example.com/docs/site acme/y" ] || fail "a homepage URL was taken as the repo: $(cat "$work/out")"
+[ "$(cat "$work/app/repo" 2>/dev/null)" = acme/y ] || fail "repo edit with a homepage did not pass acme/y to agent-gh-token"
+
+status=0
+(cd "$work/plain" && CLAUDECODE=1 HOME="$work/home" PATH="$work/wrap:$work/app:$work/stub:/usr/bin:/bin" gh repo edit --homepage https://github.com/other/z acme/y) >"$work/out" 2>"$work/err" || status=$?
+if [ "$status" -ne 1 ]; then
+  fail "two distinct repos in an agent session exited $status, not 1"
+elif [ -s "$work/out" ]; then
+  fail "the real gh ran with two distinct repos: $(cat "$work/out")"
+elif ! grep -qF 'gh: cannot tell which repo "other/z" or "acme/y" this targets; pass -R OWNER/REPO' "$work/err"; then
+  fail "the ambiguity was not reported: $(cat "$work/err")"
+fi
+
+run_gh "$work/plain" repo edit --homepage https://github.com/other/z acme/y || true
+[ "$(cat "$work/out")" = "token=none args=repo edit --homepage https://github.com/other/z acme/y" ] || fail "two distinct repos outside an agent session did not pass through: $(cat "$work/out")"
+
+agent_in "$work/plain" gh repo edit https://github.com/Acme/Y.git acme/y
+[ "$(cat "$work/out")" = "token=app-token args=repo edit https://github.com/Acme/Y.git acme/y" ] || fail "the same repo written twice was treated as ambiguous: $(cat "$work/out")"
+
+agent_in "$work/plain" gh -R acme/y repo edit --homepage https://github.com/other/z
+[ "$(cat "$work/out")" = "token=app-token args=-R acme/y repo edit --homepage https://github.com/other/z" ] || fail "-R did not win over a positional URL: $(cat "$work/out")"
 
 if [ "$failures" -gt 0 ]; then
   exit 1

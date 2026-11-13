@@ -32,35 +32,194 @@ passthrough() {
 [ -z "${GH_TOKEN:-}" ] || passthrough "$@"
 [ "${1:-}" != auth ] || [ "${2:-}" = git-credential ] || passthrough "$@"
 
-map_file="${XDG_CONFIG_HOME:-$HOME/.config}/countersign/profile/gh-accounts.tsv"
-[ -f "$map_file" ] || passthrough "$@"
-git rev-parse --is-inside-work-tree >/dev/null 2>&1 || passthrough "$@"
-url=$(git remote get-url origin 2>/dev/null) || passthrough "$@"
+config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/countersign/profile"
+map_file="$config_dir/gh-accounts.tsv"
+apps_file="$config_dir/agent-gh-apps.tsv"
+[ -f "$map_file" ] || [ -f "$apps_file" ] || passthrough "$@"
+agent_session=
+if [ -n "${CLAUDECODE:-}${CODEX_THREAD_ID:-}" ] && [ -f "$apps_file" ]; then
+  agent_session=yes
+fi
 
-case $url in
-  *://*)
-    rest=${url#*://}
-    authority=${rest%%/*}
-    path=${rest#*/}
-    host=${authority#*@}
-    host=${host%%:*}
-    ;;
-  *@*:*)
-    rest=${url#*@}
-    host=${rest%%:*}
-    path=${rest#*:}
-    ;;
-  *)
-    passthrough "$@"
-    ;;
-esac
+valid_part() {
+  case $1 in
+    '' | -*) return 1 ;;
+  esac
+  return 0
+}
+
+parse_repo() {
+  case $1 in
+    */*/*/*) return 1 ;;
+    */*/*)
+      host=${1%%/*}
+      path=${1#*/}
+      ;;
+    */*)
+      host=github.com
+      path=$1
+      ;;
+    *) return 1 ;;
+  esac
+  valid_part "$host" && valid_part "${path%%/*}" && valid_part "${path#*/}"
+}
+
+parse_positional() {
+  case $1 in
+    http://* | https://*)
+      rest=${1#*://}
+      [ "${rest#*/}" != "$rest" ] || return 1
+      authority=${rest%%/*}
+      host=${authority#*@}
+      host=${host%%:*}
+      path=${rest#*/}
+      ;;
+    git@*:*)
+      rest=${1#git@}
+      host=${rest%%:*}
+      path=${rest#*:}
+      ;;
+    *)
+      parse_repo "$1"
+      return
+      ;;
+  esac
+  path=${path%/}
+  path=${path%.git}
+  case $path in
+    */*/*) return 1 ;;
+    */*) ;;
+    *) return 1 ;;
+  esac
+  valid_part "$host" && valid_part "${path%%/*}" && valid_part "${path#*/}"
+}
+
+reject_target() {
+  if [ -n "$agent_session" ]; then
+    echo "$1" >&2
+    exit 1
+  fi
+  shift
+  passthrough "$@"
+}
+
+explicit=
+flag_seen=
+want_value=
+for arg in "$@"; do
+  if [ -n "$want_value" ]; then
+    explicit=$arg
+    want_value=
+    continue
+  fi
+  case $arg in
+    --) break ;;
+    -R | --repo)
+      flag_seen=$arg
+      want_value=yes
+      ;;
+    -R?*)
+      flag_seen=$arg
+      explicit=${arg#-R}
+      ;;
+    --repo=*)
+      flag_seen=$arg
+      explicit=${arg#--repo=}
+      ;;
+  esac
+done
+if [ -n "$flag_seen" ] && [ -z "$explicit" ]; then
+  reject_target "gh: cannot read a repo from \"$flag_seen\"; pass -R OWNER/REPO" "$@"
+fi
+
+positional=
+if [ -z "$explicit" ] && [ "${1:-}" = repo ]; then
+  candidate=
+  position=0
+  for arg in "$@"; do
+    position=$((position + 1))
+    [ "$position" -gt 2 ] || continue
+    case $arg in
+      --) break ;;
+      -*) continue ;;
+    esac
+    parse_positional "$arg" || continue
+    [ "$(lowercase "$host")" = github.com ] || continue
+    normalized=$(lowercase "${path%%/*}/${path#*/}")
+    normalized=${normalized%.git}
+    if [ -z "$candidate" ]; then
+      candidate=$normalized
+      positional=$arg
+    elif [ "$normalized" != "$candidate" ]; then
+      reject_target "gh: cannot tell which repo \"$candidate\" or \"$normalized\" this targets; pass -R OWNER/REPO" "$@"
+    fi
+  done
+fi
+
+have_target=
+if [ -n "$explicit" ]; then
+  parse_repo "$explicit" || reject_target "gh: cannot read a repo from \"$explicit\"; pass -R OWNER/REPO" "$@"
+  have_target=yes
+elif [ -n "$positional" ] && parse_positional "$positional"; then
+  have_target=yes
+elif [ -n "${GH_REPO:-}" ]; then
+  parse_repo "$GH_REPO" || reject_target "gh: cannot read a repo from \"$GH_REPO\"; pass -R OWNER/REPO" "$@"
+  have_target=yes
+fi
+
+if [ -z "$have_target" ]; then
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || passthrough "$@"
+  url=$(git remote get-url origin 2>/dev/null) || passthrough "$@"
+  case $url in
+    *://*)
+      rest=${url#*://}
+      authority=${rest%%/*}
+      path=${rest#*/}
+      host=${authority#*@}
+      host=${host%%:*}
+      ;;
+    *@*:*)
+      rest=${url#*@}
+      host=${rest%%:*}
+      path=${rest#*:}
+      ;;
+    *)
+      passthrough "$@"
+      ;;
+  esac
+fi
 
 [ "$(lowercase "$host")" = github.com ] || passthrough "$@"
 owner=${path%%/*}
 [ -n "$owner" ] || passthrough "$@"
+repo=${path#*/}
+repo=${repo%/}
+repo=${repo%.git}
+[ -n "$repo" ] && [ "$repo" != "$path" ] || passthrough "$@"
 wanted=$(lowercase "$owner")
 
 tab=$(printf '\t')
+
+if [ -n "$agent_session" ]; then
+  app_matched=
+  while IFS=$tab read -r app_owner _ || [ -n "$app_owner" ]; do
+    [ -n "$app_owner" ] || continue
+    if [ "$(lowercase "$app_owner")" = "$wanted" ]; then
+      app_matched=yes
+      break
+    fi
+  done <"$apps_file"
+  if [ -n "$app_matched" ]; then
+    if ! command -v agent-gh-token >/dev/null 2>&1; then
+      echo "gh: $owner is mapped to a GitHub App in $apps_file, but agent-gh-token is not on PATH; run install.sh" >&2
+      exit 1
+    fi
+    exec agent-gh-token --repo "$owner/$repo" "$real" "$@"
+  fi
+fi
+
+[ -f "$map_file" ] || passthrough "$@"
+
 account=
 while IFS=$tab read -r map_owner map_account || [ -n "$map_owner" ]; do
   [ -n "$map_owner" ] || continue

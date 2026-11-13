@@ -26,7 +26,8 @@ tree_hash() {
   else
     rm -f "$index"
   fi
-  GIT_INDEX_FILE=$index git -C "$top" add -A -- . ':(exclude).claude/worktrees' >/dev/null 2>&1 || return 1
+  GIT_INDEX_FILE=$index git -C "$top" add -A -- . >/dev/null 2>&1 || return 1
+  GIT_INDEX_FILE=$index git -C "$top" rm -r -q -f --cached --ignore-unmatch -- .claude/worktrees >/dev/null 2>&1 || return 1
   tree=$(GIT_INDEX_FILE=$index git -C "$top" write-tree 2>/dev/null) || return 1
   [ -n "$tree" ] || return 1
   printf '%s\n' "$tree"
@@ -121,10 +122,9 @@ if [ -n "$instruction_file" ]; then
 fi
 
 if [ -z "$command" ]; then
-  if [ "$subagent" != true ]; then
-    [ ! -f "$told" ] || exit 0
-    mkdir -p "$sessions" && : >"$told"
-  fi
+  [ "$subagent" != true ] || exit 0
+  [ ! -f "$told" ] || exit 0
+  mkdir -p "$sessions" && : >"$told"
   mark_blocked
   printf 'Gate: %s has no gate line. Add one line under "## Gates" in %s, in the form "gate: <command that runs all of the repo'"'"'s gates>". Then run `gate`.\n' "$name" "$name"
   exit 10

@@ -12,4 +12,9 @@ system-file	pre_tool	edit	/etc/hosts	-	deny
 home-dotfile	pre_tool	edit	~/.zshrc	-	deny
 second-path-outside	pre_tool	edit	src/a.ts ../x.txt	-	deny
 worktree-edits-main	pre_tool	edit	../../../src/main.ts	worktree	deny
+listed-main-writeups	pre_tool	edit	writeups/x.md	listed	allow
 listed-main-checkout	pre_tool	edit	src/a.ts	listed	deny
+listed-writeups-dotdot-src	pre_tool	edit	writeups/new/../../src/f	listed	deny
+listed-writeups-dotdot-missing	pre_tool	edit	writeups/../src/f	listed	deny
+listed-writeups-dotdot-outside	pre_tool	edit	writeups/../../outside/f	listed	deny
+listed-writeups-symlink	pre_tool	edit	writeups/link	listed-link	deny

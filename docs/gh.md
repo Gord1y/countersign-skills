@@ -1,7 +1,7 @@
 # gh
 
-`bin/gh` wraps the real `gh`. It reads the owner of the repo's `origin` remote, looks the owner up
-in a map, and runs `gh` with that account's token in `GH_TOKEN` for that one call. It never runs
+`bin/gh` wraps the real `gh`. It reads the repo a call targets (`-R`, `--repo`, `GH_REPO`, else the
+`origin` remote), looks the owner up in a map, and runs `gh` with that account's token in `GH_TOKEN` for that one call. It never runs
 `gh auth switch`, so parallel sessions on different accounts don't break each other.
 
 `install.sh` links it into `~/.local/bin`. Put that folder before the real `gh` on `PATH`. The
@@ -14,8 +14,8 @@ profile repo. One line per owner, `owner<TAB>account`. Empty lines are skipped. 
 ignores case.
 
 ```
-Gord1y	Gord1y
-freedomseeker-ai	danylo-freedomseeker
+solo	solo-user
+acme	acme-bot
 ```
 
 The account must be signed in to `gh` (`gh auth login`). The token comes from
@@ -27,10 +27,11 @@ The account must be signed in to `gh` (`gh auth login`). The token comes from
 
 - `GH_TOKEN` is set and not empty.
 - The first argument is `auth`, except `auth git-credential`, which gets the mapped token.
-- The map file is missing.
-- The current directory is not in a git work tree.
-- `git remote get-url origin` fails.
-- The origin host is not `github.com`.
+- The map file is missing and no app row applies.
+- No repo can be determined: no `-R`, `--repo`, repo argument or `GH_REPO`, and the current
+  directory is not in a git work tree or has no `origin`. A call tied to no repo, such as `gh api user` outside a
+  checkout, runs as the default account, in an agent session too.
+- The repo's host is not `github.com`.
 - The owner is not in the map.
 
 `-h` and `--help` are `gh`'s own.
@@ -61,13 +62,71 @@ done
 git runs the helper in the repo, so it gets the token of the account mapped to `origin`'s owner.
 Running `gh auth setup-git` again puts the real `gh` back.
 
+## Agent sessions and a GitHub App
+
+In a Claude Code or Codex session (`CLAUDECODE` or `CODEX_THREAD_ID` set), an owner listed in the
+profile's `agent-gh-apps.tsv` gets a 1h installation token of that GitHub App instead of the
+account token. `bin/agent-gh-token` signs the app's JWT, asks GitHub for an installation token
+scoped to the one repo the call targets, and runs the real `gh` with it as `GH_TOKEN`. Git's
+credential helper is this wrapper, so pushes use the app too.
+
+The target repo is the first of these that is present:
+
+1. `-R <v>`, `-R<v>`, `--repo <v>` or `--repo=<v>`. The scan stops at a `--` argument, so a `-R`
+   after it never counts, and the last flag before it wins.
+2. For `gh repo <subcommand> ...`, the repo named among the arguments after the subcommand and
+   before `--`. A candidate does not start with `-` and is `OWNER/REPO`, `HOST/OWNER/REPO`,
+   `https://github.com/OWNER/REPO[.git]` or `git@github.com:OWNER/REPO[.git]` on `github.com`. URLs
+   on other hosts, such as `--homepage https://example.com/docs/site`, are not candidates. Names
+   are compared in lowercase. One distinct candidate is the target. Two or more distinct ones stop
+   an agent session with `gh: cannot tell which repo "<a>" or "<b>" this targets; pass -R
+   OWNER/REPO` and exit 1, and pass through elsewhere. No candidate, such as `gh repo create
+   newname`, moves on to step 3. An explicit `-R` or `--repo` always wins over these candidates.
+3. `GH_REPO`.
+4. The `origin` remote.
+
+A value from 1 or 3 must be `OWNER/REPO` or `HOST/OWNER/REPO`, each part non-empty and not starting
+with `-`. In an agent session with an `agent-gh-apps.tsv`, any other value stops the call with
+`gh: cannot read a repo from "<value>"; pass -R OWNER/REPO` and exit 1, so a mistyped target never
+runs as your account. Outside agent sessions it passes through as before.
+
+The owner and repo of the target decide both the app check and the account map. So
+`gh pr list -R acme/y` from any directory, or from a checkout of another owner, uses the mapping of
+`acme`.
+
+Agents therefore push and open PRs as the app for every call tied to a repo. The app has no
+administration permission and no bypass, so GitHub refuses its pushes to protected branches. Your
+own terminal sets neither variable and keeps your account.
+
+`agent-gh-token --repo <owner>/<name> <command>` is the tool underneath. Every token request is
+scoped to that one repo, and the tool stops when it has no repo name. It refuses an app whose token
+carries the administration permission.
+
+`${XDG_CONFIG_HOME:-$HOME/.config}/countersign/profile/agent-gh-apps.tsv`, one line per owner,
+`owner<TAB>app id<TAB>private key path`. A leading `~/` in the path is allowed.
+
+```
+acme	123	~/.config/agent-keys/acme.pem
+```
+
+- The key stays outside every git work tree. `agent-gh-token` follows symlinks and refuses a key
+  that resolves into a repo.
+- Configure the app with no administration permission, which `agent-gh-token` checks on every
+  token. Keep it out of every ruleset's bypass list too. The tool cannot see that: check each
+  repo's rulesets yourself.
+- `agent-gh-token` needs `openssl`, `curl` and `jq`.
+- Where the app is not installed on the repo, `gh` fails in agent sessions. Install the app on
+  every repo agents work in.
+- A preset `GH_TOKEN` and `gh auth` (except `auth git-credential`) stay untouched.
+- If `agent-gh-token` is not on `PATH`, the wrapper exits 1 and tells you to run `install.sh`.
+
 ## Limits
 
 - Inside a sandbox that blocks the keychain, `gh` has no token either way, and the wrapper prints
   the error above for a signed-in account. Run `gh` where it runs today.
-- Only `origin` counts. `-R owner/repo`, `--repo` and GitHub Enterprise hosts are not read, and a
-  `git clone` outside a repo gets the active account.
+- GitHub Enterprise hosts are not read, and a `git clone` outside a repo gets the active account.
 
 ## Test
 
 `scripts/test-gh.sh` runs the wrapper against a stub `gh` and a scratch home.
+`scripts/test-agent-gh-token.sh` runs `bin/agent-gh-token` against a stub `curl`.

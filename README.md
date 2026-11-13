@@ -146,7 +146,9 @@ and sets its own model. Each caps its compaction window at 300K tokens.
 - **The status line:** `bin/statusline` shows the model, the context used and the plan limits left.
   It is off until you turn it on; see [docs/statusline.md](docs/statusline.md).
 - **The gh wrapper:** `bin/gh` picks the GitHub account from the repo's remote owner, so parallel
-  sessions never need `gh auth switch`; see [docs/gh.md](docs/gh.md).
+  sessions never need `gh auth switch`; see [docs/gh.md](docs/gh.md). In Claude Code and Codex
+  sessions, `bin/agent-gh-token` swaps in a GitHub App's repo-scoped token for owners you list;
+  see [Agent sessions and a GitHub App](docs/gh.md#agent-sessions-and-a-github-app).
 - **The hook walls:** `bin/harness-hook` runs one policy set for Claude Code and Codex hooks; see
   [docs/hooks.md](docs/hooks.md).
 - **The gate stamp:** `bin/gate` runs the repo's gate line and stamps the tree the stop hooks check;
