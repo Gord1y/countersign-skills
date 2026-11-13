@@ -36,37 +36,115 @@ config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/countersign/profile"
 map_file="$config_dir/gh-accounts.tsv"
 apps_file="$config_dir/agent-gh-apps.tsv"
 [ -f "$map_file" ] || [ -f "$apps_file" ] || passthrough "$@"
-target=
+agent_session=
+if [ -n "${CLAUDECODE:-}${CODEX_THREAD_ID:-}" ] && [ -f "$apps_file" ]; then
+  agent_session=yes
+fi
+
+valid_part() {
+  case $1 in
+    '' | -*) return 1 ;;
+  esac
+  return 0
+}
+
+parse_repo() {
+  case $1 in
+    */*/*/*) return 1 ;;
+    */*/*)
+      host=${1%%/*}
+      path=${1#*/}
+      ;;
+    */*)
+      host=github.com
+      path=$1
+      ;;
+    *) return 1 ;;
+  esac
+  valid_part "$host" && valid_part "${path%%/*}" && valid_part "${path#*/}"
+}
+
+parse_positional() {
+  case $1 in
+    http://* | https://*)
+      rest=${1#*://}
+      [ "${rest#*/}" != "$rest" ] || return 1
+      authority=${rest%%/*}
+      host=${authority#*@}
+      host=${host%%:*}
+      path=${rest#*/}
+      ;;
+    git@*:*)
+      rest=${1#git@}
+      host=${rest%%:*}
+      path=${rest#*:}
+      ;;
+    *)
+      parse_repo "$1"
+      return
+      ;;
+  esac
+  path=${path%/}
+  path=${path%.git}
+  case $path in
+    */*/*) return 1 ;;
+    */*) ;;
+    *) return 1 ;;
+  esac
+  valid_part "$host" && valid_part "${path%%/*}" && valid_part "${path#*/}"
+}
+
+reject_target() {
+  if [ -n "$agent_session" ]; then
+    echo "gh: cannot read a repo from \"$1\"; pass -R OWNER/REPO" >&2
+    exit 1
+  fi
+  shift
+  passthrough "$@"
+}
+
+explicit=
 want_value=
 for arg in "$@"; do
   if [ -n "$want_value" ]; then
-    target=$arg
+    explicit=$arg
     want_value=
     continue
   fi
   case $arg in
+    --) break ;;
     -R | --repo) want_value=yes ;;
-    -R?*) target=${arg#-R} ;;
-    --repo=*) target=${arg#--repo=} ;;
+    -R?*) explicit=${arg#-R} ;;
+    --repo=*) explicit=${arg#--repo=} ;;
   esac
 done
-[ -n "$target" ] || target=${GH_REPO:-}
 
-if [ -n "$target" ]; then
-  case $target in
-    */*/*)
-      host=${target%%/*}
-      path=${target#*/}
-      ;;
-    */*)
-      host=github.com
-      path=$target
-      ;;
-    *)
-      passthrough "$@"
-      ;;
-  esac
-else
+positional=
+if [ -z "$explicit" ] && [ "${1:-}" = repo ]; then
+  position=0
+  for arg in "$@"; do
+    position=$((position + 1))
+    [ "$position" -gt 2 ] || continue
+    case $arg in
+      -*) continue ;;
+    esac
+    positional=$arg
+    break
+  done
+fi
+
+have_target=
+if [ -n "$explicit" ]; then
+  parse_repo "$explicit" || reject_target "$explicit" "$@"
+  have_target=yes
+elif [ -n "$positional" ] && parse_positional "$positional"; then
+  have_target=yes
+elif [ -n "${GH_REPO:-}" ]; then
+  parse_repo "$GH_REPO" || reject_target "$GH_REPO" "$@"
+  have_target=yes
+fi
+
+if [ -z "$have_target" ]; then
   git rev-parse --is-inside-work-tree >/dev/null 2>&1 || passthrough "$@"
   url=$(git remote get-url origin 2>/dev/null) || passthrough "$@"
   case $url in
@@ -99,7 +177,7 @@ wanted=$(lowercase "$owner")
 
 tab=$(printf '\t')
 
-if [ -n "${CLAUDECODE:-}${CODEX_THREAD_ID:-}" ] && [ -f "$apps_file" ]; then
+if [ -n "$agent_session" ]; then
   app_matched=
   while IFS=$tab read -r app_owner _ || [ -n "$app_owner" ]; do
     [ -n "$app_owner" ] || continue

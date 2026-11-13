@@ -185,6 +185,38 @@ run_gh "$work/plain" pr list -R acme/y || true
 agent_in "$work/plain" gh pr list
 [ "$(cat "$work/out")" = "token=none args=pr list" ] || fail "a call tied to no repo did not run as the default account: $(cat "$work/out")"
 
+status=0
+(cd "$work/plain" && CLAUDECODE=1 HOME="$work/home" PATH="$work/wrap:$work/app:$work/stub:/usr/bin:/bin" gh issue create --repo acme/y --title -R --body x) >"$work/out" 2>"$work/err" || status=$?
+if [ "$status" -ne 1 ]; then
+  fail "a malformed -R target in an agent session exited $status, not 1"
+elif [ -s "$work/out" ]; then
+  fail "the real gh ran on a malformed -R target: $(cat "$work/out")"
+elif ! grep -qF 'gh: cannot read a repo from "--body"; pass -R OWNER/REPO' "$work/err"; then
+  fail "the malformed target was not reported: $(cat "$work/err")"
+fi
+
+run_gh "$work/plain" issue create --repo acme/y --title -R --body x || true
+[ "$(cat "$work/out")" = "token=none args=issue create --repo acme/y --title -R --body x" ] || fail "a malformed -R target outside an agent session did not pass through: $(cat "$work/out")"
+
+agent_in "$work/plain" gh issue create --repo acme/y -- -R other/z
+[ "$(cat "$work/out")" = "token=app-token args=issue create --repo acme/y -- -R other/z" ] || fail "a -R after -- overrode the target: $(cat "$work/out")"
+[ "$(cat "$work/app/repo" 2>/dev/null)" = acme/y ] || fail "a -R after -- changed the repo passed to agent-gh-token"
+
+for positional in acme/y https://github.com/acme/y.git git@github.com:acme/y.git github.com/acme/y; do
+  agent_in "$work/plain" gh repo clone "$positional"
+  [ "$(cat "$work/out")" = "token=app-token args=repo clone $positional" ] || fail "repo clone $positional did not use the app: $(cat "$work/out")"
+  [ "$(cat "$work/app/repo" 2>/dev/null)" = acme/y ] || fail "repo clone $positional did not pass acme/y to agent-gh-token"
+done
+
+agent_in "$work/plain" gh repo view acme/y
+[ "$(cat "$work/out")" = "token=app-token args=repo view acme/y" ] || fail "repo view acme/y did not use the app: $(cat "$work/out")"
+
+agent_in "$work/plain" gh repo create newname
+[ "$(cat "$work/out")" = "token=none args=repo create newname" ] || fail "repo create newname did not pass through: $(cat "$work/out")"
+
+agent_in "$work/company" gh repo view other/z
+[ "$(cat "$work/out")" = "token=token-other-user args=repo view other/z" ] || fail "a positional repo did not beat origin: $(cat "$work/out")"
+
 if [ "$failures" -gt 0 ]; then
   exit 1
 fi

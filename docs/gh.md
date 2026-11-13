@@ -28,8 +28,8 @@ The account must be signed in to `gh` (`gh auth login`). The token comes from
 - `GH_TOKEN` is set and not empty.
 - The first argument is `auth`, except `auth git-credential`, which gets the mapped token.
 - The map file is missing and no app row applies.
-- No repo can be determined: no `-R`, `--repo` or `GH_REPO`, and the current directory is not in a
-  git work tree or has no `origin`. A call tied to no repo, such as `gh api user` outside a
+- No repo can be determined: no `-R`, `--repo`, repo argument or `GH_REPO`, and the current
+  directory is not in a git work tree or has no `origin`. A call tied to no repo, such as `gh api user` outside a
   checkout, runs as the default account, in an agent session too.
 - The repo's host is not `github.com`.
 - The owner is not in the map.
@@ -70,10 +70,25 @@ account token. `bin/agent-gh-token` signs the app's JWT, asks GitHub for an inst
 scoped to the one repo the call targets, and runs the real `gh` with it as `GH_TOKEN`. Git's
 credential helper is this wrapper, so pushes use the app too.
 
-The target repo is read from `-R <v>`, `-R<v>`, `--repo <v>`, `--repo=<v>`, else `GH_REPO`, else
-`origin`. `OWNER/REPO` and `HOST/OWNER/REPO` both work, and the owner and repo decide both the app
-check and the account map. So `gh pr list -R acme/y` from any directory, or from a checkout of
-another owner, uses the mapping of `acme`.
+The target repo is the first of these that is present:
+
+1. `-R <v>`, `-R<v>`, `--repo <v>` or `--repo=<v>`. The scan stops at a `--` argument, so a `-R`
+   after it never counts, and the last flag before it wins.
+2. For `gh repo <subcommand> <repo>`, the first argument after the subcommand that does not start
+   with `-`, when it is `OWNER/REPO`, `HOST/OWNER/REPO`, `https://github.com/OWNER/REPO[.git]` or
+   `git@github.com:OWNER/REPO[.git]`. Anything else, such as `gh repo create newname`, is not a
+   target.
+3. `GH_REPO`.
+4. The `origin` remote.
+
+A value from 1 or 3 must be `OWNER/REPO` or `HOST/OWNER/REPO`, each part non-empty and not starting
+with `-`. In an agent session with an `agent-gh-apps.tsv`, any other value stops the call with
+`gh: cannot read a repo from "<value>"; pass -R OWNER/REPO` and exit 1, so a mistyped target never
+runs as your account. Outside agent sessions it passes through as before.
+
+The owner and repo of the target decide both the app check and the account map. So
+`gh pr list -R acme/y` from any directory, or from a checkout of another owner, uses the mapping of
+`acme`.
 
 Agents therefore push and open PRs as the app for every call tied to a repo. The app has no
 administration permission and no bypass, so GitHub refuses its pushes to protected branches. Your
