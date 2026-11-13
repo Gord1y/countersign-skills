@@ -5,5 +5,7 @@
   checking nothing, a stale fact in a skill. Never park one.
 - Ask only when the fix needs a decision (a trade-off, a product call, something destructive):
   that is a ❓ with your recommendation, and the rest still gets fixed.
-- An issue in another repo comes to me as a verified brief: what is wrong, where, and the fix.
+- An issue in another repo I develop gets fixed in a new T3 thread there, as the orchestration
+  rule says; one in another team's repo comes to me as a verified brief: what is wrong, where, and
+  the fix.
 - Sweep, don't recall: answer "is it done or safe" from the code, config and live behaviour.

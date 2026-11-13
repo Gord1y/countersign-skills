@@ -29,6 +29,12 @@
 - When one provider's quota or model is unavailable, the same role runs on the other provider and
   the report says so. Outside T3, where the other provider can't be reached, that work waits and
   the report names it as an action for me.
+- Work in another repo I develop runs in a new T3 thread in that repo's project, started without
+  asking me: `t3_thread_launch` with its `projectId`, on its main checkout or a worktree, on
+  Claude, with a builder brief. `delegate_task` runs only in the current thread's project, and the
+  write hook refuses paths outside the current repo, so neither reaches the other repo. The
+  launching session reviews the result and commits it there. Another team's repo still gets only a
+  note for that team.
 
 - Handoffs go through the `context-transfer` skill only. If it isn't offered, the install is
   broken: say so and ask me to re-run `install.sh`.
