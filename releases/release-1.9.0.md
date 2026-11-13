@@ -22,11 +22,12 @@ testedWith:
 ## Added
 
 - **`agent-gh-token` runs a command as a GitHub App.** It signs in as the app you map to a repo
-  owner, gets a one-hour token scoped to that one repo, and runs the command with it.
+  owner, gets a one-hour token that always covers that one repo alone, and runs the command with it.
 - **`gh`, and git through it, uses that app in Claude Code and Codex sessions.** List an owner in
-  `agent-gh-apps.tsv` in your profile. Agents then push and open pull requests as the app, which
-  has no administration rights and no bypass, so GitHub refuses its pushes to protected branches.
-  Your own terminal keeps your account. See `docs/gh.md`.
+  `agent-gh-apps.tsv` in your profile. Agents then push and open pull requests as the app for every
+  call tied to a repo, whether it comes from the checkout, `-R`, `--repo` or `GH_REPO`. The app has
+  no administration rights and no bypass, so GitHub refuses its pushes to protected branches. Your
+  own terminal keeps your account. See `docs/gh.md`.
 
 ## Changed
 
@@ -60,7 +61,11 @@ testedWith:
 
 - **The app's sign-in token stays out of the process list.** `agent-gh-token` hands it to `curl`
   on standard input, so `ps` and other processes cannot read it.
-- **A private key inside a git work tree is refused.**
+- **A private key inside a git work tree is refused, also when it is reached through a symlink.**
+- **An app that holds the administration permission is refused.** Keep it out of every ruleset's
+  bypass list too, which you check in each repo.
+- **The write wall denies a path with a `..` component and follows a symlink at the end of a path.**
+  A write cannot reach a repo's source through `writeups/` any more.
 
 ## Upgrading
 
