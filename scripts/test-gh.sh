@@ -25,6 +25,11 @@ if [ "${1:-}" = auth ] && [ "${2:-}" = token ] && [ "${3:-}" = -u ]; then
   echo "token-$4"
   exit 0
 fi
+if [ "${1:-}" = auth ] && [ "${2:-}" = git-credential ]; then
+  read -r first || first=
+  echo "token=${GH_TOKEN:-none} args=$* stdin=$first"
+  exit 0
+fi
 echo "token=${GH_TOKEN:-none} args=$*"
 STUB
 chmod 755 "$work/stub/gh"
@@ -88,8 +93,8 @@ mv "$map_file.off" "$map_file"
 run_gh "$work/mine" auth status || true
 [ "$(cat "$work/out")" = "token=none args=auth status" ] || fail "gh auth did not pass through untouched: $(cat "$work/out")"
 
-run_gh "$work/mine" auth git-credential get || true
-[ "$(cat "$work/out")" = "token=token-Gord1y args=auth git-credential get" ] || fail "gh auth git-credential did not get the mapped token: $(cat "$work/out")"
+printf 'protocol=https\nhost=github.com\n\n' | run_gh "$work/mine" auth git-credential get || true
+[ "$(cat "$work/out")" = "token=token-Gord1y args=auth git-credential get stdin=protocol=https" ] || fail "gh auth git-credential did not get the mapped token: $(cat "$work/out")"
 
 run_gh "$work/plain" pr list || true
 [ "$(cat "$work/out")" = "token=none args=pr list" ] || fail "a directory outside git did not pass through: $(cat "$work/out")"
@@ -122,8 +127,8 @@ run_agent_gh "$work/company" pr list || true
 run_agent_gh "$work/mine" pr list || true
 [ "$(cat "$work/out")" = "token=token-Gord1y args=pr list" ] || fail "an owner without an app row did not keep the account token: $(cat "$work/out")"
 
-run_agent_gh "$work/company" auth git-credential get || true
-[ "$(cat "$work/out")" = "token=app-token args=auth git-credential get" ] || fail "the credential helper did not get the app token: $(cat "$work/out")"
+printf 'protocol=https\nhost=github.com\n\n' | run_agent_gh "$work/company" auth git-credential get || true
+[ "$(cat "$work/out")" = "token=app-token args=auth git-credential get stdin=protocol=https" ] || fail "the credential helper did not get the app token: $(cat "$work/out")"
 
 mv "$map_file" "$map_file.off"
 run_agent_gh "$work/company" pr list || true

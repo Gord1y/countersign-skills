@@ -65,16 +65,21 @@ wanted=$(lowercase "$owner")
 tab=$(printf '\t')
 
 if [ -n "${CLAUDECODE:-}${CODEX_THREAD_ID:-}" ] && [ -f "$apps_file" ]; then
+  app_matched=
   while IFS=$tab read -r app_owner _ || [ -n "$app_owner" ]; do
     [ -n "$app_owner" ] || continue
     if [ "$(lowercase "$app_owner")" = "$wanted" ]; then
-      if ! command -v agent-gh-token >/dev/null 2>&1; then
-        echo "gh: $owner is mapped to a GitHub App in $apps_file, but agent-gh-token is not on PATH; run install.sh" >&2
-        exit 1
-      fi
-      exec agent-gh-token "$real" "$@"
+      app_matched=yes
+      break
     fi
   done <"$apps_file"
+  if [ -n "$app_matched" ]; then
+    if ! command -v agent-gh-token >/dev/null 2>&1; then
+      echo "gh: $owner is mapped to a GitHub App in $apps_file, but agent-gh-token is not on PATH; run install.sh" >&2
+      exit 1
+    fi
+    exec agent-gh-token "$real" "$@"
+  fi
 fi
 
 [ -f "$map_file" ] || passthrough "$@"
