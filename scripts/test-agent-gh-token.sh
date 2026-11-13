@@ -41,6 +41,8 @@ case "$method ${url#"$STUB_API"}" in
   "GET /orgs/acme/installation") echo '{"id":42}' ;;
   "GET /orgs/solo/installation") exit 22 ;;
   "GET /users/solo/installation") echo '{"id":7}' ;;
+  "GET /orgs/admin/installation") echo '{"id":99}' ;;
+  "POST /app/installations/99/access_tokens") echo '{"token":"ghs_admin","permissions":{"administration":"write","contents":"write"}}' ;;
   "POST /app/installations/"*"/access_tokens") echo '{"token":"ghs_stubbed","expires_at":"2026-01-01T00:00:00Z"}' ;;
   *) exit 22 ;;
 esac
@@ -49,6 +51,12 @@ chmod +x "$work/bin/curl"
 
 tab=$(printf '\t')
 printf 'acme%s123%s%s\nsolo%s456%s%s\n' "$tab" "$tab" "$work/keys/app.pem" "$tab" "$tab" "$work/keys/app.pem" >"$work/apps.tsv"
+mkdir -p "$work/inrepo" "$work/linked-keys"
+git -C "$work/inrepo" init -q
+cp "$work/keys/app.pem" "$work/inrepo/app.pem"
+ln -s "$work/inrepo/app.pem" "$work/linked-keys/link.pem"
+printf 'not a key\n' >"$work/keys/garbage.pem"
+printf 'admin%s9%s%s\nlinky%s8%s%s\nbad%s5%s%s\n' "$tab" "$tab" "$work/keys/app.pem" "$tab" "$tab" "$work/linked-keys/link.pem" "$tab" "$tab" "$work/keys/garbage.pem" >>"$work/apps.tsv"
 
 git -C "$work/repo" init -q
 git -C "$work/repo" remote add origin git@github.com:acme/widget.git
@@ -81,18 +89,54 @@ printed=$(run true 2>&1) || fail "a command that succeeds made the tool fail"
 [ -z "$printed" ] || fail "the tool printed output of its own: $printed"
 
 : >"$work/log"
-seen=$(run --owner solo sh -c 'printf %s "$GH_TOKEN"') || fail "a user-owned install failed"
-[ "$seen" = ghs_stubbed ] || fail "--owner solo did not get a token"
-grep -qx 'POST /app/installations/7/access_tokens ' "$work/log" ||
-  fail "--owner did not fall back to the user installation, unscoped to a repo"
+seen=$(run --repo solo/thing sh -c 'printf %s "$GH_TOKEN"') || fail "a user-owned install failed"
+[ "$seen" = ghs_stubbed ] || fail "--repo solo/thing did not get a token"
+grep -qx 'POST /app/installations/7/access_tokens {"repositories":\["thing"\]}' "$work/log" ||
+  fail "--repo did not fall back to the user installation, scoped to the repo"
 
-if out=$(run --owner nobody true 2>&1); then
+if out=$(run --repo nobody/x true 2>&1); then
   fail "an owner missing from the config did not fail"
 fi
 case $out in
   *"no GitHub App for nobody"*) ;;
   *) fail "an unknown owner gave the wrong message: $out" ;;
 esac
+
+if out=$(run --repo solo true 2>&1); then
+  fail "a --repo without a repo name did not fail"
+fi
+case $out in
+  *"OWNER/REPO"*) ;;
+  *) fail "a --repo without a repo name gave the wrong message: $out" ;;
+esac
+
+if out=$(run --repo linky/x true 2>&1); then
+  fail "a key reached through a symlink into a git work tree was used"
+fi
+case $out in
+  *"inside a git work tree"*) ;;
+  *) fail "a symlinked key in a git work tree gave the wrong message: $out" ;;
+esac
+
+rm -f "$work/ran"
+if out=$(run --repo bad/x sh -c ': >"$1"' sh "$work/ran" 2>&1); then
+  fail "a garbage key did not fail"
+fi
+case $out in
+  *"could not sign with the key"*) ;;
+  *) fail "a garbage key gave the wrong message: $out" ;;
+esac
+[ ! -e "$work/ran" ] || fail "the command ran although the key could not sign"
+
+rm -f "$work/ran"
+if out=$(run --repo admin/x sh -c ': >"$1"' sh "$work/ran" 2>&1); then
+  fail "an app with the administration permission was accepted"
+fi
+case $out in
+  *"has the administration permission"*) ;;
+  *) fail "an app with administration gave the wrong message: $out" ;;
+esac
+[ ! -e "$work/ran" ] || fail "the command ran with an administration token"
 
 git -C "$work/keys" init -q
 if out=$(run true 2>&1); then

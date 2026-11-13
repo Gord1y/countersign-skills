@@ -36,30 +36,65 @@ config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/countersign/profile"
 map_file="$config_dir/gh-accounts.tsv"
 apps_file="$config_dir/agent-gh-apps.tsv"
 [ -f "$map_file" ] || [ -f "$apps_file" ] || passthrough "$@"
-git rev-parse --is-inside-work-tree >/dev/null 2>&1 || passthrough "$@"
-url=$(git remote get-url origin 2>/dev/null) || passthrough "$@"
+target=
+want_value=
+for arg in "$@"; do
+  if [ -n "$want_value" ]; then
+    target=$arg
+    want_value=
+    continue
+  fi
+  case $arg in
+    -R | --repo) want_value=yes ;;
+    -R?*) target=${arg#-R} ;;
+    --repo=*) target=${arg#--repo=} ;;
+  esac
+done
+[ -n "$target" ] || target=${GH_REPO:-}
 
-case $url in
-  *://*)
-    rest=${url#*://}
-    authority=${rest%%/*}
-    path=${rest#*/}
-    host=${authority#*@}
-    host=${host%%:*}
-    ;;
-  *@*:*)
-    rest=${url#*@}
-    host=${rest%%:*}
-    path=${rest#*:}
-    ;;
-  *)
-    passthrough "$@"
-    ;;
-esac
+if [ -n "$target" ]; then
+  case $target in
+    */*/*)
+      host=${target%%/*}
+      path=${target#*/}
+      ;;
+    */*)
+      host=github.com
+      path=$target
+      ;;
+    *)
+      passthrough "$@"
+      ;;
+  esac
+else
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || passthrough "$@"
+  url=$(git remote get-url origin 2>/dev/null) || passthrough "$@"
+  case $url in
+    *://*)
+      rest=${url#*://}
+      authority=${rest%%/*}
+      path=${rest#*/}
+      host=${authority#*@}
+      host=${host%%:*}
+      ;;
+    *@*:*)
+      rest=${url#*@}
+      host=${rest%%:*}
+      path=${rest#*:}
+      ;;
+    *)
+      passthrough "$@"
+      ;;
+  esac
+fi
 
 [ "$(lowercase "$host")" = github.com ] || passthrough "$@"
 owner=${path%%/*}
 [ -n "$owner" ] || passthrough "$@"
+repo=${path#*/}
+repo=${repo%/}
+repo=${repo%.git}
+[ -n "$repo" ] && [ "$repo" != "$path" ] || passthrough "$@"
 wanted=$(lowercase "$owner")
 
 tab=$(printf '\t')
@@ -78,7 +113,7 @@ if [ -n "${CLAUDECODE:-}${CODEX_THREAD_ID:-}" ] && [ -f "$apps_file" ]; then
       echo "gh: $owner is mapped to a GitHub App in $apps_file, but agent-gh-token is not on PATH; run install.sh" >&2
       exit 1
     fi
-    exec agent-gh-token "$real" "$@"
+    exec agent-gh-token --repo "$owner/$repo" "$real" "$@"
   fi
 fi
 
