@@ -27,6 +27,11 @@ case $state in
     list_row_dir
     add_worktree
     ;;
+  listed-link)
+    list_row_dir
+    mkdir -p src writeups
+    ln -s ../src/f writeups/link
+    ;;
   no-repo)
     mkdir -p "$row_home/plain"
     printf '%s\n' "$row_home/plain"

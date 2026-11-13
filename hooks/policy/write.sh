@@ -8,7 +8,7 @@ paths=$(printf '%s' "$event" | jq -r '.paths[]?')
 [ -n "$paths" ] || exit 0
 cwd=$(printf '%s' "$event" | jq -r '.cwd')
 
-resolve() {
+resolve_path() {
   rest=
   probe=$1
   while [ -n "$probe" ] && [ ! -d "$probe" ]; do
@@ -22,6 +22,21 @@ resolve() {
   else
     printf '%s%s\n' "$base" "$rest"
   fi
+}
+
+resolve() {
+  followed=$(resolve_path "$1")
+  hops=0
+  while [ -L "$followed" ] && [ "$hops" -lt 40 ]; do
+    link_target=$(readlink "$followed")
+    case $link_target in
+      /*) ;;
+      *) link_target=${followed%/*}/$link_target ;;
+    esac
+    followed=$(resolve_path "$link_target")
+    hops=$((hops + 1))
+  done
+  printf '%s\n' "$followed"
 }
 
 within() {
@@ -90,6 +105,12 @@ IFS='
 '
 set -f
 for path in $paths; do
+  case $path in
+    ..|../*|*/..|*/../*)
+      echo "write denied: $path has a .. component; write by its absolute path without one."
+      exit 10
+      ;;
+  esac
   target=$(resolve "$path")
   if in_other_place "$target"; then
     continue

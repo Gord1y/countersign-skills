@@ -547,6 +547,16 @@ case $message in
   *) fail "the worktree-only message does not name the way out: $message" ;;
 esac
 
+for dotdot_path in "$message_repo/writeups/new/../../src/f" "$message_repo/writeups/../src/f" "$message_repo/writeups/../../outside/f"; do
+  write_event=$(jq -nc --arg cwd "$message_repo" --arg path "$dotdot_path" '
+    {paths: [$path], cwd: $cwd}')
+  message=$(printf '%s' "$write_event" | HOME=$message_home XDG_CONFIG_HOME=$message_home/.config sh "$root/hooks/policy/write.sh" 2>/dev/null) || true
+  case $message in
+    *"has a .. component"*) ;;
+    *) fail "a path with a .. component was not denied for it: $dotdot_path gave: $message" ;;
+  esac
+done
+
 if [ "$failures" -gt 0 ]; then
   exit 1
 fi

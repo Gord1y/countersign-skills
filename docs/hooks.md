@@ -251,6 +251,11 @@ the scratchpad or `$TMPDIR` (the hook tests do) is fenced to its repo, not to it
 Anything else is denied with `write denied: <path> is outside this repo (<top>). Write inside the
 repo, ~/.claude/plans, the scratchpad or writeups/.`
 
+A path with a `..` component is denied first, with `write denied: <path> has a .. component; write
+by its absolute path without one.` The adapter already folds `..` away, so this only guards a
+policy run on its own. A path that ends in a symlink is followed, with `readlink`, before the check,
+so a link under `writeups/` that points into the checkout is judged by its target.
+
 #### The worktree-only list
 
 A repo can be edited only from a worktree when its main checkout is listed in
