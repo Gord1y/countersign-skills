@@ -74,10 +74,14 @@ The target repo is the first of these that is present:
 
 1. `-R <v>`, `-R<v>`, `--repo <v>` or `--repo=<v>`. The scan stops at a `--` argument, so a `-R`
    after it never counts, and the last flag before it wins.
-2. For `gh repo <subcommand> <repo>`, the first argument after the subcommand that does not start
-   with `-`, when it is `OWNER/REPO`, `HOST/OWNER/REPO`, `https://github.com/OWNER/REPO[.git]` or
-   `git@github.com:OWNER/REPO[.git]`. Anything else, such as `gh repo create newname`, is not a
-   target.
+2. For `gh repo <subcommand> ...`, the repo named among the arguments after the subcommand and
+   before `--`. A candidate does not start with `-` and is `OWNER/REPO`, `HOST/OWNER/REPO`,
+   `https://github.com/OWNER/REPO[.git]` or `git@github.com:OWNER/REPO[.git]` on `github.com`. URLs
+   on other hosts, such as `--homepage https://example.com/docs/site`, are not candidates. Names
+   are compared in lowercase. One distinct candidate is the target. Two or more distinct ones stop
+   an agent session with `gh: cannot tell which repo "<a>" or "<b>" this targets; pass -R
+   OWNER/REPO` and exit 1, and pass through elsewhere. No candidate, such as `gh repo create
+   newname`, moves on to step 3. An explicit `-R` or `--repo` always wins over these candidates.
 3. `GH_REPO`.
 4. The `origin` remote.
 

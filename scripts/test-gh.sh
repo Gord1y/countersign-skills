@@ -238,6 +238,29 @@ agent_in "$work/plain" gh repo view --json name acme/y
 agent_in "$work/plain" gh repo view --json name
 [ "$(cat "$work/out")" = "token=none args=repo view --json name" ] || fail "repo view --json name did not pass through: $(cat "$work/out")"
 
+agent_in "$work/plain" gh repo edit --homepage https://example.com/docs/site acme/y
+[ "$(cat "$work/out")" = "token=app-token args=repo edit --homepage https://example.com/docs/site acme/y" ] || fail "a homepage URL was taken as the repo: $(cat "$work/out")"
+[ "$(cat "$work/app/repo" 2>/dev/null)" = acme/y ] || fail "repo edit with a homepage did not pass acme/y to agent-gh-token"
+
+status=0
+(cd "$work/plain" && CLAUDECODE=1 HOME="$work/home" PATH="$work/wrap:$work/app:$work/stub:/usr/bin:/bin" gh repo edit --homepage https://github.com/other/z acme/y) >"$work/out" 2>"$work/err" || status=$?
+if [ "$status" -ne 1 ]; then
+  fail "two distinct repos in an agent session exited $status, not 1"
+elif [ -s "$work/out" ]; then
+  fail "the real gh ran with two distinct repos: $(cat "$work/out")"
+elif ! grep -qF 'gh: cannot tell which repo "other/z" or "acme/y" this targets; pass -R OWNER/REPO' "$work/err"; then
+  fail "the ambiguity was not reported: $(cat "$work/err")"
+fi
+
+run_gh "$work/plain" repo edit --homepage https://github.com/other/z acme/y || true
+[ "$(cat "$work/out")" = "token=none args=repo edit --homepage https://github.com/other/z acme/y" ] || fail "two distinct repos outside an agent session did not pass through: $(cat "$work/out")"
+
+agent_in "$work/plain" gh repo edit https://github.com/Acme/Y.git acme/y
+[ "$(cat "$work/out")" = "token=app-token args=repo edit https://github.com/Acme/Y.git acme/y" ] || fail "the same repo written twice was treated as ambiguous: $(cat "$work/out")"
+
+agent_in "$work/plain" gh -R acme/y repo edit --homepage https://github.com/other/z
+[ "$(cat "$work/out")" = "token=app-token args=-R acme/y repo edit --homepage https://github.com/other/z" ] || fail "-R did not win over a positional URL: $(cat "$work/out")"
+
 if [ "$failures" -gt 0 ]; then
   exit 1
 fi

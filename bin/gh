@@ -96,7 +96,7 @@ parse_positional() {
 
 reject_target() {
   if [ -n "$agent_session" ]; then
-    echo "gh: cannot read a repo from \"$1\"; pass -R OWNER/REPO" >&2
+    echo "$1" >&2
     exit 1
   fi
   shift
@@ -129,11 +129,12 @@ for arg in "$@"; do
   esac
 done
 if [ -n "$flag_seen" ] && [ -z "$explicit" ]; then
-  reject_target "$flag_seen" "$@"
+  reject_target "gh: cannot read a repo from \"$flag_seen\"; pass -R OWNER/REPO" "$@"
 fi
 
 positional=
 if [ -z "$explicit" ] && [ "${1:-}" = repo ]; then
+  candidate=
   position=0
   for arg in "$@"; do
     position=$((position + 1))
@@ -142,21 +143,27 @@ if [ -z "$explicit" ] && [ "${1:-}" = repo ]; then
       --) break ;;
       -*) continue ;;
     esac
-    if parse_positional "$arg"; then
+    parse_positional "$arg" || continue
+    [ "$(lowercase "$host")" = github.com ] || continue
+    normalized=$(lowercase "${path%%/*}/${path#*/}")
+    normalized=${normalized%.git}
+    if [ -z "$candidate" ]; then
+      candidate=$normalized
       positional=$arg
-      break
+    elif [ "$normalized" != "$candidate" ]; then
+      reject_target "gh: cannot tell which repo \"$candidate\" or \"$normalized\" this targets; pass -R OWNER/REPO" "$@"
     fi
   done
 fi
 
 have_target=
 if [ -n "$explicit" ]; then
-  parse_repo "$explicit" || reject_target "$explicit" "$@"
+  parse_repo "$explicit" || reject_target "gh: cannot read a repo from \"$explicit\"; pass -R OWNER/REPO" "$@"
   have_target=yes
 elif [ -n "$positional" ] && parse_positional "$positional"; then
   have_target=yes
 elif [ -n "${GH_REPO:-}" ]; then
-  parse_repo "$GH_REPO" || reject_target "$GH_REPO" "$@"
+  parse_repo "$GH_REPO" || reject_target "gh: cannot read a repo from \"$GH_REPO\"; pass -R OWNER/REPO" "$@"
   have_target=yes
 fi
 
