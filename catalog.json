@@ -3,12 +3,13 @@
   "skills": [
     {
       "name": "orchestrate",
-      "version": "1.5.1",
+      "version": "2.2.1",
       "agents": [
-        "claude"
+        "claude",
+        "codex"
       ],
-      "description": "Run work of 3+ independently verifiable commits as an orchestrator: split into units, brief one builder per unit in its own worktree, land and commit each unit, gate once.",
-      "whenToUse": "Use for a task of three or more independently verifiable commits, or on request at any size.",
+      "description": "Route every task to one playbook (feature, bug-fix, refactor, investigation, prototype, UI change, release, PR triage, knowledge, unattended run); at 3+ commits, brief builders.",
+      "whenToUse": "Use for every task that changes, investigates or ships code: a feature, a bug, a refactor, how or why code works, a spike, a UI change, a release, a PR link or its findings, a knowledge-graph update, an unattended run. Not for a question answered without the repo.",
       "invocation": "model",
       "path": "skills/orchestrate"
     },
@@ -27,7 +28,7 @@
     },
     {
       "name": "human-voice-writing",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "agents": [
         "claude",
         "codex",
@@ -39,15 +40,17 @@
       "path": "skills/human-voice-writing"
     },
     {
-      "name": "memory-review",
-      "version": "1.0.0",
+      "name": "retro",
+      "version": "1.1.1",
       "agents": [
-        "claude"
+        "claude",
+        "codex",
+        "antigravity"
       ],
-      "description": "Sort Claude Code's auto memory by the memory rule - preferences into rules, project knowledge into repo docs, progress deleted. Read-only until approved. Run with /memory-review.",
-      "whenToUse": null,
-      "invocation": "manual",
-      "path": "skills/memory-review"
+      "description": "Turn a session's or run's mistakes and lessons into structure, not notes. Each lesson goes to the highest rung that works, proven to fail on the real mistake first.",
+      "whenToUse": "Use at the end of a run that had a user correction, a failed gate, a revert or a parked unit, or when asked for a retro or to learn from a session.",
+      "invocation": "model",
+      "path": "skills/retro"
     },
     {
       "name": "codebase-research",
@@ -76,7 +79,7 @@
     },
     {
       "name": "feature-pr-description",
-      "version": "1.2.1",
+      "version": "1.3.0",
       "agents": [
         "claude",
         "codex",
@@ -102,7 +105,7 @@
     },
     {
       "name": "thorough-diff-review",
-      "version": "1.0.1",
+      "version": "1.1.0",
       "agents": [
         "claude",
         "codex",
@@ -127,7 +130,7 @@
     },
     {
       "name": "qa-tester",
-      "version": "1.1.1",
+      "version": "1.2.0",
       "agents": [
         "claude",
         "codex"
@@ -152,7 +155,7 @@
     },
     {
       "name": "how-it-works",
-      "version": "1.0.2",
+      "version": "1.1.0",
       "agents": [
         "claude",
         "codex",
@@ -190,7 +193,7 @@
     },
     {
       "name": "writeups-cleanup",
-      "version": "1.0.3",
+      "version": "1.1.0",
       "agents": [
         "claude",
         "codex",
@@ -200,6 +203,19 @@
       "whenToUse": null,
       "invocation": "manual",
       "path": "skills/writeups-cleanup"
+    },
+    {
+      "name": "repo-knowledge",
+      "version": "1.1.1",
+      "agents": [
+        "claude",
+        "codex",
+        "antigravity"
+      ],
+      "description": "Bootstrap, update and lint a repo's knowledge graph (feature nodes in docs/features, a generated path index, glossary, ADRs, a drift lint in its CI).",
+      "whenToUse": "Use after a change to paths the knowledge index maps, to refresh their nodes and run the lint, or when asked to set up or update a repo's knowledge graph.",
+      "invocation": "model",
+      "path": "skills/repo-knowledge"
     }
   ],
   "rules": [
@@ -247,7 +263,8 @@
       "name": "orchestration",
       "title": "Planning and orchestration",
       "agents": [
-        "claude"
+        "claude",
+        "codex"
       ],
       "path": "rules/orchestration.md"
     },
@@ -308,6 +325,12 @@
       "path": "agents/builder.md"
     },
     {
+      "name": "conformance",
+      "description": "Read-only spec-axis review of a change against the approved plan, mapping every changed file to a plan slice and every acceptance criterion to evidence, run by the other model family from the author. Spawned by orchestrate.",
+      "model": "sonnet",
+      "path": "agents/conformance.md"
+    },
+    {
       "name": "planner",
       "description": "Turns one orchestrated unit's brief into an exact implementation spec, read-only; a sonnet builder implements it. Spawned by orchestrate for intricate units.",
       "model": "opus",
@@ -327,7 +350,7 @@
     },
     {
       "name": "reviewer",
-      "description": "Read-only review of one orchestrated unit's worktree against its brief, with the thorough-diff-review checklist; reports at most 20 lines. Spawned by orchestrate for large units.",
+      "description": "Read-only standards-axis review of one orchestrated unit's worktree, code quality with the thorough-diff-review checklist; conformance to the plan is the conformance agent's job. Reports at most 20 lines. Spawned by orchestrate for large units.",
       "model": "sonnet",
       "path": "agents/reviewer.md"
     }

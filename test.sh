@@ -20,24 +20,26 @@ sh -n "$root/install.sh"
 sh -n "$root/update.sh"
 sh -n "$root/uninstall.sh"
 sh -n "$root/lib.sh"
-for script in "$root"/bin/* "$root"/skills/*/scripts/*; do
+for script in "$root"/bin/* "$root"/skills/*/scripts/* "$root"/hooks/*/*.sh; do
   [ "$(head -n 1 "$script")" = "#!/bin/sh" ] || continue
   sh -n "$script"
 done
 
 mkdir -p "$home/.codex" "$home/.claude/skills/orchestrate"
 echo old >"$home/.claude/skills/orchestrate/SKILL.md"
-echo '{"hooks": {"Stop": [], "SessionEnd": [{"hooks": [{"type": "command", "command": "mine"}]}]}, "theme": "light", "permissions": {"allow": ["Read(//kept)"], "ask": ["Bash(kept-ask *)"]}}' >"$home/.claude/settings.json"
+echo '{"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "mine-stop"}]}], "SessionEnd": [{"hooks": [{"type": "command", "command": "mine"}]}]}, "theme": "light", "permissions": {"allow": ["Read(//kept)"], "ask": ["Bash(kept-ask *)"]}}' >"$home/.claude/settings.json"
 
 HOME=$home CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null
 
 [ "$(readlink "$home/.claude/skills/orchestrate")" = "$root/skills/orchestrate" ] || fail "orchestrate is not linked for Claude Code"
+printf 'policy:\n  allow_implicit_invocation: false\n' | cmp -s - "$home/.agents/skills/writeups-cleanup/agents/openai.yaml" || fail "writeups-cleanup reaches Codex without its implicit invocation turned off"
 for agent in "$root"/agents/*.md; do
   name=$(basename "$agent" .md)
   [ "$(readlink "$home/.claude/agents/$name.md")" = "$agent" ] || fail "$name.md is not linked for Claude Code"
   frontmatter=$(sed -n '2,/^---$/p' "$agent")
   echo "$frontmatter" | grep -q '^model: ' || fail "agents/$name.md does not set a model"
   echo "$frontmatter" | grep -qE '^effort: (low|medium|high|xhigh|max)$' || fail "agents/$name.md does not set an effort of low, medium, high, xhigh or max"
+  echo "$frontmatter" | grep -qE '^autoCompactWindow: [0-9]+$' || fail "agents/$name.md does not set autoCompactWindow as a plain integer of tokens"
   if echo "$frontmatter" | grep -q '^skills: *[^ ]'; then
     fail "agents/$name.md lists its skills inline; write them as a YAML list so this test can check them"
   fi
@@ -49,14 +51,20 @@ for agent in "$root"/agents/*.md; do
   done
 done
 [ -L "$home/.agents/skills/context-transfer" ] || fail "context-transfer is not linked for Codex"
-[ ! -e "$home/.agents/skills/orchestrate" ] || fail "orchestrate was linked for Codex, which skills.tsv excludes"
+[ -L "$home/.agents/skills/orchestrate" ] || fail "orchestrate is not linked for Codex"
 [ ! -e "$home/.gemini" ] || fail "an Antigravity folder was created although Antigravity is not installed"
 ls "$home"/.config/countersign/skills/backups/*/claude/orchestrate/SKILL.md >/dev/null 2>&1 || fail "the existing orchestrate folder was not backed up"
 grep -q "@$root/rules/code.md" "$home/.claude/CLAUDE.md" || fail "CLAUDE.md was not written from claude/CLAUDE.template.md"
 [ "$(readlink "$home/.local/bin/statusline")" = "$root/bin/statusline" ] || fail "statusline is not linked into ~/.local/bin"
 [ "$(readlink "$home/.local/bin/gh")" = "$root/bin/gh" ] || fail "gh is not linked into ~/.local/bin"
+[ "$(readlink "$home/.local/bin/harness-hook")" = "$root/bin/harness-hook" ] || fail "harness-hook is not linked into ~/.local/bin"
+codex_block_expected=$(printf '%s\n' '# BEGIN countersign-skills: install.sh manages this block' 'model_auto_compact_token_limit = 200000' 'approval_policy = "never"' 'sandbox_mode = "workspace-write"' '# END countersign-skills')
+[ "$(cat "$home/.codex/config.toml")" = "$codex_block_expected" ] || fail "a fresh .codex did not get exactly the managed config.toml block"
+codex_hook_command=$(jq -r '.hooks.Stop[0].hooks[0].command' "$root/codex/hooks.json")
+jq -e --arg cmd "$codex_hook_command" '(.hooks | keys) == ["PreToolUse","Stop","SubagentStop"] and ([.hooks[][].hooks[].command] | unique) == [$cmd] and .hooks.PreToolUse[0].matcher == "Bash|apply_patch|Edit|Write"' "$home/.codex/hooks.json" >/dev/null || fail "a fresh .codex did not get the hook entries from codex/hooks.json"
+HOME=$fake sh -c "$codex_hook_command" </dev/null || fail "the Codex hook command did not fail open without harness-hook"
 settings_json="$home/.claude/settings.json"
-jq -e '.hooks.Stop == [] and .theme == "light" and .worktree.baseRef == "head" and .sandbox.enabled == true and (.permissions.allow | index("Read(//kept)") != null) and (.permissions.allow | index("mcp__context7") != null) and (.permissions.ask | index("Bash(kept-ask *)") != null) and (.permissions.ask == ["Bash(kept-ask *)"]) and (.permissions.deny | index("Read(~/.ssh/**)") != null) and (.sandbox.filesystem.denyRead | index("~/.ssh") != null)' "$settings_json" >/dev/null || fail "settings.json was not merged from settings/claude.json"
+jq -e '(.hooks.Stop | length) == 2 and (.hooks.Stop | map(.hooks[0].command) | index("mine-stop") != null) and (.hooks.PreToolUse | length) == 1 and (.hooks.SubagentStop | length) == 1 and .theme == "light" and .worktree.baseRef == "head" and .sandbox.enabled == true and (.permissions.allow | index("Read(//kept)") != null) and (.permissions.allow | index("mcp__context7") != null) and (.permissions.ask | index("Bash(kept-ask *)") != null) and (.permissions.ask == ["Bash(kept-ask *)"]) and (.permissions.deny | index("Read(~/.ssh/**)") != null) and (.sandbox.filesystem.denyRead | index("~/.ssh") != null)' "$settings_json" >/dev/null || fail "settings.json was not merged from settings/claude.json"
 jq -e '(.permissions.deny | index("Read(**/.env)") != null) and ([.permissions.deny[] | select(test("^Read\\((\\*\\*/)?\\.env(\\.\\*)?\\)$"))] == ["Read(**/.env)"]) and ([.sandbox.filesystem.allowRead[]? | select(contains(".env"))] == [])' "$settings_json" >/dev/null || fail "settings.json must deny .env at any depth by name, never .env.* (it hides .env.example) or root-only rules, and needs no .env allowRead"
 jq -e '(.hooks.SessionEnd | length) == 3 and (.hooks.SessionEnd | map(.hooks[0].command) | index("mine") != null)' "$settings_json" >/dev/null || fail "settings.json replaced the SessionEnd hook the user had instead of joining it"
 proj="$home/proj"
@@ -90,7 +98,8 @@ if user_tmp=$(getconf DARWIN_USER_TEMP_DIR 2>/dev/null); then
   jq -e --arg t "${user_tmp%/}" '.sandbox.filesystem.allowWrite | index($t) != null' "$settings_json" >/dev/null || fail "settings.json does not let the sandbox write the macOS user temp folder"
 fi
 grep -q '^## Code$' "$home/.codex/AGENTS.md" || fail "AGENTS.md does not expand the code rule"
-grep -q '^## Planning and orchestration$' "$home/.codex/AGENTS.md" && fail "AGENTS.md took the orchestration rule, which rules.tsv keeps for Claude Code"
+grep -q '^## Planning and orchestration$' "$home/.codex/AGENTS.md" || fail "AGENTS.md lacks the orchestration rule, which Codex needs for orchestrate's routing table"
+grep -q '^## Memory$' "$home/.codex/AGENTS.md" && fail "AGENTS.md took the memory rule, which rules.tsv keeps for Claude Code"
 grep -q '^@' "$home/.codex/AGENTS.md" && fail "AGENTS.md kept an unexpanded import"
 cut -f1 "$root/rules.tsv" | while read -r rule; do
   [ -f "$root/rules/$rule.md" ] || fail "rules.tsv lists $rule but rules/$rule.md is missing"
@@ -111,6 +120,25 @@ for skill in "$root"/skills/*/; do
     echo "$skill_frontmatter" | grep -q '^when_to_use: ' || fail "skills/$name/SKILL.md is model-invocable but has no when_to_use"
   fi
 done
+claude_only_tools='AskUserQuestion|subagent_type|the `?Agent`? tool|`Agent`|the `?Artifact`? tool|`Artifact`'
+codex_fallback='^\*\*(Under|On) Codex|without subagents \(Codex'
+check_claude_only_tools() {
+  tools_root=$1
+  tools_tsv=$2
+  for skill in "$tools_root"/skills/*/; do
+    name=$(basename "$skill")
+    awk -F '\t' -v n="$name" '$1 == n { print $3 }' "$tools_tsv" | grep -q 'codex' || continue
+    sed -n '2,/^---$/p' "$skill/SKILL.md" | grep -q '^disable-model-invocation: true' && continue
+    find "$skill" -name '*.md' | sort | while read -r file; do
+      grep -qE "$claude_only_tools" "$file" || continue
+      grep -qE "$codex_fallback" "$file" && continue
+      first_match=$(grep -nE "$claude_only_tools" "$file" | head -n 1)
+      echo "skills/$name/${file#"$skill"}:$first_match: names a Claude-only tool without saying what Codex does instead; add an **Under Codex** paragraph"
+    done
+  done
+}
+claude_only_errors=$(check_claude_only_tools "$root" "$root/skills.tsv")
+[ -z "$claude_only_errors" ] || fail "$claude_only_errors"
 grep -qi 'never start' "$root/skills/qa-tester/SKILL.md" || fail "skills/qa-tester/SKILL.md lost its never-start rule"
 invocable=""
 for skill in "$root"/skills/*/; do
@@ -141,13 +169,14 @@ for case_dir in "$root"/evals/*/; do
     *) fail "evals/$case_name does not belong to an existing model-invocable skill" ;;
   esac
 done
-"$root/scripts/catalog.sh" --check >/dev/null || fail "catalog.json is out of date; run scripts/catalog.sh"
+"$root/scripts/catalog.sh" --check >/dev/null || fail "catalog.json or a Codex policy file is out of date; run scripts/catalog.sh"
 jq -e \
   --argjson skills "$(wc -l <"$root/skills.tsv" | tr -d ' ')" \
   --argjson rules "$(wc -l <"$root/rules.tsv" | tr -d ' ')" \
   --argjson agents "$(ls -1 "$root"/agents/*.md | wc -l | tr -d ' ')" \
   '(.skills | length) == $skills and (.rules | length) == $rules and (.agents | length) == $agents
-    and (.skills[] | select(.name == "memory-review") | .invocation) == "manual"
+    and (.skills[] | select(.name == "retro") | .invocation) == "model"
+    and (.skills[] | select(.name == "repo-knowledge") | .invocation) == "model"
     and (.skills[] | select(.name == "orchestrate") | .invocation == "model" and .whenToUse != null)
     and (.agents[] | select(.name == "builder") | .model) == "sonnet"' "$root/catalog.json" >/dev/null || fail "catalog.json does not match the skills, rules and agents in the repo"
 git -C "$root" check-ignore -q skills/orchestrate/local.md || fail "a skill's local.md is not gitignored"
@@ -162,8 +191,10 @@ echo "$second" | grep -q "^ok      $home/.claude/CLAUDE.md" || fail "a second ru
 echo "$second" | grep -q "^ok      $home/.codex/AGENTS.md" || fail "a second run rewrote an unchanged AGENTS.md"
 echo "$second" | grep -q "^ok      $settings_json" || fail "a second run rewrote an unchanged settings.json"
 jq '.worktree.baseRef = "changed"' "$settings_json" >"$settings_json.tmp" && mv "$settings_json.tmp" "$settings_json"
+rm "$home/.codex/config.toml"
 HOME=$home CLAUDE_CONFIG_DIR= "$root/install.sh" --no-settings >/dev/null
 [ "$(jq -r .worktree.baseRef "$settings_json")" = changed ] || fail "--no-settings changed settings.json"
+[ ! -e "$home/.codex/config.toml" ] || fail "--no-settings wrote the Codex config.toml"
 
 echo edited >"$home/.codex/AGENTS.md"
 out=$(HOME=$home CLAUDE_CONFIG_DIR= "$root/install.sh")
@@ -184,6 +215,7 @@ copied="$copyhome/.claude/skills/orchestrate"
 orchestrate_version=$(awk -F "$(printf '\t')" '$1 == "orchestrate" { print $2 }' "$root/skills.tsv")
 grep -qF "$(printf 'claude\torchestrate\t%s\tSKILL.md\t%s' "$orchestrate_version" "$(sha256_of "$root/skills/orchestrate/SKILL.md")")" "$copyhome/.config/countersign/skills/manifest.tsv" || fail "the manifest does not record orchestrate's SKILL.md"
 cmp -s "$copyhome/.config/countersign/skills/base/claude/orchestrate/SKILL.md" "$root/skills/orchestrate/SKILL.md" || fail "the shipped orchestrate was not kept as the base"
+[ -f "$copyhome/.claude/skills/writeups-cleanup/agents/openai.yaml" ] && grep -q "^claude$(printf '\t')writeups-cleanup$(printf '\t').*$(printf '\t')agents/openai.yaml$(printf '\t')" "$copyhome/.config/countersign/skills/manifest.tsv" || fail "--copy did not copy and record a skill's agents/openai.yaml"
 
 echo edited >>"$copied/SKILL.md"
 third=$(HOME=$copyhome CLAUDE_CONFIG_DIR= "$root/install.sh" --copy)
@@ -235,7 +267,7 @@ replace_second_to_last() {
 }
 prepend_line "$fake/skills/context-transfer/SKILL.md"
 prepend_line "$fake/skills/orchestrate/SKILL.md"
-replace_second_to_last "$fake/skills/memory-review/SKILL.md" "shipped change"
+replace_second_to_last "$fake/skills/retro/SKILL.md" "shipped change"
 shipped() {
   awk -F "$tab" -v name="$1" '$1 == name { print $2 }' "$root/skills.tsv"
 }
@@ -244,7 +276,7 @@ mv "$fake/skills.tsv.tmp" "$fake/skills.tsv"
 
 installed="$updhome/.claude/skills"
 echo "my edit" >>"$installed/orchestrate/SKILL.md"
-replace_second_to_last "$installed/memory-review/SKILL.md" "my change"
+replace_second_to_last "$installed/retro/SKILL.md" "my change"
 echo mine >"$installed/orchestrate/local.md"
 
 out=$(HOME=$updhome CLAUDE_CONFIG_DIR= "$fake/update.sh") && status=0 || status=$?
@@ -255,7 +287,7 @@ echo "$out" | grep -q "^merged  claude orchestrate $(shipped orchestrate) -> 99.
   && [ "$(tail -n 1 "$installed/orchestrate/SKILL.md")" = "my edit" ] \
   && [ "$(tail -n 1 "$installed/orchestrate/SKILL.md.mine")" = "my edit" ] \
   && [ "$(head -n 1 "$installed/orchestrate/SKILL.md.mine")" != "new first line" ] || fail "an edited copy was not merged cleanly"
-echo "$out" | grep -q "^conflict claude memory-review" && grep -q '^<<<<<<<' "$installed/memory-review/SKILL.md" && [ -f "$installed/memory-review/SKILL.md.mine" ] || fail "a conflicting edit was not marked"
+echo "$out" | grep -q "^conflict claude retro" && grep -q '^<<<<<<<' "$installed/retro/SKILL.md" && [ -f "$installed/retro/SKILL.md.mine" ] || fail "a conflicting edit was not marked"
 [ "$(cat "$installed/orchestrate/local.md")" = mine ] || fail "update.sh touched local.md"
 grep -qF "$(printf 'claude\torchestrate\t99.0.0\tSKILL.md\t%s' "$(sha256_of "$fake/skills/orchestrate/SKILL.md")")" "$updhome/.config/countersign/skills/manifest.tsv" || fail "the manifest was not moved to the new version"
 
@@ -316,22 +348,266 @@ printf -- '---\nname: how-it-works\n---\n' >"$extra/skills/how-it-works/SKILL.md
 printf 'how-it-works\t1.0.0\tclaude\n' >>"$extra/skills.tsv"
 HOME=$profhome CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null 2>&1 && fail "an addition's skill that clashes with this repo's was installed"
 
+aghome="$fake/aghome"
+mkdir -p "$aghome/.gemini/antigravity-cli"
+HOME=$aghome CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null
+[ -L "$aghome/.gemini/antigravity-cli/skills/context-transfer" ] || fail "context-transfer is not linked for Antigravity"
+[ ! -e "$aghome/.gemini/antigravity-cli/skills/codebase-research" ] || fail "codebase-research was linked for Antigravity, which skills.tsv excludes"
+
+cxhome="$fake/cxhome"
+cxkeep="$fake/cxkeep"
+mkdir -p "$cxhome/.codex"
+printf 'approval_policy = "on-request"\nmodel = "m"\n\n[features]\nx = true\n\n[hooks.state."/p/hooks.json:permission_request:0:0"]\ntrusted_hash = "sha256:abc"\n' >"$cxhome/.codex/config.toml"
+cp "$cxhome/.codex/config.toml" "$cxhome/config.fixture"
+echo '{"hooks": {"PermissionRequest": [{"matcher": "", "hooks": [{"type": "command", "command": "app hook", "timeout": 3600}]}], "PreToolUse": [{"hooks": [{"type": "command", "command": "app pre"}]}]}}' >"$cxhome/.codex/hooks.json"
+cp "$cxhome/.codex/hooks.json" "$cxhome/hooks.fixture"
+HOME=$cxhome CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null
+cxconfig="$cxhome/.codex/config.toml"
+cxhooks="$cxhome/.codex/hooks.json"
+[ "$(head -n 5 "$cxconfig")" = "$codex_block_expected" ] || fail "the managed block is not the first 5 lines of an existing config.toml"
+[ "$(grep -c '^approval_policy' "$cxconfig")" -eq 1 ] || fail "a user's top-level approval_policy was kept next to the block's"
+grep -qx 'model = "m"' "$cxconfig" || fail "the block replaced a key it does not own"
+[ "$(sed -n '/^\[/,$p' "$cxconfig")" = "$(sed -n '/^\[/,$p' "$cxhome/config.fixture")" ] || fail "the managed block changed the tables of config.toml"
+jq -e '.hooks.PermissionRequest == [{"matcher": "", "hooks": [{"type": "command", "command": "app hook", "timeout": 3600}]}] and .hooks.PreToolUse[0].hooks[0].command == "app pre" and .hooks.PreToolUse[1].matcher == "Bash|apply_patch|Edit|Write" and (.hooks.PreToolUse | length) == 2 and (.hooks.Stop | length) == 1 and (.hooks.SubagentStop | length) == 1' "$cxhooks" >/dev/null || fail "the Codex hook entries were not appended after the app's"
+cp "$cxconfig" "$cxhome/config.after"
+cp "$cxhooks" "$cxhome/hooks.after"
+out=$(HOME=$cxhome CLAUDE_CONFIG_DIR= "$root/install.sh")
+echo "$out" | grep -q "^ok      $cxconfig" || fail "a second run rewrote an unchanged Codex config.toml"
+echo "$out" | grep -q "^ok      $cxhooks" || fail "a second run rewrote an unchanged Codex hooks.json"
+cmp -s "$cxconfig" "$cxhome/config.after" && cmp -s "$cxhooks" "$cxhome/hooks.after" || fail "a second run changed the Codex files"
+HOME=$cxhome CLAUDE_CONFIG_DIR= "$root/uninstall.sh" >/dev/null
+cmp -s "$cxconfig" "$cxhome/config.fixture" || fail "uninstall.sh did not put back the config.toml it found"
+[ "$(jq -S . "$cxhooks")" = "$(jq -S . "$cxhome/hooks.fixture")" ] || fail "uninstall.sh did not remove exactly its hook entries"
+mkdir -p "$cxkeep/.codex"
+printf '[approval_policy.granular]\nx = 1\n' >"$cxkeep/.codex/config.toml"
+cp "$cxkeep/.codex/config.toml" "$cxkeep/config.fixture"
+out=$(HOME=$cxkeep CLAUDE_CONFIG_DIR= "$root/install.sh")
+echo "$out" | grep -q "^skipped $cxkeep/.codex/config.toml" || fail "install.sh did not skip a config.toml that sets one of its keys as a table"
+cmp -s "$cxkeep/.codex/config.toml" "$cxkeep/config.fixture" || fail "install.sh changed a config.toml it skipped"
+
+cxcase=0
+for badhooks in '{ // comment
+"hooks": {}}' '[]' '{"hooks": {"Stop": {"a": 1}}}'; do
+  cxcase=$((cxcase + 1))
+  cxbad="$fake/cxbad$cxcase"
+  mkdir -p "$cxbad/.codex"
+  printf '%s\n' "$badhooks" >"$cxbad/.codex/hooks.json"
+  cp "$cxbad/.codex/hooks.json" "$cxbad/hooks.fixture"
+  out=$(HOME=$cxbad CLAUDE_CONFIG_DIR= "$root/install.sh") || fail "install.sh aborted on a hooks.json it cannot merge"
+  echo "$out" | grep -q "^skipped $cxbad/.codex/hooks.json (not valid JSON)" || fail "install.sh did not report a hooks.json it cannot merge"
+  cmp -s "$cxbad/.codex/hooks.json" "$cxbad/hooks.fixture" || fail "install.sh changed a hooks.json it cannot merge"
+  HOME=$cxbad CLAUDE_CONFIG_DIR= "$root/uninstall.sh" >/dev/null || fail "uninstall.sh aborted on a hooks.json it cannot merge"
+  cmp -s "$cxbad/.codex/hooks.json" "$cxbad/hooks.fixture" || fail "uninstall.sh changed a hooks.json it cannot merge"
+done
+cxempty="$fake/cxempty"
+mkdir -p "$cxempty/.codex"
+: >"$cxempty/.codex/hooks.json"
+HOME=$cxempty CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null || fail "install.sh aborted on a 0-byte hooks.json"
+jq -e '(.hooks | keys) == ["PreToolUse","Stop","SubagentStop"]' "$cxempty/.codex/hooks.json" >/dev/null || fail "a 0-byte hooks.json did not get the hook entries"
+
+cxarray="$fake/cxarray"
+mkdir -p "$cxarray/.codex"
+printf 'x = [\n[1,2],\n]\napproval_policy = "on-request"\n\n[features]\ny = 1\n' >"$cxarray/.codex/config.toml"
+HOME=$cxarray CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null
+[ "$(grep -c '^approval_policy' "$cxarray/.codex/config.toml")" -eq 1 ] || fail "a bracket line inside a multi-line array hid a top-level key from the block"
+grep -qx '\[1,2\],' "$cxarray/.codex/config.toml" || fail "the multi-line array was changed"
+HOME=$cxarray CLAUDE_CONFIG_DIR= "$root/uninstall.sh" >/dev/null
+printf 'approval_policy = "on-request"\nx = [\n[1,2],\n]\n\n[features]\ny = 1\n' | cmp -s - "$cxarray/.codex/config.toml" || fail "uninstall.sh did not put the displaced key back above the rest"
+
+cxindent="$fake/cxindent"
+mkdir -p "$cxindent/.codex"
+printf '  [features]\n  approval_policy = "x"\n' >"$cxindent/.codex/config.toml"
+HOME=$cxindent CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null
+[ "$(tail -n 2 "$cxindent/.codex/config.toml")" = "$(printf '  [features]\n  approval_policy = "x"')" ] || fail "a key inside an indented table was stripped"
+[ "$(head -n 1 "$cxindent/.codex/config.toml")" = "$codex_block_begin" ] && [ "$(grep -c 'approval_policy' "$cxindent/.codex/config.toml")" -eq 2 ] || fail "the block was not placed above an indented table"
+
+cxstray="$fake/cxstray"
+mkdir -p "$cxstray/.codex"
+printf '  approval_policy = "x"\n[features]\ny = 1\n' >"$cxstray/.codex/config.toml"
+cp "$cxstray/.codex/config.toml" "$cxstray/config.fixture"
+out=$(HOME=$cxstray CLAUDE_CONFIG_DIR= "$root/install.sh")
+echo "$out" | grep -q "^skipped $cxstray/.codex/config.toml (could not place the managed block safely" || fail "install.sh did not skip a config.toml with an indented top-level key"
+cmp -s "$cxstray/.codex/config.toml" "$cxstray/config.fixture" || fail "install.sh changed a config.toml it could not place the block in"
+
+cxgone="$fake/cxgone"
+mkdir -p "$cxgone/.codex"
+printf 'approval_policy = "on-request"\nmodel = "m"\n' >"$cxgone/.codex/config.toml"
+HOME=$cxgone CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null
+printf 'model = "m"\n' >"$cxgone/.codex/config.toml"
+out=$(HOME=$cxgone CLAUDE_CONFIG_DIR= "$root/uninstall.sh")
+echo "$out" | grep -q "^kept    .*codex-config-displaced.toml (the managed block was already gone)" || fail "uninstall.sh did not report the displaced values it kept"
+grep -qx 'approval_policy = "on-request"' "$cxgone/.config/countersign/skills/codex-config-displaced.toml" || fail "uninstall.sh deleted the displaced values after the block was already gone"
+
+cxfrag="$fake/cxfrag"
+cxfragfile="$cxfrag/.config/countersign/profile/codex/config.toml"
+cxfragconfig="$cxfrag/.codex/config.toml"
+mkdir -p "$cxfrag/.codex" "$(dirname "$cxfragfile")"
+printf 'approval_policy = "on-request"\nmodel = "m"\n\n[features]\nx = true\n\n[plugins."visualize@openai-bundled"]\nenabled = true\n' >"$cxfragconfig"
+cp "$cxfragconfig" "$cxfrag/config.fixture"
+printf '# profile choices\nmodel = "gpt-6"\n\n[plugins."visualize@openai-bundled"]\nenabled = false\n\n[ plugins . "other@openai-bundled" ]\nenabled = false\n' >"$cxfragfile"
+HOME=$cxfrag CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null
+{
+  printf '%s\n' "$codex_block_begin" 'model_auto_compact_token_limit = 200000' 'approval_policy = "never"' 'sandbox_mode = "workspace-write"' 'model = "gpt-6"' "$codex_block_end"
+  printf '\n[features]\nx = true\n\n[plugins."visualize@openai-bundled"]\nenabled = false\n\n[plugins."other@openai-bundled"]\nenabled = false\n'
+} >"$cxfrag/config.expected"
+cmp -s "$cxfragconfig" "$cxfrag/config.expected" || fail "the profile's codex/config.toml was not merged into config.toml as a block key and two table upserts"
+out=$(HOME=$cxfrag CLAUDE_CONFIG_DIR= "$root/install.sh")
+echo "$out" | grep -q "^ok      $cxfragconfig" || fail "a second run with an unchanged codex fragment rewrote config.toml"
+HOME=$cxfrag CLAUDE_CONFIG_DIR= "$root/uninstall.sh" >/dev/null
+cmp -s "$cxfragconfig" "$cxfrag/config.fixture" || fail "uninstall.sh did not restore config.toml byte for byte after the codex fragment"
+[ ! -e "$cxfrag/.config/countersign/skills/codex-config-upserts.tsv" ] || fail "uninstall.sh left the upsert record behind"
+
+HOME=$cxfrag CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null
+printf '\n[hooks.state."x"]\ntrusted_hash = "sha256:def"\n' >>"$cxfragconfig"
+cp "$cxfragconfig" "$cxfrag/config.codex-written"
+out=$(HOME=$cxfrag CLAUDE_CONFIG_DIR= "$root/install.sh")
+echo "$out" | grep -q "^ok      $cxfragconfig" || fail "a table Codex added between runs made the next run rewrite config.toml"
+cmp -s "$cxfragconfig" "$cxfrag/config.codex-written" || fail "a run changed the table Codex added between runs"
+printf '# profile choices\nmodel = "gpt-6"\n\n[plugins."other@openai-bundled"]\nenabled = false\n' >"$cxfragfile"
+HOME=$cxfrag CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null
+grep -qx 'enabled = true' "$cxfragconfig" || fail "a key dropped from the codex fragment was not restored to the original line"
+grep -qx '\[hooks.state."x"\]' "$cxfragconfig" || fail "a table Codex added between runs did not survive a codex fragment change"
+HOME=$cxfrag CLAUDE_CONFIG_DIR= "$root/uninstall.sh" >/dev/null
+{
+  cat "$cxfrag/config.fixture"
+  printf '\n[hooks.state."x"]\ntrusted_hash = "sha256:def"\n'
+} >"$cxfrag/config.expected"
+cmp -s "$cxfragconfig" "$cxfrag/config.expected" || fail "uninstall.sh did not restore the fixture plus the table Codex added"
+
+cxinsert="$fake/cxinsert"
+cxinsertfile="$cxinsert/.config/countersign/profile/codex/config.toml"
+mkdir -p "$cxinsert/.codex" "$(dirname "$cxinsertfile")"
+printf '[features]\nx = true\ny = 1\n' >"$cxinsert/.codex/config.toml"
+cp "$cxinsert/.codex/config.toml" "$cxinsert/config.fixture"
+printf '[features]\nz = 3\ny = 2\n' >"$cxinsertfile"
+HOME=$cxinsert CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null
+[ "$(sed -n '/^\[features\]/,$p' "$cxinsert/.codex/config.toml")" = "$(printf '[features]\nz = 3\nx = true\ny = 2')" ] || fail "a new table key was not inserted right after its header, or an existing key was not replaced in place"
+HOME=$cxinsert CLAUDE_CONFIG_DIR= "$root/uninstall.sh" >/dev/null
+cmp -s "$cxinsert/.codex/config.toml" "$cxinsert/config.fixture" || fail "uninstall.sh did not delete an inserted key and restore a replaced line"
+
+cxbadfrag="$fake/cxbadfrag"
+cxbadfragfile="$cxbadfrag/.config/countersign/profile/codex/config.toml"
+mkdir -p "$cxbadfrag/.codex" "$(dirname "$cxbadfragfile")"
+printf 'model = "m"\n' >"$cxbadfrag/.codex/config.toml"
+cp "$cxbadfrag/.codex/config.toml" "$cxbadfrag/config.fixture"
+printf '[plugins."a"]\nenabled = false\nnot a key value pair\n' >"$cxbadfragfile"
+if HOME=$cxbadfrag CLAUDE_CONFIG_DIR= "$root/install.sh" >"$cxbadfrag/out" 2>"$cxbadfrag/err"; then
+  fail "install.sh went on with a malformed codex fragment"
+fi
+grep -q "config.toml line 3:" "$cxbadfrag/err" || fail "install.sh did not name the file and line of a malformed codex fragment"
+cmp -s "$cxbadfrag/.codex/config.toml" "$cxbadfrag/config.fixture" || fail "install.sh changed config.toml before it stopped on a malformed codex fragment"
+
+cxsetup() {
+  cxdir="$fake/$1"
+  cxprofilefile="$cxdir/.config/countersign/profile/codex/config.toml"
+  cxtoml="$cxdir/.codex/config.toml"
+  mkdir -p "$cxdir/.codex" "$(dirname "$cxprofilefile")"
+  printf '%b' "$2" >"$cxtoml"
+  cp "$cxtoml" "$cxdir/config.fixture"
+  printf '%b' "$3" >"$cxprofilefile"
+}
+cxinstall() {
+  HOME=$cxdir CLAUDE_CONFIG_DIR= "$root/install.sh"
+}
+cxuninstall() {
+  HOME=$cxdir CLAUDE_CONFIG_DIR= "$root/uninstall.sh" >/dev/null
+}
+
+for cxvalue in 'truex' 'falsey' '"a" junk' '1 2' '[1] x' '-' '+' '[1,' '"open' '[}' '{]' '[1, {a = 1]}' '{' '0x_' '0o' '01' '00' '1__0' '[1,,2]' '[,]' '{a = }' '{a = 1,}' '{= 1}' '2026-99-99' '25:00:00' '2026-11-32' '2026-00-10' '2026-02-31' '2025-02-29' '2026-04-31' '1900-02-29' '2026-11-13T24:00:00Z' '2026-11-13T01:60:00Z' '2026-11-13T01:02:03+24:00' '{a = 1 b = 2}' '[1 2]' '{a}' '[1, # c'; do
+  cxsetup cxvalue '[t]\nk = 0\n' "[t]\nk = $cxvalue\n"
+  if cxinstall >/dev/null 2>"$cxdir/err"; then
+    fail "install.sh accepted the codex fragment value: $cxvalue"
+  fi
+  grep -q "config.toml line 2:" "$cxdir/err" || fail "install.sh did not name line 2 for the codex fragment value: $cxvalue"
+  cmp -s "$cxtoml" "$cxdir/config.fixture" || fail "install.sh changed config.toml for the codex fragment value: $cxvalue"
+done
+for cxvalue in 'true' '-1' '0x1F' '1_000' '1.5e3' '-inf' 'nan' '1979-05-27' '2024-02-29' '2000-02-29' '2026-01-31' '1979-05-27T07:32:00Z' '07:32:00' '"a" # note' "'lit'" '[1, 2] # note' '{ a = 1 }' '"""a"""' '0' '-0' '0b1' '0o7' '0x1_F' '0.5' '[1, {a = [2]}]' '{ a = "]" }' '[1, 2,]' '[[1], {a = 1}]' '{a = 1, b.c = "x"}' '2026-11-13T01:02:03Z' '{}' '[]' '[ ]' '{ "q.x" = 1, '"'"'l'"'"'.m = [] }' '[1979-05-27 07:32:00Z, 07:32:00.5]' '2026-11-13T23:59:59-23:59' '[ 1 , 2 ] # c'; do
+  cxsetup cxvalue '[t]\nk = 0\n' "[t]\nk = $cxvalue\n"
+  cxinstall >/dev/null 2>&1 || fail "install.sh rejected the valid codex fragment value: $cxvalue"
+  grep -qxF "k = $cxvalue" "$cxtoml" || fail "install.sh did not write the valid codex fragment value: $cxvalue"
+done
+
+cxsetup cxspan '[t]\nk = [\n  "a\\\\b",\n  2,\n]\nafter = 1\n' '[t]\nk = 5\n'
+cxinstall >/dev/null
+[ "$(sed -n '/^\[t\]/,$p' "$cxtoml")" = "$(printf '[t]\nk = 5\nafter = 1')" ] || fail "replacing a multi-line key left the tail of its old value behind"
+cxuninstall
+cmp -s "$cxtoml" "$cxdir/config.fixture" || fail "uninstall.sh did not restore a multi-line value it replaced"
+
+cxsetup cxinherit '[features]\nx = true\n' '[n]\na = 1\n'
+cxinstall >/dev/null
+printf '[n]\nb = 2\n' >"$cxprofilefile"
+cxinstall >/dev/null
+cxuninstall
+cmp -s "$cxtoml" "$cxdir/config.fixture" || fail "uninstall.sh left an empty table or blank line when the fragment moved its keys inside a table an earlier run added"
+
+cxsetup cxquotes "[plugins.'v@o']\nenabled = true\n" '[plugins."v@o"]\nenabled = false\n'
+cxinstall >/dev/null
+[ "$(grep -c '^\[plugins' "$cxtoml")" -eq 1 ] || fail "a literal-quoted table header and a basic-quoted fragment header were treated as two tables"
+grep -qx 'enabled = false' "$cxtoml" || fail "the fragment value did not reach the literal-quoted table"
+cxuninstall
+cmp -s "$cxtoml" "$cxdir/config.fixture" || fail "uninstall.sh did not restore a literal-quoted table"
+
+cxsetup cxdisplaced 'model = "m"\n\n[features]\nx = 1\n' 'model = "p"\n'
+cxinstall >/dev/null
+rm "$cxprofilefile"
+out=$(cxinstall)
+echo "$out" | grep -q "^restored" || fail "install.sh did not report restoring a displaced key the block no longer holds"
+[ "$(grep -c '^model =' "$cxtoml")" -eq 1 ] && grep -qx 'model = "m"' "$cxtoml" || fail "a displaced key was not put back once the fragment dropped its block key"
+[ ! -s "$cxdir/.config/countersign/skills/codex-config-displaced.toml" ] || fail "a restored displaced line stayed in codex-config-displaced.toml"
+cxuninstall
+cmp -s "$cxtoml" "$cxdir/config.fixture" || fail "uninstall.sh did not restore the config after a displaced key came back early"
+
+cxsetup cxmulti 'notify = [\n  "a",\n  "b",\n]\n\n[features]\nx = 1\n' 'notify = ["x"]\n'
+cxinstall >/dev/null
+! grep -qx '  "a",' "$cxtoml" || fail "a displaced multi-line value left its continuation lines in config.toml"
+[ "$(sed -n "/^$codex_block_end\$/,\$p" "$cxtoml")" = "$(printf '%s\n\n[features]\nx = 1' "$codex_block_end")" ] || fail "a displaced multi-line value left lines below the managed block"
+[ "$(cat "$cxdir/.config/countersign/skills/codex-config-displaced.toml")" = "$(printf 'notify = [\n  "a",\n  "b",\n]')" ] || fail "a displaced multi-line value was not kept whole in codex-config-displaced.toml"
+out=$(cxinstall)
+echo "$out" | grep -q "^ok      $cxtoml" || fail "a second run rewrote config.toml after displacing a multi-line value"
+rm "$cxprofilefile"
+cxinstall >/dev/null
+[ "$(sed -n "/^$codex_block_end\$/,\$p" "$cxtoml")" = "$(printf '%s\nnotify = [\n  "a",\n  "b",\n]\n\n[features]\nx = 1' "$codex_block_end")" ] || fail "a displaced multi-line value was not restored whole once the fragment dropped its key"
+[ ! -s "$cxdir/.config/countersign/skills/codex-config-displaced.toml" ] || fail "a restored multi-line value stayed in codex-config-displaced.toml"
+cxuninstall
+cmp -s "$cxtoml" "$cxdir/config.fixture" || fail "uninstall.sh did not restore a config whose multi-line value was displaced and restored"
+
+cxsetup cxmultiout 'notify = [\n  "a",\n  "b",\n]\n' 'notify = ["x"]\n'
+cxinstall >/dev/null
+cxuninstall
+cmp -s "$cxtoml" "$cxdir/config.fixture" || fail "uninstall.sh did not restore a displaced multi-line value byte for byte"
+
+cxsetup cxreadd 'approval_policy = "on-request"\n' ''
+cxinstall >/dev/null
+printf 'approval_policy = "later"\n' >>"$cxtoml"
+cxinstall >/dev/null
+[ "$(grep -c '^approval_policy' "$cxdir/.config/countersign/skills/codex-config-displaced.toml")" -eq 1 ] || fail "a key re-added at top level was displaced a second time"
+cxuninstall
+cmp -s "$cxtoml" "$cxdir/config.fixture" || fail "uninstall.sh did not restore the original line of a key re-added at top level"
+
+cxsetup cxequals '"a=b" = [\n[plugins.zz]\n]\n\n[features]\nx = 1\n' '[plugins.zz]\nenabled = false\n'
+cxinstall >/dev/null
+[ "$(sed -n '/^"a=b"/,/^\]/p' "$cxtoml")" = "$(printf '"a=b" = [\n[plugins.zz]\n]')" ] || fail "a quoted key containing = hid its multi-line array from the table scan"
+[ "$(tail -n 2 "$cxtoml")" = "$(printf '[plugins.zz]\nenabled = false')" ] || fail "the fragment table was not appended after a quoted key containing ="
+cxuninstall
+cmp -s "$cxtoml" "$cxdir/config.fixture" || fail "uninstall.sh did not restore a config with a quoted key containing ="
+
 unhome=$(mktemp -d "${TMPDIR:-/tmp}/countersign-skills.XXXXXX")
 trap 'rm -rf "$home" "$copyhome" "$fake" "$updhome" "$profhome" "$extra" "$unhome"' EXIT
 mkdir -p "$unhome/.claude/skills" "$unhome/.codex"
 echo 'my own instructions' >"$unhome/.claude/CLAUDE.md"
-echo '{"theme": "light", "worktree": {"baseRef": "mine"}, "permissions": {"allow": ["Read(//mine)"]}, "hooks": {"Stop": []}}' >"$unhome/.claude/settings.json"
+echo '{"theme": "light", "worktree": {"baseRef": "mine"}, "permissions": {"allow": ["Read(//mine)"]}, "hooks": {"Stop": [{"hooks": [{"type": "command", "command": "mine-stop"}]}]}}' >"$unhome/.claude/settings.json"
 ln -s "$fake/elsewhere" "$unhome/.claude/skills/foreign-link"
 HOME=$unhome CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null
 unsettings="$unhome/.claude/settings.json"
 jq '.model = "added-later" | .permissions.defaultMode = "changed-later"' "$unsettings" >"$unsettings.tmp" && mv "$unsettings.tmp" "$unsettings"
 HOME=$unhome CLAUDE_CONFIG_DIR= "$root/uninstall.sh" >/dev/null
 [ ! -e "$unhome/.claude/skills/orchestrate" ] && [ ! -L "$unhome/.claude/skills/orchestrate" ] || fail "uninstall.sh left a skill link"
-[ ! -L "$unhome/.claude/agents/builder.md" ] && [ ! -L "$unhome/.local/bin/statusline" ] && [ ! -L "$unhome/.local/bin/gh" ] || fail "uninstall.sh left an agent or bin link"
+[ ! -L "$unhome/.claude/agents/builder.md" ] && [ ! -L "$unhome/.local/bin/statusline" ] && [ ! -L "$unhome/.local/bin/gh" ] && [ ! -L "$unhome/.local/bin/harness-hook" ] || fail "uninstall.sh left an agent or bin link"
 [ -L "$unhome/.claude/skills/foreign-link" ] || fail "uninstall.sh removed a link it did not make"
 [ "$(cat "$unhome/.claude/CLAUDE.md")" = 'my own instructions' ] || fail "uninstall.sh did not put back the original CLAUDE.md"
 [ ! -e "$unhome/.codex/AGENTS.md" ] || fail "uninstall.sh left a generated AGENTS.md"
-jq -e '.theme == "light" and .worktree.baseRef == "mine" and .permissions.allow == ["Read(//mine)"] and .hooks.Stop == [] and (.hooks | has("SessionEnd") | not) and .model == "added-later" and .permissions.defaultMode == "changed-later" and (has("sandbox") | not) and (.permissions | has("deny") | not)' "$unsettings" >/dev/null || fail "uninstall.sh did not remove exactly the merged settings"
+[ ! -e "$unhome/.codex/config.toml" ] && [ ! -e "$unhome/.codex/hooks.json" ] || fail "uninstall.sh left the Codex config.toml or hooks.json that the install had created"
+jq -e '.theme == "light" and .worktree.baseRef == "mine" and .permissions.allow == ["Read(//mine)"] and .hooks.Stop == [{"hooks": [{"type": "command", "command": "mine-stop"}]}] and ((.hooks | has("SessionEnd") or has("PreToolUse") or has("SubagentStop")) | not) and .model == "added-later" and .permissions.defaultMode == "changed-later" and (has("sandbox") | not) and (.permissions | has("deny") | not)' "$unsettings" >/dev/null || fail "uninstall.sh did not remove exactly the merged settings"
 ls "$unhome"/.config/countersign/skills/backups/*/claude-settings/settings.json >/dev/null 2>&1 || fail "uninstall.sh did not back up settings.json first"
 copies_before=$(awk -F "$tab" '!seen[$1 FS $2]++' "$copyhome/.config/countersign/skills/manifest.tsv" | wc -l)
 HOME=$copyhome CLAUDE_CONFIG_DIR= "$root/uninstall.sh" >/dev/null
@@ -391,6 +667,11 @@ out=$(echo "$status_input" | HOME=$slhome CLAUDE_CONFIG_DIR=/x/.other "$root/bin
 badcat=$(mktemp -d "${TMPDIR:-/tmp}/countersign-skills.XXXXXX")
 trap 'rm -rf "$home" "$copyhome" "$fake" "$updhome" "$profhome" "$extra" "$unhome" "$land" "$slhome" "$badcat"' EXIT
 mkdir -p "$badcat/skills/bad"
+printf 'bad\t1.0.0\tclaude,codex\n' >"$badcat/skills.tsv"
+printf -- '---\nname: bad\ndescription: one line\nwhen_to_use: x\n---\nAsk with AskUserQuestion.\n' >"$badcat/skills/bad/SKILL.md"
+[ -n "$(check_claude_only_tools "$badcat" "$badcat/skills.tsv")" ] || fail "the Claude-only tool check passed a skill with no Codex paragraph"
+printf '**Under Codex**\n' >>"$badcat/skills/bad/SKILL.md"
+[ -z "$(check_claude_only_tools "$badcat" "$badcat/skills.tsv")" ] || fail "the Claude-only tool check failed a skill with a Codex paragraph"
 printf 'bad\t1.0.0\tclaude\n' >"$badcat/skills.tsv"
 printf -- '---\nname: bad\ndescription: >\n  folded\n---\n' >"$badcat/skills/bad/SKILL.md"
 if badcat_err=$("$root/scripts/catalog.sh" "$badcat" 2>&1 >/dev/null); then
@@ -411,5 +692,34 @@ if badcat_err=$("$root/scripts/catalog.sh" "$badcat" 2>&1 >/dev/null); then
   fail "catalog.sh accepted a rules.tsv row without agents"
 fi
 echo "$badcat_err" | grep -q 'rules.tsv:1' || fail "catalog.sh did not name the malformed rules.tsv line"
+
+rm -rf "$badcat/rules" "$badcat/rules.tsv" "$badcat/skills" "$badcat/catalog.json"
+mkdir -p "$badcat/skills/slash" "$badcat/skills/open"
+printf -- '---\nname: slash\ndescription: x\ndisable-model-invocation: true\n---\n' >"$badcat/skills/slash/SKILL.md"
+printf -- '---\nname: open\ndescription: y\nwhen_to_use: z\n---\n' >"$badcat/skills/open/SKILL.md"
+printf 'slash\t1.0.0\tclaude,codex\nopen\t1.0.0\tclaude,codex\n' >"$badcat/skills.tsv"
+slash_policy="$badcat/skills/slash/agents/openai.yaml"
+"$root/scripts/catalog.sh" "$badcat" >/dev/null
+printf 'policy:\n  allow_implicit_invocation: false\n' | cmp -s - "$slash_policy" || fail "catalog.sh did not hide a slash-only skill from Codex"
+[ ! -e "$badcat/skills/open/agents" ] || fail "catalog.sh wrote a Codex policy for a model-invocable skill"
+"$root/scripts/catalog.sh" --check "$badcat" >/dev/null || fail "catalog.sh --check failed right after a run"
+rm "$slash_policy"
+if "$root/scripts/catalog.sh" --check "$badcat" >/dev/null 2>&1; then
+  fail "catalog.sh --check passed without a slash-only skill's Codex policy"
+fi
+[ ! -e "$slash_policy" ] || fail "catalog.sh --check wrote a file"
+"$root/scripts/catalog.sh" "$badcat" >/dev/null
+echo 'policy: {}' >"$slash_policy"
+if badcat_err=$("$root/scripts/catalog.sh" --check "$badcat" 2>&1 >/dev/null); then
+  fail "catalog.sh --check passed an edited Codex policy"
+fi
+echo "$badcat_err" | grep -q 'skills/slash/agents/openai.yaml' || fail "catalog.sh --check passed an edited Codex policy"
+"$root/scripts/catalog.sh" "$badcat" >/dev/null
+printf 'policy:\n  allow_implicit_invocation: false\n' | cmp -s - "$slash_policy" || fail "catalog.sh did not restore an edited Codex policy"
+cp -R "$badcat/skills/slash/agents" "$badcat/skills/open/agents"
+if badcat_err=$("$root/scripts/catalog.sh" "$badcat" 2>&1 >/dev/null); then
+  fail "catalog.sh accepted a Codex policy that hides a model-invocable skill"
+fi
+echo "$badcat_err" | grep -q 'skills/open/agents/openai.yaml:1' || fail "catalog.sh did not name the policy file"
 
 echo "test.sh: ok"

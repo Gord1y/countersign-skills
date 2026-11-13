@@ -8,6 +8,7 @@ only=
 mode="link"
 settings=yes
 new_addition=
+codex_compact_limit=200000
 
 usage() {
   echo "usage: install.sh [--copy] [--skills name,name,...] [--no-settings] [--addition <folder>]"
@@ -21,6 +22,9 @@ usage() {
   echo "the file ~/.gemini/GEMINI.md from it with the rules each agent takes."
   echo "Merges claude/settings.json, then the profile's settings.json, into ~/.claude/settings.json,"
   echo "unless --no-settings."
+  echo "When ~/.codex exists, also writes a managed block at the top of ~/.codex/config.toml and merges"
+  echo "codex/hooks.json into ~/.codex/hooks.json, unless --no-settings. The profile's codex/config.toml"
+  echo "adds its top-level keys to that block and upserts its table keys into ~/.codex/config.toml."
   echo "The profile is $profile; state, backups and the record of merged settings are in $state."
 }
 
@@ -57,6 +61,15 @@ while [ $# -gt 0 ]; do
   shift
 done
 
+work=$(mktemp -d "${TMPDIR:-/tmp}/countersign-skills.XXXXXX")
+trap 'rm -rf "$work"' EXIT
+codex_fragment="$work/codex-fragment.tsv"
+: >"$codex_fragment"
+if [ "$settings" = yes ] && [ -f "$codex_fragment_file" ]; then
+  parse_codex_fragment "$codex_fragment_file" >"$codex_fragment" || exit 1
+fi
+codex_block_keys="$codex_block_keys$(awk -F "$tab" '$1 == "" { printf "|%s", $2 }' "$codex_fragment")"
+
 mkdir -p "$state"
 
 if [ -n "$new_addition" ]; then
@@ -83,8 +96,6 @@ sources() {
   done <"$additions"
 }
 
-work=$(mktemp -d "${TMPDIR:-/tmp}/countersign-skills.XXXXXX")
-trap 'rm -rf "$work"' EXIT
 sources >"$work/sources"
 : >"$work/links"
 
@@ -250,7 +261,8 @@ merge_settings='
     ["sandbox", "filesystem", "allowRead"], ["sandbox", "filesystem", "denyRead"],
     ["sandbox", "filesystem", "allowWrite"], ["sandbox", "filesystem", "denyWrite"],
     ["sandbox", "network", "allowedDomains"],
-    ["autoMode", "environment"], ["autoMode", "allow"], ["hooks", "SessionEnd"];
+    ["autoMode", "environment"], ["autoMode", "allow"], ["hooks", "SessionEnd"],
+    ["hooks", "PreToolUse"], ["hooks", "Stop"], ["hooks", "SubagentStop"];
   def lists($a; $b):
     reduce joined as $path (.;
       ([$a, $b] | map((try getpath($path) catch null) // []) | add | unique) as $merged
@@ -314,8 +326,134 @@ write_settings() {
   echo "wrote   $dest"
 }
 
+codex_block() {
+  echo "$codex_block_begin"
+  printf '%s\n' "model_auto_compact_token_limit = $codex_compact_limit" 'approval_policy = "never"' 'sandbox_mode = "workspace-write"' |
+    awk -v fragment_file="$codex_fragment" '
+      BEGIN {
+        while ((getline row < fragment_file) > 0) {
+          if (substr(row, 1, 1) != "\t") continue
+          row = substr(row, 2)
+          position = index(row, "\t")
+          count++
+          order[count] = substr(row, 1, position - 1)
+          profile[order[count]] = substr(row, position + 1)
+        }
+      }
+      {
+        name = $0
+        sub(/[ \t]*=.*/, "", name)
+        if (name in profile) {
+          print profile[name]
+          used[name] = 1
+        } else {
+          print
+        }
+      }
+      END {
+        for (i = 1; i <= count; i++) {
+          if (!(order[i] in used)) print profile[order[i]]
+        }
+      }
+    '
+  echo "$codex_block_end"
+}
+
+write_codex_config() {
+  [ -d "$codex_home" ] || return 0
+  if [ -f "$codex_config" ] && grep -Eq "^[ $tab]*\[[ $tab]*($codex_block_keys)([].]|[ $tab])" "$codex_config"; then
+    echo "skipped $codex_config (it sets a key of the managed block as a table)"
+    return 0
+  fi
+  generated="$work/codex-config.toml"
+  displaced="$work/codex-displaced"
+  : >"$displaced"
+  held="$work/codex-displaced-held"
+  restored="$work/codex-displaced-restored"
+  : >"$held"
+  : >"$restored"
+  if [ -f "$codex_displaced" ]; then
+    split_codex_displaced "$codex_displaced" "$held" "$restored"
+  fi
+  codex_block >"$generated"
+  cat "$restored" >>"$generated"
+  if [ -f "$codex_config" ]; then
+    strip_codex_block "$codex_config" "$work/codex-displaced-new" >>"$generated"
+    split_codex_displaced "$work/codex-displaced-new" "$displaced" "$work/codex-displaced-unused" "$held"
+  fi
+  if ! strip_codex_block "$generated" "" check >/dev/null; then
+    echo "skipped $codex_config (could not place the managed block safely; set the keys of the managed block yourself)"
+    return 0
+  fi
+  reconciled="$work/codex-config-reconciled.toml"
+  reconcile_codex_tables "$generated" "$codex_fragment" "$codex_upserts" "$work/codex-upserts.tsv" >"$reconciled"
+  mv "$reconciled" "$generated"
+  if [ -s "$work/codex-upserts.tsv" ]; then
+    cp "$work/codex-upserts.tsv" "$codex_upserts"
+  else
+    rm -f "$codex_upserts"
+  fi
+  if [ -f "$codex_config" ] && cmp -s "$generated" "$codex_config"; then
+    echo "ok      $codex_config"
+    return 0
+  fi
+  if [ -s "$restored" ]; then
+    echo "restored the values you had in $codex_config for keys the block no longer holds"
+  fi
+  if [ -s "$displaced" ]; then
+    echo "kept    your $codex_config values for the block's keys in $codex_displaced"
+  fi
+  cat "$held" "$displaced" >"$work/codex-displaced-next"
+  if [ -s "$work/codex-displaced-next" ]; then
+    cp "$work/codex-displaced-next" "$codex_displaced"
+  else
+    rm -f "$codex_displaced"
+  fi
+  if [ -e "$codex_config" ]; then
+    mkdir -p "$backup/codex"
+    cp "$codex_config" "$backup/codex/config.toml"
+    echo "saved   $codex_config to $backup/codex/"
+  fi
+  cp "$generated" "$codex_config"
+  echo "wrote   $codex_config"
+}
+
+write_codex_hooks() {
+  [ -d "$codex_home" ] || return 0
+  layer="$root/codex/hooks.json"
+  [ -f "$layer" ] || return 0
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "skipped $codex_hooks (jq not found)"
+    return 0
+  fi
+  current="$work/codex-hooks-current.json"
+  previous="$work/codex-hooks-previous.json"
+  generated="$work/codex-hooks.json"
+  if [ -s "$codex_hooks" ]; then cp "$codex_hooks" "$current"; else echo '{}' >"$current"; fi
+  if [ -s "$codex_hooks_record" ]; then cp "$codex_hooks_record" "$previous"; else echo '{}' >"$previous"; fi
+  if ! jq -s "$merge_codex_hooks" "$current" "$layer" "$previous" >"$generated" 2>/dev/null; then
+    echo "skipped $codex_hooks (not valid JSON)"
+    return 0
+  fi
+  cp "$layer" "$codex_hooks_record"
+  if [ -f "$codex_hooks" ] && cmp -s "$generated" "$codex_hooks"; then
+    echo "ok      $codex_hooks"
+    return 0
+  fi
+  if [ -e "$codex_hooks" ]; then
+    mkdir -p "$backup/codex"
+    cp "$codex_hooks" "$backup/codex/hooks.json"
+    echo "saved   $codex_hooks to $backup/codex/"
+  fi
+  cp "$generated" "$codex_hooks"
+  echo "wrote   $codex_hooks"
+  echo "trust   start codex and pick \"Review hooks\" or \"Trust all and continue\": Codex skips hooks in $codex_hooks until you trust them"
+}
+
 if [ "$settings" = yes ]; then
   write_settings
+  write_codex_config
+  write_codex_hooks
 fi
 
 rule_agents() {

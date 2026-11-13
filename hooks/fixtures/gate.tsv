@@ -1,0 +1,24 @@
+case	event	tool	input	setup	expect
+gate-clean-allowed	stop	-	-	clean	allow
+gate-ignored-allowed	stop	-	-	ignored	allow
+gate-stamped-allowed	stop	-	-	stamped	allow
+gate-stamped-committed-allowed	stop	-	-	stamped-committed	allow
+gate-no-baseline-allowed	stop	-	-	no-baseline	allow
+gate-no-line-told-allowed	stop	-	-	no-line-told	allow
+gate-agents-only-allowed	stop	-	-	agents-only	allow
+gate-not-repo-allowed	stop	-	-	not-repo	allow
+gate-active-allowed	stop	-	active	edited	allow
+gate-pre-tool-allowed	pre_tool	shell	echo hi	edited	allow
+gate-subagent-main-edited-allowed	subagent_stop	-	-	edited	allow
+gate-subagent-clean-allowed	subagent_stop	-	-	wt-clean	allow
+gate-subagent-stamped-allowed	subagent_stop	-	-	wt-stamped	allow
+gate-edited-blocked	stop	-	-	edited	deny
+gate-untracked-blocked	stop	-	-	untracked	deny
+gate-stamped-edited-blocked	stop	-	-	stamped-edited	deny
+gate-no-line-blocked	stop	-	-	no-line	deny
+gate-subagent-edited-blocked	subagent_stop	-	-	wt-edited	deny
+gate-deleted-blocked	stop	-	-	deleted	deny
+gate-committed-blocked	stop	-	-	committed	deny
+gate-agents-only-unstamped-blocked	stop	-	-	agents-only-unstamped	deny
+gate-subagent-no-line-blocked	subagent_stop	-	-	wt-no-line	deny
+gate-repeat-allowed	stop	-	-	blocked-before	allow

@@ -22,6 +22,9 @@ first, never deleted; the newest 5 runs' backups are kept. A link to a skill thi
 is removed. Running it again changes nothing.
 `--skills orchestrate,human-voice-writing` installs only the skills you name.
 
+A manual skill ships `agents/openai.yaml`, which turns off implicit invocation in Codex. It
+travels inside the skill folder, so links and copies carry it with no extra step.
+
 ## Link or copy
 
 Plain `install.sh` links, so an edit is a git commit and `git pull` updates the skill.
@@ -42,7 +45,8 @@ reaches every machine.
 
 Codex and Antigravity don't read `@` imports, so `install.sh` also generates their global
 instructions from your `~/.claude/CLAUDE.md`, with every import expanded and only the rules
-`rules.tsv` marks for that agent (the orchestration rule needs a skill only Claude Code has):
+`rules.tsv` marks for that agent (the orchestration rule needs `orchestrate`, which Antigravity
+does not get):
 
 | Agent | File | When |
 | --- | --- | --- |
@@ -63,6 +67,11 @@ when that is set, as Countersign does):
   - `settings.json`: merged over `claude/settings.json`, so your keys win, and the permission,
     sandbox and auto-mode lists add up (see [Settings merge](#settings-merge)).
   - `bin/`: linked into `~/.local/bin` next to this repo's `bin/`.
+  - `codex/config.toml`: your Codex settings, merged into `~/.codex/config.toml` (see
+    [Codex settings](#codex-settings)).
+  - `worktree-only.tsv`: the repos whose main checkout the write fence refuses to edit, one
+    absolute path per line (`~/` allowed, blank lines and `#` lines skipped). Work on a listed repo
+    happens in a worktree under `.claude/worktrees/`. See [Hook walls](hooks.md#write).
 - **Additions**: `install.sh --addition <folder>` records a folder in this repo's layout
   (`skills.tsv` and `skills/`, `rules.tsv` and `rules/`, `agents/`) and installs it alongside on
   every later run: its skills and agents are linked, and its rules are imported into `CLAUDE.md`
@@ -89,7 +98,8 @@ when that is set, as Countersign does):
 - These lists are joined, not replaced, so an entry from any layer survives:
   `permissions.allow`, `ask` and `deny`; the sandbox's `excludedCommands`,
   `filesystem.allowRead`, `denyRead`, `allowWrite` and `denyWrite`, and
-  `network.allowedDomains`; `autoMode.environment` and `allow`; and `hooks.SessionEnd`. So rules
+  `network.allowedDomains`; `autoMode.environment` and `allow`; and `hooks.SessionEnd`,
+  `PreToolUse`, `Stop` and `SubagentStop` (see [docs/hooks.md](hooks.md)). So rules
   Claude Code saved from a "don't ask again" answer survive, a hook you added stays next to the
   repo's, and a profile adds to a list without hiding the repo's entries. No layer can take out another layer's entry: to narrow a joined list, edit the file
   that adds the entry.
@@ -98,8 +108,9 @@ when that is set, as Countersign does):
   on the next run, and so is a path-bound rule after the repo moves. A value you changed since,
   and one you had before the first install, stay.
 - There is no `ask` list: inside the sandbox nothing prompts, and outside it the auto-mode
-  classifier decides. `deny` blocks `git push` and reading `.env`, `.env.local`, `.env.*.local`, `.env.development`, `.env.production`,
-  `.env.staging` and `.env.test` at any depth, for the Read tool and sandboxed commands alike.
+  classifier decides. `deny` blocks reading `.env`, `.env.local`, `.env.*.local`,
+  `.env.development`, `.env.production`, `.env.staging` and `.env.test` at any depth, for the
+  Read tool and sandboxed commands alike.
   `.env.example` and other templates stay readable and editable. The files are named because a
   deny always beats an allow: `Read(.env.*)` would also hide `.env.example`, and no `allowRead`
   re-opens it for the Read tool. Each rule starts with `**/` because a relative rule such as
@@ -155,6 +166,97 @@ in your profile's `settings.json`, not here.
 The sandbox protects `~/.claude` from sandboxed commands, so run `install.sh` from your own
 terminal, not through an agent.
 
+## Codex settings
+
+When `~/.codex` exists, `install.sh` also writes two Codex files. `--no-settings` skips both, and
+`CODEX_HOME` is not honoured, like the rest of the installer.
+
+- `~/.codex/config.toml` gets a block of three top-level keys at the very top of the file, between
+  the lines `# BEGIN countersign-skills: install.sh manages this block` and
+  `# END countersign-skills`: `model_auto_compact_token_limit = 200000`,
+  `approval_policy = "never"` and `sandbox_mode = "workspace-write"`. A re-run replaces the block
+  in place: once the `# END` line exists, every line between the two markers goes, comments and
+  lines of your own included, so an edit inside the block does not survive. Without the `# END`
+  line only the block's keys go. Tables below it are never touched. TOML forbids
+  a key twice, so a top-level line of your own for one of those three keys moves out of the file
+  into `~/.config/countersign/skills/codex-config-displaced.toml`, and `uninstall.sh` puts it back.
+  A multi-line value moves whole. When you add the same key at the top level again while the
+  displaced file still holds it, the installer drops the new line and keeps the earlier one.
+  A key written with a quoted name is not detected and Codex then rejects the duplicate. When the
+  file has a table named like one of the keys (`[approval_policy.granular]`), the installer
+  skips the file and prints `skipped`. It skips too when a key of those three stays above the
+  first table after the block is placed, for example an indented one, and tells you to set the
+  three keys yourself. Only column-0 keys above the first table (an indented `[table]` counts)
+  are replaced, and a `[` line inside a multi-line array is not taken for a table.
+- `uninstall.sh` puts displaced keys back at the top of the file, not on their original line, and
+  normalises the final newline. A CRLF file comes out with mixed line endings, which TOML accepts.
+  TOML reads top-level keys the same in any order, so the restored file means what yours did. It
+  is byte for byte the same only when the displaced keys already sat first, in that order, and the
+  file ended in a newline: `install.sh` adds a missing final newline and `uninstall.sh` does not
+  take it out again. Table keys the profile changed always go back to their own line. When you
+  deleted the block yourself, the displaced values stay in `codex-config-displaced.toml` and are
+  copied to the backup folder.
+- A `hooks.json` that is not an object of event arrays (a JSONC comment, a top-level `[]`) is
+  left alone and printed as `skipped ... (not valid JSON)`. A 0-byte file counts as `{}`.
+- The limit is one value for every Codex session, because Codex takes it from the top level and
+  T3 Code's `delegate_task` passes no profile. 200000 tokens is 40% of the 500000 window of the
+  gpt-6.1 models. Codex caps the limit at 90% of the model's window, so on a 272000 window it
+  compacts at 200000 too, later than 40% there.
+- `~/.codex/hooks.json` gets the entries of `codex/hooks.json` (`PreToolUse` for `Bash` and
+  `apply_patch`, `Stop`, `SubagentStop`), each running `bin/harness-hook codex` and failing open
+  without it. They are appended after the entries already there, so the keys Codex stores trust
+  under (event, group index, handler index) keep their positions for entries another tool wrote,
+  such as Countersign's. The merge finds its own entries by their exact command, and the last
+  merged file is recorded in `codex-hooks-layer.json` so a run removes entries the repo dropped.
+  Changing one of our entries moves it to the end of its event once, which shifts the key of an
+  entry that another tool appended after ours.
+- Codex skips an unmanaged hook until you trust it. After the first write the installer prints a
+  `trust` line: start `codex` and pick "Review hooks" or "Trust all and continue". The installer
+  never writes `trusted_hash`. A tool that rewrites `hooks.json` may drop our entries until the
+  next `install.sh` run.
+- `~/.codex/config.toml` also takes your profile's `codex/config.toml`, so a Codex choice such as
+  turning plugins off follows you to every device. The fragment is a TOML subset: comments, blank
+  lines, `[table]` headers (dotted, with quoted segments such as `[plugins."x@y"]`) and
+  single-line `key = value` pairs with bare keys. A value is a string, a number, a boolean, a date
+  or time, or an array or inline table written on one line, followed by nothing but a comment;
+  an array is checked item by item (comma separated, a trailing comma allowed, no empty item) and
+  an inline table pair by pair (`key = value`, bare, quoted or dotted keys, no trailing comma), each
+  value recursively. A date or time needs a month of 01 to 12, a day that exists in that month (leap years
+  included), an hour of 00 to
+  23, a minute of 00 to 59, a second of 00 to 60 and an offset hour of 00 to 23. Arrays of tables,
+  dotted keys, multi-line values and any other line stop `install.sh` before it changes anything,
+  with the fragment's path and the line number on stderr. `--no-settings` skips the check.
+  - The keys above the first table join the managed block after the three built-in ones. They are
+    displaced and restored like those three. A profile key equal to a built-in key replaces that
+    line, so the block never holds a key twice. A line of yours that the block displaced comes
+    back into the file, right below the block, on the next `install.sh` run after the profile
+    drops that key.
+  - Each key under a table is upserted in place. TOML forbids a repeated table header, so the
+    managed block cannot carry them. An existing key is replaced where it stands, and when its
+    value spans several lines, all of those lines are replaced and recorded. A key the
+    table lacks is inserted right after the table's header. A table the file lacks is appended at
+    the end, after a blank line when the file does not already end in one.
+  - Tables are matched by header, ignoring spaces around dots, quotes around a segment that
+    needs none (`[plugins."a"]` is `[plugins.a]`) and the quote style (`'a@b'` is `"a@b"`). Only
+    the `\\` and `\"` escapes of a quoted segment are decoded. A table that `config.toml` spells with dotted
+    keys under its parent (`"x@y".enabled = true` below `[plugins]`) is not detected, and the
+    appended table then makes the file invalid.
+  - Before the first change, `codex-config-upserts.tsv` in the state folder records for each key
+    the table, the key, whether the table was added (`kept`, `added`, or `added-spaced` when a
+    separating blank line came with it) and the original lines, empty when there was none, with
+    `\` written as `\\` and a line break as `\n`. A key added to a table an earlier run added
+    inherits that table's `added` state. Each
+    run reconciles against that record instead of starting over, so Codex's own additions, such
+    as `[hooks.state."..."]` tables, stay where they are and an unchanged fragment leaves the file
+    byte for byte unchanged (`ok`). A key dropped from the fragment gets its original line back,
+    or is deleted when the install had inserted it. A table the install added goes too once it
+    holds nothing else.
+  - A value you or Codex change by hand under a key the fragment sets is overwritten on the next
+    run, like a settings key the profile sets. The record keeps the original line, not that
+    value, so `uninstall.sh` puts back what was there before the first install.
+
+The previous files go to the backup folder under `codex/`, and an unchanged file prints `ok`.
+
 ## Updating copies
 
 Linked skills and imported rules update with `git pull`. Run `install.sh` again afterwards when
@@ -178,6 +280,10 @@ regenerates the Codex and Antigravity files and installs any skill added since.
   back to what you had before the first install, or removed if you had nothing there. A value you
   changed since is kept, and so is everything Claude Code wrote. When the install created the file
   and nothing is left in it, the file goes.
+- In `~/.codex`, the block at the top of `config.toml` goes and the lines it displaced come back,
+  and the hook entries this repo added go from `hooks.json`. The table keys your profile's
+  `codex/config.toml` upserted go back to their recorded original lines, and inserted keys and
+  added tables are deleted. Each file goes too when nothing else is left in it.
 - `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` and `~/.gemini/GEMINI.md` go back to the versions you
   had before the first install (`install.sh` keeps them in `originals/`), or move to the backup
   folder if there were none.
@@ -245,10 +351,15 @@ questions.
   ignored. Precedence is deny, then ask, then allow. Never allow an interpreter or a shell by rule
   (`python3`, `node`, `sh -c`, `pnpm exec`) or "anything not denied"; make the narrow safe action
   free instead.
-- **What still stops a run:** `git push` (denied), anything the classifier
+- **What still stops a run:** a push to a protected branch, a force push or a branch delete
+  (denied by the `push` wall in [hooks.md](hooks.md)), anything the classifier
   judges destructive or outside the trust boundary, and a Bash command that can't run in the
   sandbox. A builder that hits one reports it, and the orchestrator parks that unit and finishes
   the rest.
+- **Each subagent compacts at 300K tokens.** `autoCompactWindow: 300000` sits in each
+  `agents/*.md`. It must be a plain integer, since `300k` reads as 300 and is ignored. It can only
+  lower the session's window. The installer never sets `CLAUDE_CODE_AUTO_COMPACT_WINDOW`, which
+  would override every agent's value.
 
 To adjust, use `/sandbox` or the Auto mode tab of `/permissions`, then copy the change into
 `claude/settings.json`.

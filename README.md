@@ -43,8 +43,8 @@ npx skills add Gord1y/countersign-skills
 ```
 
 It installs from the default branch, `main`, which moves only at releases. `orchestrate` still
-works this way: it carries `land-worktree` and `remove-worktree` in its own `scripts/`, and falls back to
-`general-purpose` subagents when no `builder` agent is installed.
+works this way: it carries `land-worktree` and `remove-worktree` in its own `scripts/`, and
+builds each unit in the main session when no `builder` agent is installed.
 
 **3. Countersign.** Planned for Countersign 0.3.0, not released yet. Its Skills pane will download
 a pinned release, verify its `.sha256`, and list `catalog.json`.
@@ -58,24 +58,26 @@ Where everything lands, how copies and settings merge, backups and unattended ru
 
 | | Claude Code | Codex | Antigravity | skills.sh |
 | --- | --- | --- | --- | --- |
-| Skills | 16 | 14 | 10 | skills only |
-| Rules | 11 | 9 | 9 | no |
-| Subagents | 4 | no | no | no |
+| Skills | 17 | 17 | 12 | skills only |
+| Rules | 10 | 9 | 8 | no |
+| Subagents | 6 | no | no | no |
 | Settings defaults | yes | no | no | no |
 | Status line | yes | no | no | no |
 
 Codex gets its rules in a generated `~/.codex/AGENTS.md`, Antigravity in `~/.gemini/GEMINI.md`.
-Neither reads `@` imports, and the orchestration and memory rules lean on things only Claude Code
-has, so those two rules stay out of both.
+Neither reads `@` imports. The memory rule leans on Claude Code's auto memory, so it stays out of
+both, and the orchestration rule, which `orchestrate` routes by, goes to Codex but not to
+Antigravity. For Codex the installer also writes a managed block in
+`~/.codex/config.toml` and hook entries in `~/.codex/hooks.json`.
 
 ## Skills
 
 | Skill | What it does | Agents |
 | --- | --- | --- |
-| `orchestrate` | Splits a multi-commit task into units and runs one builder subagent per unit, then QAs every surface the run touched and leaves a local walkthrough. | Claude Code |
+| `orchestrate` | The entry point for every task: picks one of ten playbooks; at 3 or more commits runs a builder per unit. | Claude Code, Codex |
 | `context-transfer` | Packs a conversation into one self-contained block for a new chat. | Claude Code, Codex, Antigravity |
 | `human-voice-writing` | Drafts and revises longer text so it reads as human, not AI-generated. | Claude Code, Codex, Antigravity |
-| `memory-review` | Sorts Claude Code's auto memory by the memory rule: preferences into rules, project knowledge into repo docs. Manual: `/memory-review`. | Claude Code |
+| `retro` | Turns a session's mistakes into structure, not notes: each lesson goes to the highest rung that works, and its fix is proven on the real mistake. Orchestrate runs it after a correction, failed gate, revert or parked unit. | Claude Code, Codex, Antigravity |
 | `codebase-research` | Picks the cheapest way to research code, with an explicit model on any spawn. | Claude Code, Codex |
 | `release-notes` | Writes release note entries, keeps an open note in step with its branch, and keeps the release index current. | Claude Code, Codex, Antigravity |
 | `feature-pr-description` | Writes the body of a feature or fix PR to the repo's description contract. | Claude Code, Codex, Antigravity |
@@ -88,9 +90,10 @@ has, so those two rules stay out of both.
 | `pr-review-triage` | Verifies a PR's AI findings, failed checks and open threads at the PR head, and writes a fix plan that proves each fix safe; starts on a bare PR link. | Claude Code, Codex |
 | `walkthrough` | Walks you through any change with its QA evidence (screenshots, request and response pairs, transcripts), or builds a customer-facing HTML walkthrough of a UI release. | Claude Code, Codex, Antigravity |
 | `writeups-cleanup` | Proposes what in `writeups/` has done its job, with the evidence, and deletes only what you approve. Manual: `/writeups-cleanup`. | Claude Code, Codex, Antigravity |
+| `repo-knowledge` | Sets up a repo's knowledge graph: feature nodes mapped to code paths, a glossary, decision records, and a drift lint the repo runs in CI. Agents refresh the nodes for the paths a change touches. | Claude Code, Codex, Antigravity |
 
-Manual skills have `disable-model-invocation: true`: their description costs no context, and only
-you start them, with `/name`.
+Manual skills have `disable-model-invocation: true` and an `agents/openai.yaml` that does the same
+for Codex: their description costs no context, and only you start them, with `/name`.
 
 The process skills (research, PR descriptions, release notes, review, QA, translation) are written
 for any repo. They read the facts they need, such as paths, commands and the branch flow, from your
@@ -120,12 +123,13 @@ and add your own version as a rule in an addition, so `git pull` never fights yo
 ## Subagents
 
 Claude Code only, linked into `~/.claude/agents`. Each is split by what it may do, never by domain,
-and sets its own model.
+and sets its own model. Each caps its compaction window at 300K tokens.
 
 - `builder` (`sonnet`, effort `medium`): implements one orchestrated unit in its own worktree, never committing.
 - `planner` (`opus`, effort `high`): read-only, turns an intricate unit's brief into an exact spec that a sonnet builder implements.
 - `researcher` (`haiku`, effort `low`): read-only lookups, without CLAUDE.md, at most 30 lines back.
-- `reviewer` (`sonnet`, effort `high`): read-only review of a unit's worktree against its brief, with `thorough-diff-review` preloaded.
+- `reviewer` (`sonnet`, effort `high`): read-only standards review of a unit's worktree, with `thorough-diff-review` preloaded.
+- `conformance` (`sonnet`, effort `high`): read-only spec review against the approved plan, every changed file mapped to a slice and every acceptance criterion to evidence; run by the other model family from the author.
 - `qa` (`sonnet`, effort `medium`): QA after each landed batch and at the end of a run, on every surface it touched, then the walkthrough, with `qa-tester` and `walkthrough` preloaded; it writes only into `writeups/`.
 
 ## Customise
@@ -135,14 +139,18 @@ and sets its own model.
   never touches it.
 - **Your profile:** `~/.config/countersign/profile/`, usually a link into a private repo. All of it
   is optional. `CLAUDE.md` replaces `claude/CLAUDE.template.md` (your "Who I am" and your list of
-  rule imports), `settings.json` is merged over the repo's so your keys win, and `bin/` is linked
-  into `~/.local/bin`.
+  rule imports), `settings.json` is merged over the repo's so your keys win, `codex/config.toml`
+  is merged into `~/.codex/config.toml`, and `bin/` is linked into `~/.local/bin`.
 - **Additions:** `install.sh --addition <folder>` installs a folder in this repo's layout (skills,
   rules, agents) alongside, on every later run. Good for a private set you don't publish.
 - **The status line:** `bin/statusline` shows the model, the context used and the plan limits left.
   It is off until you turn it on; see [docs/statusline.md](docs/statusline.md).
 - **The gh wrapper:** `bin/gh` picks the GitHub account from the repo's remote owner, so parallel
   sessions never need `gh auth switch`; see [docs/gh.md](docs/gh.md).
+- **The hook walls:** `bin/harness-hook` runs one policy set for Claude Code and Codex hooks; see
+  [docs/hooks.md](docs/hooks.md).
+- **The gate stamp:** `bin/gate` runs the repo's gate line and stamps the tree the stop hooks check;
+  see [docs/hooks.md](docs/hooks.md).
 - **The worktree remover:** `bin/remove-worktree` removes landed builder worktrees instantly, and a
   `SessionEnd` hook sweeps them, clean scratch worktrees and ignored-output folders when a session
   ends. `bin/prune-branches` deletes local branches already merged or squash-merged on the remote;
@@ -170,18 +178,18 @@ your profile. Everything it replaces is backed up first. Details in
 ## Startup cost
 
 Rules and skill listings sit in every session's context. Measured with `/context` for 1.0.0 in
-Claude Code 2.1.278 with Opus 5.5, with every rule on, then scaled by size for 1.1.0:
+Claude Code 2.1.278 with Opus 5.5, with every rule on, then scaled by size for 1.1.0 and 1.8.0:
 
 | Part | Tokens |
 | --- | --- |
-| 10 rules | about 2.3K |
-| 14 model-invocable skills (listing) | about 1.3K |
-| 4 subagents | about 0.3K |
-| Total | about 3.9K |
+| 10 rules | about 2.8K |
+| 16 model-invocable skills (listing) | about 1.5K |
+| 6 subagents | about 0.5K |
+| Total | about 4.8K |
 
-The rules still dominate: `responses` (about 510), `safety` (about 450) and `orchestration`
-(about 350) are the biggest, and the smallest, `commits`, is about 90. A skill's listing costs 70
-to 130 tokens. The 2 manual skills cost nothing until you type them. Dropping a rule's import line
+The rules still dominate: `responses` (about 780), `orchestration` (about 480) and `safety`
+(about 450) are the biggest, and the smallest, `commits`, is about 90. A skill's listing costs 70
+to 130 tokens. The 1 manual skill costs nothing until you type it. Dropping a rule's import line
 saves its share.
 
 In a 200K context window, Claude Code's default budget for the skill listing is too small for its
@@ -206,10 +214,6 @@ permission lists this repo ships:
   },
   "permissions": {
     "deny": [
-      "Bash(git push)",
-      "Bash(git push *)",
-      "Bash(git -C * push)",
-      "Bash(git -C * push *)",
       "Read(**/.env)",
       "Read(**/.env.local)",
       "Read(**/.env.*.local)",
@@ -234,7 +238,7 @@ The file goes at `/Library/Application Support/ClaudeCode/managed-settings.json`
 `C:\Program Files\ClaudeCode\managed-settings.json` on Windows
 ([managed settings docs](https://code.claude.com/docs/en/managed-settings)). `/status` shows
 `Enterprise managed settings (file)` once it applies. It runs every Bash command in the sandbox
-without a prompt and blocks `git push` and reading `.env` files and credential stores outright. It
+without a prompt and blocks reading `.env` files and credential stores outright. It
 allows no network hosts, and no writes outside the working folder and a per-user temp folder, so
 a sandboxed command that needs either is blocked until it is allowed: add the hosts your builds use under
 `sandbox.network.allowedDomains` and the cache folders they write under

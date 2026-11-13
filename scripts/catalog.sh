@@ -16,6 +16,8 @@ else
 fi
 target="$folder/catalog.json"
 tab=$(printf '\t')
+codex_policy='policy:
+  allow_implicit_invocation: false'
 
 die() {
   echo "catalog.sh: $1" >&2
@@ -83,6 +85,17 @@ if [ -f "$folder/skills.tsv" ]; then
     fm_get "$rel" disable-model-invocation 0
     invocation=model
     [ "$fm_val" = true ] && invocation=manual
+    policy_rel="skills/$name/agents/openai.yaml"
+    if [ "$invocation" = manual ]; then
+      if ! printf '%s\n' "$codex_policy" | cmp -s - "$folder/$policy_rel"; then
+        [ "$check" = 1 ] && die "$folder/$policy_rel is out of date; run scripts/catalog.sh $folder"
+        mkdir -p "$folder/skills/$name/agents"
+        printf '%s\n' "$codex_policy" >"$folder/$policy_rel"
+        echo "wrote   $folder/$policy_rel"
+      fi
+    elif grep -q 'allow_implicit_invocation: false' "$folder/$policy_rel" 2>/dev/null; then
+      die "$policy_rel:1: hides $name from Codex, but its SKILL.md lets the model invoke it; delete the file or set disable-model-invocation: true"
+    fi
     entry=$(jq -cn --arg name "$name" --arg version "$version" --arg agents "$agents" \
       --arg description "$description" --argjson hasWhen "$when_has" --arg when "$when_to_use" \
       --arg invocation "$invocation" --arg path "skills/$name" \

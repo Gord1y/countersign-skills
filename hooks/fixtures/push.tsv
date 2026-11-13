@@ -1,0 +1,71 @@
+case	event	tool	input	setup	expect
+feature-plain-push	pre_tool	shell	git push	on-feature	allow
+feature-upstream-push	pre_tool	shell	git push -u origin feat-x	on-feature	allow
+feature-head-push	pre_tool	shell	git push origin HEAD	on-feature	allow
+sub-repo-feature-push	pre_tool	shell	git -C sub push	with-sub	allow
+tag-push	pre_tool	shell	git push origin v1.2.0	on-feature	allow
+status-then-push	pre_tool	shell	git status && git push	on-feature	allow
+pr-create	pre_tool	shell	gh pr create --fill	-	allow
+rulesets-read	pre_tool	shell	gh api repos/o/r/rulesets	-	allow
+echo-push-word	pre_tool	shell	echo push the button	-	allow
+main-plain-push	pre_tool	shell	git push	on-main	deny
+release-plain-push	pre_tool	shell	git push	on-release	deny
+detached-plain-push	pre_tool	shell	git push	detached	deny
+main-head-push	pre_tool	shell	git push origin HEAD	on-main	deny
+main-named-push	pre_tool	shell	git push origin main	-	deny
+feature-to-main-push	pre_tool	shell	git push origin feat-x:main	-	deny
+head-to-staging-push	pre_tool	shell	git push origin HEAD:refs/heads/staging	-	deny
+hotfix-named-push	pre_tool	shell	git push origin release-hotfix-2	-	deny
+force-long-push	pre_tool	shell	git push --force origin feat-x	-	deny
+force-lease-push	pre_tool	shell	git push --force-with-lease origin feat-x	-	deny
+force-short-push	pre_tool	shell	git push -f	-	deny
+force-cluster-push	pre_tool	shell	git push -uf origin feat-x	-	deny
+plus-refspec-push	pre_tool	shell	git push origin +feat-x	-	deny
+colon-refspec-push	pre_tool	shell	git push origin :feat-x	-	deny
+delete-push	pre_tool	shell	git push --delete origin feat-x	-	deny
+all-push	pre_tool	shell	git push --all	-	deny
+cd-then-push	pre_tool	shell	cd app && git push origin main	-	deny
+env-prefix-push	pre_tool	shell	FOO=1 git push origin main	-	deny
+global-options-push	pre_tool	shell	git -C /x -c a=b push origin main	-	deny
+quoted-branch-push	pre_tool	shell	git push origin "main"	-	deny
+sh-c-push	pre_tool	shell	sh -c "git push origin feat-x"	-	deny
+subshell-push	pre_tool	shell	echo $(git push origin feat-x)	-	deny
+pr-merge	pre_tool	shell	gh pr merge 12 --squash	-	deny
+auth-token	pre_tool	shell	gh auth token	-	deny
+ruleset-write	pre_tool	shell	gh api -X PUT repos/o/r/rulesets/1	-	deny
+protection-write	pre_tool	shell	gh api repos/o/r/branches/main/protection -f x=y	-	deny
+path-pr-merge	pre_tool	shell	/opt/homebrew/bin/gh pr merge 3	-	deny
+sub-main-c-push	pre_tool	shell	git -C sub push	with-sub-main	deny
+sub-main-cd-push	pre_tool	shell	cd sub && git push	with-sub-main	deny
+commit-substitution-push	pre_tool	shell	git commit -m "$(cat msg.txt)" && git push	on-feature	allow
+echo-substitution-push	pre_tool	shell	echo $(git rev-parse HEAD) && git push	on-feature	allow
+trailing-comment-push	pre_tool	shell	git push origin feat-x # main	on-feature	allow
+branch-substitution-push	pre_tool	shell	git push origin "$(git branch --show-current)"	on-feature	allow
+branch-substitution-main-push	pre_tool	shell	git push origin "$(git branch --show-current)"	on-main	deny
+branch-backtick-main-push	pre_tool	shell	git push origin `git branch --show-current`	on-main	deny
+branch-variable-push	pre_tool	shell	git push origin $BRANCH	on-feature	deny
+rulesets-get-with-fields	pre_tool	shell	gh api repos/o/r/rulesets -X GET -f per_page=1	-	allow
+issue-comment-post	pre_tool	shell	gh api repos/o/r/issues/1/comments -f body=hi	-	allow
+bash-login-push	pre_tool	shell	bash --login -c "git push origin main"	-	deny
+sh-flags-push	pre_tool	shell	sh -x -c "git push origin feat-x"	-	deny
+echo-pipe-sh-push	pre_tool	shell	echo 'git push origin main' | sh	-	deny
+timeout-push	pre_tool	shell	timeout 10 git push origin main	-	deny
+sudo-push	pre_tool	shell	sudo git push origin feat-x	-	deny
+env-option-push	pre_tool	shell	env -u FOO git push origin main	-	deny
+git-dir-env-push	pre_tool	shell	GIT_DIR=sub/.git git push	-	deny
+remote-push-config	pre_tool	shell	git -c remote.origin.push=HEAD:main push origin	-	deny
+alias-config-push	pre_tool	shell	git -c alias.p=push p origin main	-	deny
+quoted-destination-push	pre_tool	shell	git push origin feat-x:"main"	-	deny
+split-quote-push	pre_tool	shell	git push origin "ma"in	-	deny
+backslash-push	pre_tool	shell	git push origin m\ain	-	deny
+sh-c-pr-merge	pre_tool	shell	sh -c "gh pr merge 1"	-	deny
+xargs-pr-merge	pre_tool	shell	echo 1 | xargs gh pr merge	-	deny
+alias-set	pre_tool	shell	gh alias set m 'pr merge'	-	deny
+auth-status-cluster	pre_tool	shell	gh auth status -at	-	deny
+api-delete-ref	pre_tool	shell	gh api -X DELETE repos/o/r/git/refs/heads/main	-	deny
+api-patch-ref	pre_tool	shell	gh api repos/o/r/git/refs/heads/main -X PATCH -f sha=x	-	deny
+api-put-contents	pre_tool	shell	gh api repos/o/r/contents/x -X PUT -f branch=main	-	deny
+api-merges	pre_tool	shell	gh api repos/o/r/merges -f base=main -f head=x	-	deny
+api-pull-merge	pre_tool	shell	gh api -X PUT repos/o/r/pulls/3/merge	-	deny
+api-graphql-merge	pre_tool	shell	gh api graphql -f query=mutation{mergePullRequest}	-	deny
+python-os-system-push	pre_tool	shell	python3 -c "import os; os.system('git push origin main')"	-	deny

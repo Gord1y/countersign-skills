@@ -1,7 +1,7 @@
 # Why orchestrate's rules are what they are
 
-The evidence behind the rules in `SKILL.md`, kept here so the skill itself stays short. Read it
-when a rule looks arbitrary, before changing one.
+The evidence behind the rules in `SKILL.md` and its references, kept here so the skill itself
+stays short. Read it when a rule looks arbitrary, before changing one.
 
 ## Why an orchestrator at all
 

@@ -1,0 +1,15 @@
+case	event	tool	input	setup	expect
+repo-file	pre_tool	edit	src/a.ts	-	allow
+repo-writeups	pre_tool	edit	writeups/x.md	-	allow
+home-plans	pre_tool	edit	~/.claude/plans/p.md	-	allow
+home-memory	pre_tool	edit	~/.claude/projects/m/memory/x.md	-	allow
+worktree-own-file	pre_tool	edit	a.ts	worktree	allow
+worktree-main-writeups	pre_tool	edit	../../../writeups/w.md	worktree	allow
+no-repo-anywhere	pre_tool	edit	/etc/hosts	no-repo	allow
+listed-worktree-own-file	pre_tool	edit	a.ts	listed-worktree	allow
+sibling-of-repo	pre_tool	edit	../outside.txt	-	deny
+system-file	pre_tool	edit	/etc/hosts	-	deny
+home-dotfile	pre_tool	edit	~/.zshrc	-	deny
+second-path-outside	pre_tool	edit	src/a.ts ../x.txt	-	deny
+worktree-edits-main	pre_tool	edit	../../../src/main.ts	worktree	deny
+listed-main-checkout	pre_tool	edit	src/a.ts	listed	deny

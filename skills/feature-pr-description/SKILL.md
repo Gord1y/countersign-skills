@@ -103,6 +103,15 @@ WRITEUPS="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/
 PR_BODY="$WRITEUPS/changes/<date>-<branch>/pr.md"
 ```
 
+When the template and the contract have no place for them, the body carries two more blocks.
+When they have their own sections for these, fill those instead.
+
+- **Evidence**: the same check at the base and at the head. A screenshot pair for UI, the command
+  and its output otherwise.
+- **Merge danger**: one or two lines. Say whether the merge is a one-way door (a migration, a
+  public contract, deleted data, anything expensive to undo) or a two-way door, and give the
+  blast radius from step 3.
+
 Do not open or edit a PR as part of writing the description. Pushing a branch, creating a PR, and
 editing a PR body are visible actions that need the user's explicit go-ahead each time. When they
 give it:
@@ -117,6 +126,7 @@ Use only the allowed PR title types from Repo facts.
 ## 6. Check it against the contract before handing it over
 
 Diff the body against the template: every fixed block from step 4 is there, word for word.
+The Evidence and Merge danger blocks, or the template's own sections for them, are filled.
 
 Walk the contract's "Do not include" list and delete anything that crept in: a verification or
 testing section, a locales section, a recap of what a backend now sends, a commit list, a

@@ -105,6 +105,10 @@ the case says which of the three failed and why. Never ask the user to run a che
 4. **Capture** the evidence (section 5) at the decisive moment.
 5. **Record** the case as PASS, FAIL or BLOCKED, with its evidence.
 
+A UI case covers the state matrix: loading, empty, error and success, each in light and dark.
+A behaviour change runs the same scenario at the base and at the head (the base lane), and the
+result names what differs.
+
 Rules:
 - **Observe, don't assume.** "The button exists" is not "the button works", and a 200 is not "it
   saved": read the persisted state back.
@@ -193,14 +197,17 @@ a file named `report.md`, `findings.md` or `summary.md`, and this skill runs ins
 ## QA run - <scope> - <date>
 
 Surfaces: web at http://localhost:3000, api at http://localhost:8000/api
+Head: <head SHA the run ran against>
 
 | # | Surface | Case | Steps (short) | Expected | Actual | Status | Evidence |
 |---|---------|------|---------------|----------|--------|--------|----------|
 | 1 | web | Settings save | fill form, submit, reload | value kept | value kept | PASS | 01-settings-saved.png |
 | 2 | api | Empty name rejected | POST /settings, name "" | 422, field error | 500 | FAIL | 02-empty-name.http |
 
-**Verdict:** N passed / M failed / K blocked. <one sentence>.
+**Verdict:** N passed / M failed / K blocked at <head SHA>. <one sentence>.
 ```
+
+Every verdict carries the head SHA it ran against, in the header and in the verdict line.
 
 For every FAIL: exact reproduction steps, observed versus expected, and the detail that pins it
 (the status and a response snippet, the stderr line, the console error). A FAIL without a repro is

@@ -2,7 +2,7 @@ responses	claude,codex,antigravity
 code	claude,codex,antigravity
 issues-found	claude,codex,antigravity
 tooling	claude,codex,antigravity
-orchestration	claude
+orchestration	claude,codex
 memory	claude
 research	claude,codex,antigravity
 commits	claude,codex,antigravity

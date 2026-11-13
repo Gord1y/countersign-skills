@@ -1,0 +1,112 @@
+#!/bin/sh
+set -eu
+LC_ALL=C
+export LC_ALL
+
+usage='usage: gate (runs the "gate:" line under "## Gates" in CLAUDE.md or AGENTS.md at the repo root, then stamps the working tree)'
+
+if [ $# -gt 0 ]; then
+  case $1 in
+    -h | --help)
+      echo "$usage"
+      exit 0
+      ;;
+    *)
+      echo "$usage" >&2
+      exit 2
+      ;;
+  esac
+fi
+
+if ! top=$(git rev-parse --show-toplevel 2>/dev/null); then
+  echo "gate: not inside a git repository" >&2
+  exit 2
+fi
+git_dir=$(git -C "$top" rev-parse --absolute-git-dir)
+common=$(git -C "$top" rev-parse --path-format=absolute --git-common-dir)
+
+tree_hash() {
+  index=$(mktemp "${TMPDIR:-/tmp}/gate-index.XXXXXX") || return 1
+  trap 'rm -f "$index"' EXIT
+  trap 'exit 1' INT TERM
+  if [ -e "$git_dir/index" ]; then
+    cp -p "$git_dir/index" "$index" || return 1
+  else
+    rm -f "$index"
+  fi
+  GIT_INDEX_FILE=$index git -C "$top" add -A -- . ':(exclude).claude/worktrees' >/dev/null 2>&1 || return 1
+  tree=$(GIT_INDEX_FILE=$index git -C "$top" write-tree 2>/dev/null) || return 1
+  [ -n "$tree" ] || return 1
+  printf '%s\n' "$tree"
+}
+
+gate_line() {
+  tr -d '\r' <"$1" | awk '
+    /^```/ { fence = !fence; next }
+    fence { next }
+    /^## / { in_gates = ($0 ~ /^## Gates[[:space:]]*$/); next }
+    /^# / { in_gates = 0; next }
+    in_gates && /^gate:[[:space:]]*[^[:space:]]/ {
+      line = $0
+      sub(/^gate:[[:space:]]*/, "", line)
+      sub(/[[:space:]]+$/, "", line)
+      print line
+      exit
+    }'
+}
+
+instruction_file=
+name=CLAUDE.md
+if [ -e "$top/CLAUDE.md" ]; then
+  instruction_file=$top/CLAUDE.md
+elif [ -e "$top/AGENTS.md" ]; then
+  instruction_file=$top/AGENTS.md
+  name=AGENTS.md
+fi
+command=
+if [ -n "$instruction_file" ]; then
+  command=$(gate_line "$instruction_file")
+fi
+if [ -z "$command" ]; then
+  echo "gate: $name has no gate line. Add one line under \"## Gates\" in $name, in the form \"gate: <command that runs all of the repo's gates>\"." >&2
+  exit 3
+fi
+
+if ! before=$(tree_hash); then
+  echo "gate: could not hash the working tree" >&2
+  exit 2
+fi
+
+echo "gate: running $command"
+mkdir -p "$git_dir/countersign" || {
+  echo "gate: cannot write $git_dir/countersign" >&2
+  exit 2
+}
+log=$git_dir/countersign/gate.log
+status=0
+(cd "$top" && sh -c "$command" </dev/null) >"$log" 2>&1 || status=$?
+tail -n 60 "$log"
+
+if [ "$status" -ne 0 ]; then
+  echo "gate: failed with exit $status. Full output: $log" >&2
+  exit 1
+fi
+
+if ! after=$(tree_hash); then
+  echo "gate: could not hash the working tree" >&2
+  exit 2
+fi
+if [ "$after" != "$before" ]; then
+  echo "gate: passed, but the working tree changed while it ran, so it is not stamped. Ignore or commit what the gate writes, then run gate again." >&2
+  exit 4
+fi
+
+stamp_dir=$common/countersign/gate
+if ! mkdir -p "$stamp_dir" ||
+  ! printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$command" >"$stamp_dir/$after.$$" ||
+  ! mv "$stamp_dir/$after.$$" "$stamp_dir/$after"; then
+  rm -f "$stamp_dir/$after.$$"
+  echo "gate: cannot write $stamp_dir" >&2
+  exit 2
+fi
+echo "gate: passed, stamped tree $(printf '%s' "$after" | cut -c1-12)"

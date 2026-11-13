@@ -1,0 +1,38 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|apply_patch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "hook=\"$HOME/.local/bin/harness-hook\"; [ -x \"$hook\" ] || exit 0; exec \"$hook\" codex"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 30,
+            "command": "hook=\"$HOME/.local/bin/harness-hook\"; [ -x \"$hook\" ] || exit 0; exec \"$hook\" codex"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 30,
+            "command": "hook=\"$HOME/.local/bin/harness-hook\"; [ -x \"$hook\" ] || exit 0; exec \"$hook\" codex"
+          }
+        ]
+      }
+    ]
+  }
+}
