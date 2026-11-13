@@ -15,7 +15,7 @@ ignores case.
 
 ```
 Gord1y	Gord1y
-freedomseeker-ai	danylo-freedomseeker
+acme	acme-bot
 ```
 
 The account must be signed in to `gh` (`gh auth login`). The token comes from

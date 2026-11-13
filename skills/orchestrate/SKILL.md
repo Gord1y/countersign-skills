@@ -74,7 +74,8 @@ Each playbook names these steps in this order and adds its own delta.
 - **review**: `conformance` per the orchestration rule's routing table; an unplanned file keeps
   the PR in draft.
 - **pr**: `feature-pr-description` writes `pr.md`; give the push commands, never push.
-- **clickup**: `skip: no ClickUp task` until a task id is known.
+- **clickup**: `skip: no ClickUp task` until a task id is known, and `skip: no clickup agent` when no
+  `clickup` agent is installed; that agent comes from a profile, not from these skills.
 - **retro**: `retro` after a user correction, a failed gate, a revert or a parked unit, else
   `skip: clean run`.
 

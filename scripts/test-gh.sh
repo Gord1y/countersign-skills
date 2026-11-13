@@ -43,10 +43,10 @@ STUB
 chmod 755 "$work/app/agent-gh-token"
 
 apps_file="$work/home/.config/countersign/profile/agent-gh-apps.tsv"
-printf 'freedomseeker-ai\t1\t/nonexistent.pem\n' >"$apps_file"
+printf 'acme\t1\t/nonexistent.pem\n' >"$apps_file"
 
 map_file="$work/home/.config/countersign/profile/gh-accounts.tsv"
-printf 'Gord1y\tGord1y\nfreedomseeker-ai\tdanylo-freedomseeker\n\ngone\tmissing\n' >"$map_file"
+printf 'Gord1y\tGord1y\nacme\tacme-bot\n\ngone\tmissing\n' >"$map_file"
 
 make_repo() {
   git init -q -b main "$work/$1"
@@ -54,7 +54,7 @@ make_repo() {
 }
 
 make_repo mine git@github.com:Gord1y/x.git
-make_repo company https://github.com/Freedomseeker-AI/y.git
+make_repo company https://github.com/Acme/y.git
 make_repo other https://github.com/someone-else/z
 make_repo gone https://github.com/gone/w.git
 
@@ -77,7 +77,7 @@ elif [ "$(cat "$work/out")" != "token=token-Gord1y args=pr list --limit 1" ]; th
 fi
 
 run_gh "$work/company" pr list || true
-[ "$(cat "$work/out")" = "token=token-danylo-freedomseeker args=pr list" ] || fail "an https origin did not match its owner case-insensitively: $(cat "$work/out")"
+[ "$(cat "$work/out")" = "token=token-acme-bot args=pr list" ] || fail "an https origin did not match its owner case-insensitively: $(cat "$work/out")"
 
 run_gh "$work/other" pr list || true
 [ "$(cat "$work/out")" = "token=none args=pr list" ] || fail "an owner outside the map did not pass through: $(cat "$work/out")"
@@ -122,7 +122,7 @@ run_agent_gh "$work/company" pr list || true
 [ "$(cat "$work/out")" = "token=app-token args=pr list" ] || fail "a Codex session did not get the app token: $(cat "$work/out")"
 
 (cd "$work/company" && HOME="$work/home" PATH="$work/wrap:$work/app:$work/stub:/usr/bin:/bin" gh pr list) >"$work/out" 2>"$work/err" || true
-[ "$(cat "$work/out")" = "token=token-danylo-freedomseeker args=pr list" ] || fail "a session without an agent marker did not keep the account token: $(cat "$work/out")"
+[ "$(cat "$work/out")" = "token=token-acme-bot args=pr list" ] || fail "a session without an agent marker did not keep the account token: $(cat "$work/out")"
 
 run_agent_gh "$work/mine" pr list || true
 [ "$(cat "$work/out")" = "token=token-Gord1y args=pr list" ] || fail "an owner without an app row did not keep the account token: $(cat "$work/out")"
