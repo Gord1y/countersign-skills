@@ -196,14 +196,39 @@ run_gate "$work/nested"
 expect_status "nested worktree" 0
 [ "$(stamp_names "$work/nested")" = "$(tree_of_head "$work/nested")" ] || fail "nested worktree: it changed the hash"
 
+new_repo ignored-worktrees
+write_gates "$work/ignored-worktrees" true
+printf '.claude/worktrees/\n' >"$work/ignored-worktrees/.gitignore"
+commit_all "$work/ignored-worktrees" base
+mkdir -p "$work/ignored-worktrees/.claude/worktrees/agent-x"
+echo x >"$work/ignored-worktrees/.claude/worktrees/agent-x/f"
+run_gate "$work/ignored-worktrees"
+expect_status "ignored .claude/worktrees" 0
+[ "$(stamp_names "$work/ignored-worktrees")" = "$(tree_of_head "$work/ignored-worktrees")" ] || fail "ignored .claude/worktrees: the stamp is not HEAD^{tree}"
+
+new_repo tracked-worktrees
+write_gates "$work/tracked-worktrees" true
+commit_all "$work/tracked-worktrees" base
+mkdir -p "$work/tracked-worktrees/.claude/worktrees/agent-x"
+echo x >"$work/tracked-worktrees/.claude/worktrees/agent-x/f"
+run_gate "$work/tracked-worktrees"
+expect_status "unignored .claude/worktrees" 0
+stamp_before=$(stamp_names "$work/tracked-worktrees")
+[ "$stamp_before" = "$(tree_of_head "$work/tracked-worktrees")" ] || fail "unignored .claude/worktrees: the stamp is not HEAD^{tree}"
+echo y >"$work/tracked-worktrees/.claude/worktrees/agent-x/f"
+run_gate "$work/tracked-worktrees"
+expect_status "unignored .claude/worktrees, changed" 0
+[ "$(stamp_names "$work/tracked-worktrees")" = "$stamp_before" ] || fail "unignored .claude/worktrees: a change inside it changed the stamped tree"
+
 new_repo sequence
 write_gates "$work/sequence" true
 commit_all "$work/sequence" base
 
 policy_session=q1
+policy_repo=$work/sequence
 
 policy_event() {
-  jq -nc --arg kind "$1" --arg cwd "$work/sequence" --arg id "$policy_session" '
+  jq -nc --arg kind "$1" --arg cwd "$policy_repo" --arg id "$policy_session" '
     {provider: "claude", event: $kind, tool: (if $kind == "stop" then "none" else "shell" end),
      tool_name: "", command: "", paths: [], cwd: $cwd, session_id: $id, subagent: false,
      stop_hook_active: false}'
@@ -239,6 +264,13 @@ run_policy pre_tool
 run_policy stop
 [ "$policy_status" -eq 0 ] || fail "unsafe session id: expected exit 0, got $policy_status"
 [ ! -e "$work/sequence/.git/countersign/x" ] || fail "unsafe session id: a file escaped the sessions folder"
+
+policy_session=q2
+policy_repo=$work/ignored-worktrees
+run_policy pre_tool
+echo two >"$work/ignored-worktrees/a.txt"
+run_policy stop
+[ "$policy_status" -eq 10 ] || fail "stop with an ignored .claude/worktrees: expected exit 10, got $policy_status"
 
 [ -z "$(ls -A "$work/tmp")" ] || fail "temporary files were left in TMPDIR: $(ls -A "$work/tmp")"
 
