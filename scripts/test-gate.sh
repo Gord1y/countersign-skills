@@ -220,6 +220,22 @@ run_gate "$work/tracked-worktrees"
 expect_status "unignored .claude/worktrees, changed" 0
 [ "$(stamp_names "$work/tracked-worktrees")" = "$stamp_before" ] || fail "unignored .claude/worktrees: a change inside it changed the stamped tree"
 
+for ignored in yes no; do
+  repo=$work/real-worktree-$ignored
+  new_repo "real-worktree-$ignored"
+  write_gates "$repo" true
+  [ "$ignored" = no ] || printf '.claude/worktrees/\n' >"$repo/.gitignore"
+  commit_all "$repo" base
+  git -C "$repo" worktree add -q .claude/worktrees/w1 -b w1
+  echo more >"$repo/.claude/worktrees/w1/b.txt"
+  git -C "$repo/.claude/worktrees/w1" add b.txt
+  git -C "$repo/.claude/worktrees/w1" commit -q -m inner
+  echo dirty >"$repo/.claude/worktrees/w1/untracked.txt"
+  run_gate "$repo"
+  expect_status "real linked worktree, ignored=$ignored" 0
+  [ "$(stamp_names "$repo")" = "$(tree_of_head "$repo")" ] || fail "real linked worktree, ignored=$ignored: the stamp is not the tree without .claude/worktrees"
+done
+
 new_repo sequence
 write_gates "$work/sequence" true
 commit_all "$work/sequence" base

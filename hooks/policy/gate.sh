@@ -27,7 +27,7 @@ tree_hash() {
     rm -f "$index"
   fi
   GIT_INDEX_FILE=$index git -C "$top" add -A -- . >/dev/null 2>&1 || return 1
-  GIT_INDEX_FILE=$index git -C "$top" rm -r -q --cached --ignore-unmatch -- .claude/worktrees >/dev/null 2>&1 || return 1
+  GIT_INDEX_FILE=$index git -C "$top" rm -r -q -f --cached --ignore-unmatch -- .claude/worktrees >/dev/null 2>&1 || return 1
   tree=$(GIT_INDEX_FILE=$index git -C "$top" write-tree 2>/dev/null) || return 1
   [ -n "$tree" ] || return 1
   printf '%s\n' "$tree"
