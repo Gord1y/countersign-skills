@@ -219,6 +219,14 @@ When `~/.codex` exists, `install.sh` also writes two Codex files. `--no-settings
   `trust` line: start `codex` and pick "Review hooks" or "Trust all and continue". The installer
   never writes `trusted_hash`. A tool that rewrites `hooks.json` may drop our entries until the
   next `install.sh` run.
+- On every run the installer also lists each hook key `hooks.json` declares that has no
+  `trusted_hash` in `config.toml`, for `~/.codex` and for each T3 Code shadow home
+  (`~/.t3/userdata/providers/codex/<instance>/shadow`) whose `hooks.json` links to
+  `~/.codex/hooks.json`. Each home gets one `trust` line with a `CODEX_HOME=<home> codex` command.
+  T3 Code runs Codex from the shadow home, and Codex keys trust by the path it opened, so the
+  entries for `~/.codex/hooks.json` do not cover the shadow home. The installer cannot see a stale
+  hash for a changed hook, which the `trust` line after a write covers. It never writes
+  `trusted_hash`.
 - `~/.codex/config.toml` also takes your profile's `codex/config.toml`, so a Codex choice such as
   turning plugins off follows you to every device. The fragment is a TOML subset: comments, blank
   lines, `[table]` headers (dotted, with quoted segments such as `[plugins."x@y"]`) and

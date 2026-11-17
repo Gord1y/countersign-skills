@@ -454,6 +454,9 @@ if [ "$settings" = yes ]; then
   write_settings
   write_codex_config
   write_codex_hooks
+  if [ -d "$codex_home" ] && command -v jq >/dev/null 2>&1; then
+    report_codex_trust
+  fi
 fi
 
 rule_agents() {
