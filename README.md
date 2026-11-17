@@ -83,7 +83,7 @@ Antigravity. For Codex the installer also writes a managed block in
 | `feature-pr-description` | Writes the body of a feature or fix PR to the repo's description contract. | Claude Code, Codex, Antigravity |
 | `promotion-pr-description` | Writes a release or hotfix PR's body from its release note (release into staging, staging into main, a hotfix into either), carrying the repo's PR template. | Claude Code, Codex, Antigravity |
 | `thorough-diff-review` | Runs a full local review of a diff before you push. | Claude Code, Codex, Antigravity |
-| `i18n-translate` | Translates new English message keys into the other locales, one subagent each. | Claude Code, Codex |
+| `i18n-translate` | Translates new English message keys into the other locales, in batched subagents: one for a small change, one per up to 5 locales otherwise. | Claude Code, Codex |
 | `qa-tester` | Tests a change in the running product on every surface it touched (web, API, CLI, native or mobile app, game, library), saves the evidence under `writeups/`, and reports pass or fail. Runs forked under Claude Code. | Claude Code, Codex |
 | `impact-check` | Finds what a change could break outside its diff, and backs its verdict with a script that runs the real code. | Claude Code, Codex, Antigravity |
 | `how-it-works` | Explains how a part of the codebase works, for the person about to change it: its moving parts, the flow with a diagram, where to start reading. | Claude Code, Codex, Antigravity |
