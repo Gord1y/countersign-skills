@@ -8,8 +8,10 @@ trap 'rm -rf "$work"' EXIT
 work=$(cd "$work" && pwd -P)
 failures=0
 hook_home=
+hook_path=
 
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE HARNESS_HOOK_POLICIES
+export XDG_CACHE_HOME=$work/cache
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 export GIT_AUTHOR_NAME=Test GIT_AUTHOR_EMAIL=test@example.com
 export GIT_COMMITTER_NAME=Test GIT_COMMITTER_EMAIL=test@example.com
@@ -117,6 +119,10 @@ run_hook() {
       HOME=$hook_home
       XDG_CONFIG_HOME=$hook_home/.config
       export HOME XDG_CONFIG_HOME
+    fi
+    if [ -n "$hook_path" ]; then
+      PATH=$hook_path
+      export PATH
     fi
     printf '%s' "$3" | HARNESS_HOOK_POLICIES=$2 "$hook_bin" "$1" 2>"$work/stderr"
   ) || hook_status=$?
@@ -485,6 +491,126 @@ for provider in claude codex; do
   { [ ! -e "$work/dump.json" ] && [ "$(verdict pre_tool)" = allow ]; } || fail "$provider: an event with a relative cwd reached a policy"
 done
 unset HARNESS_TEST_DUMP
+
+sweep_count() {
+  if [ -f "$1" ]; then
+    grep -c . "$1" || :
+  else
+    echo 0
+  fi
+}
+
+wait_for_sweeps() {
+  waited=0
+  while [ "$(sweep_count "$1")" -lt "$2" ] && [ "$waited" -lt 50 ]; do
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+}
+
+sweep_repo() {
+  git init -q "$work/sweep/$1"
+  echo "$work/sweep/$1"
+}
+
+mkdir -p "$work/sweep/bin" "$work/sweep/min" "$work/sweep/lone" "$work/sweep/partial"
+ln -s "$root/bin/harness-hook" "$work/sweep/bin/harness-hook"
+ln -s "$root/bin/harness-hook" "$work/sweep/lone/harness-hook"
+for sweep_tool in remove-worktree prune-branches; do
+  printf '#!/bin/sh\necho "%s $PWD" >>"$HARNESS_TEST_SWEEPS"\n' "$sweep_tool" >"$work/sweep/bin/$sweep_tool"
+  chmod 755 "$work/sweep/bin/$sweep_tool"
+done
+for sweep_tool in jq git sh cat dirname basename readlink find mkdir rmdir touch env printf; do
+  sweep_path=$(command -v "$sweep_tool" 2>/dev/null || :)
+  case $sweep_path in
+    /*) ln -s "$sweep_path" "$work/sweep/min/$sweep_tool" ;;
+  esac
+done
+cp "$work/sweep/bin/remove-worktree" "$work/sweep/partial/remove-worktree"
+export HARNESS_TEST_SWEEPS="$work/sweeps.log"
+original_path=$PATH
+PATH="$work/sweep/bin:$original_path"
+
+for provider in claude codex; do
+  sweep_dir=$(sweep_repo "$provider-once")
+  sweep_stop=$(provider_json "$provider" stop - - "$sweep_dir")
+  : >"$HARNESS_TEST_SWEEPS"
+  run_hook "$provider" "$work/policies/frame" "$sweep_stop"
+  { [ "$hook_status" -eq 0 ] && [ -z "$hook_out" ] && [ -z "$hook_err" ]; } || fail "$provider: a sweeping stop exited $hook_status with '$hook_out' '$hook_err'"
+  wait_for_sweeps "$HARNESS_TEST_SWEEPS" 2
+  expect_verdict "$provider sweep starts remove-worktree then prune-branches" "remove-worktree $sweep_dir${newline}prune-branches $sweep_dir" "$(cat "$HARNESS_TEST_SWEEPS")"
+
+  run_hook "$provider" "$work/policies/frame" "$sweep_stop"
+  sleep 1
+  expect_verdict "$provider second stop inside 30 minutes starts no sweep" 2 "$(sweep_count "$HARNESS_TEST_SWEEPS")"
+  { [ "$hook_status" -eq 0 ] && [ -z "$hook_out" ]; } || fail "$provider: a throttled stop exited $hook_status with '$hook_out'"
+
+  touch -t 200001010000 "$sweep_dir/.git/countersign/sweep.stamp"
+  run_hook "$provider" "$work/policies/frame" "$sweep_stop"
+  wait_for_sweeps "$HARNESS_TEST_SWEEPS" 4
+  expect_verdict "$provider stop after the stamp aged starts a sweep" 4 "$(sweep_count "$HARNESS_TEST_SWEEPS")"
+  [ ! -e "$sweep_dir/.git/countersign/sweep.lock" ] || fail "$provider: the sweep lock was left behind"
+
+  sweep_dir=$(sweep_repo "$provider-linked")
+  git -C "$sweep_dir" commit -q --allow-empty -m "chore: seed"
+  git -C "$sweep_dir" worktree add -q -b linked "$work/sweep/$provider-linked-wt"
+  : >"$HARNESS_TEST_SWEEPS"
+  run_hook "$provider" "$work/policies/frame" "$(provider_json "$provider" stop - - "$work/sweep/$provider-linked-wt")"
+  wait_for_sweeps "$HARNESS_TEST_SWEEPS" 2
+  expect_verdict "$provider stop in a linked worktree sweeps from the main checkout" "remove-worktree $sweep_dir${newline}prune-branches $sweep_dir" "$(cat "$HARNESS_TEST_SWEEPS")"
+
+  sweep_dir=$(sweep_repo "$provider-stale")
+  mkdir -p "$sweep_dir/.git/countersign/sweep.lock"
+  touch -t 200001010000 "$sweep_dir/.git/countersign/sweep.lock"
+  : >"$HARNESS_TEST_SWEEPS"
+  run_hook "$provider" "$work/policies/frame" "$(provider_json "$provider" stop - - "$sweep_dir")"
+  wait_for_sweeps "$HARNESS_TEST_SWEEPS" 2
+  expect_verdict "$provider stop over a stale lock still sweeps" 2 "$(sweep_count "$HARNESS_TEST_SWEEPS")"
+
+  sweep_dir=$(sweep_repo "$provider-subagent")
+  : >"$HARNESS_TEST_SWEEPS"
+  run_hook "$provider" "$work/policies/frame" "$(provider_json "$provider" subagent_stop - - "$sweep_dir")"
+  sleep 1
+  expect_verdict "$provider subagent stop starts no sweep" 0 "$(sweep_count "$HARNESS_TEST_SWEEPS")"
+
+  sweep_dir=$(sweep_repo "$provider-blocked")
+  : >"$sweep_dir/block-stop"
+  : >"$HARNESS_TEST_SWEEPS"
+  run_hook "$provider" "$work/policies/frame" "$(provider_json "$provider" stop - - "$sweep_dir")"
+  wait_for_sweeps "$HARNESS_TEST_SWEEPS" 2
+  expect_verdict "$provider blocked stop still decides deny" deny "$(verdict stop)"
+  expect_verdict "$provider blocked stop still sweeps" 2 "$(sweep_count "$HARNESS_TEST_SWEEPS")"
+
+  sweep_dir=$work/sweep/$provider-plain
+  mkdir -p "$sweep_dir"
+  : >"$HARNESS_TEST_SWEEPS"
+  run_hook "$provider" "$work/policies/frame" "$(provider_json "$provider" stop - - "$sweep_dir")"
+  sleep 1
+  expect_verdict "$provider stop outside a repository starts no sweep" 0 "$(sweep_count "$HARNESS_TEST_SWEEPS")"
+
+  sweep_dir=$(sweep_repo "$provider-missing")
+  hook_path="$work/sweep/partial:$work/sweep/min"
+  hook_bin=$work/sweep/lone/harness-hook
+  : >"$HARNESS_TEST_SWEEPS"
+  run_hook "$provider" "$work/policies/frame" "$(provider_json "$provider" stop - - "$sweep_dir")"
+  hook_path=
+  hook_bin=$root/bin/harness-hook
+  sleep 1
+  expect_verdict "$provider stop without prune-branches on PATH starts no sweep" 0 "$(sweep_count "$HARNESS_TEST_SWEEPS")"
+  [ ! -e "$sweep_dir/.git/countersign" ] || fail "$provider: a skipped sweep left state in the repository"
+
+  sweep_dir=$(sweep_repo "$provider-installed")
+  hook_path="$work/sweep/min"
+  hook_bin=$work/sweep/bin/harness-hook
+  : >"$HARNESS_TEST_SWEEPS"
+  run_hook "$provider" "$work/policies/frame" "$(provider_json "$provider" stop - - "$sweep_dir")"
+  hook_path=
+  hook_bin=$root/bin/harness-hook
+  wait_for_sweeps "$HARNESS_TEST_SWEEPS" 2
+  expect_verdict "$provider stop sweeps with the tools beside the hook but off PATH" 2 "$(sweep_count "$HARNESS_TEST_SWEEPS")"
+done
+sleep 1
+unset HARNESS_TEST_SWEEPS
 
 settings=$root/claude/settings.json
 expected_matcher='Bash|Edit|Write|MultiEdit|NotebookEdit'

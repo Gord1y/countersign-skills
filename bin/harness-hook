@@ -18,6 +18,7 @@ if ! command -v jq >/dev/null 2>&1; then
 fi
 trap 'exit 0' EXIT
 
+invoked_dir=$(cd "$(dirname "$0")" 2>/dev/null && pwd) || invoked_dir=
 self=$0
 while [ -L "$self" ]; do
   target=$(readlink "$self")
@@ -32,6 +33,43 @@ adapter=$root/hooks/adapters/$provider.sh
 [ -f "$adapter" ] || exit 0
 policies=${HARNESS_HOOK_POLICIES:-$root/hooks/policy}
 [ -d "$policies" ] || exit 0
+
+start_sweep() {
+  saved_path=$PATH
+  sweep_path=$PATH${invoked_dir:+:$invoked_dir}
+  PATH=$sweep_path
+  found=0
+  if command -v remove-worktree >/dev/null 2>&1 && command -v prune-branches >/dev/null 2>&1; then
+    found=1
+  fi
+  PATH=$saved_path
+  [ "$found" -eq 1 ] || return 0
+  common=$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 0
+  state=$common/countersign
+  mkdir -p "$state" 2>/dev/null || return 0
+  if [ -n "$(find "$state/sweep.lock" -maxdepth 0 -mmin +2 2>/dev/null)" ]; then
+    rmdir "$state/sweep.lock" 2>/dev/null || :
+  fi
+  mkdir "$state/sweep.lock" 2>/dev/null || return 0
+  if [ -f "$state/sweep.stamp" ] && [ -z "$(find "$state/sweep.stamp" -maxdepth 0 -mmin +30 2>/dev/null)" ]; then
+    rmdir "$state/sweep.lock" 2>/dev/null || :
+    return 0
+  fi
+  : >"$state/sweep.stamp" 2>/dev/null || {
+    rmdir "$state/sweep.lock" 2>/dev/null || :
+    return 0
+  }
+  from=$1
+  if [ "$(basename "$common")" = .git ] && [ -d "$(dirname "$common")" ]; then
+    from=$(dirname "$common")
+  fi
+  (
+    cd "$from" 2>/dev/null || exit 0
+    trap '' HUP
+    env PATH="$sweep_path" sh -c 'remove-worktree --landed; prune-branches' >"$state/sweep.log" 2>&1 </dev/null &
+  )
+  rmdir "$state/sweep.lock" 2>/dev/null || :
+}
 
 raw=$(cat)
 adapted=$(printf '%s' "$raw" | sh "$adapter" 2>/dev/null) || exit 0
@@ -62,6 +100,10 @@ event=$(printf '%s' "$adapted" | jq -c '
       stop_hook_active: (.stop_hook_active == true)
     }' 2>/dev/null) || exit 0
 [ -n "$event" ] || exit 0
+
+if [ "$(printf '%s' "$event" | jq -r '.event == "stop" and (.subagent | not)')" = true ]; then
+  start_sweep "$(printf '%s' "$event" | jq -r '.cwd')" || :
+fi
 
 if [ "$(printf '%s' "$event" | jq -r '.event == "stop" and .stop_hook_active')" = true ]; then
   exit 0

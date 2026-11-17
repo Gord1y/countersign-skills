@@ -129,6 +129,34 @@ Exit 10 is the only deny code. It avoids 1, which `set -e` produces by accident,
 A stop that is already inside a block (`stop_hook_active` true) is always allowed, before any policy
 runs. A policy that blocks a stop therefore blocks it once per stop chain and can never loop.
 
+## The stop sweep
+
+`bin/harness-hook` starts a cleanup on every `stop` of a main session, before any policy runs, so
+it happens even when a policy blocks the stop. A subagent's stop does not start it. It exists
+because a session under a host such as T3 Code lives for hours and is killed, so the `SessionEnd`
+hook that runs `remove-worktree --landed` almost never fires there, and Codex has no such hook.
+Running it from the hook that both providers already trust adds no hook entry, so a Codex install
+asks for no new trust.
+
+The sweep runs `remove-worktree --landed`, then `prune-branches`, from the repository's main
+checkout, fully detached: standard input from `/dev/null`, output into
+`<git-dir>/countersign/sweep.log` (replaced on each sweep), and `SIGHUP` ignored. The hook returns
+at once, prints nothing and never changes the stop decision.
+
+- It runs at most once in 30 minutes per repository. `<git-dir>/countersign/sweep.stamp` holds the
+  time of the last start, and a `mkdir` lock, `sweep.lock`, held only while the hook checks and
+  writes the stamp, keeps two parallel stops from both starting one. A lock older than two minutes
+  is a leftover and is removed.
+- It finds the repository from the stop's `cwd` through the common git directory, so a stop in a
+  linked worktree sweeps the same repository.
+- It needs `remove-worktree` and `prune-branches`, found on `PATH` or in the folder the hook was
+  started from (`~/.local/bin` after an install). Without both it does nothing and writes nothing.
+- `remove-worktree --landed` covers `.claude/worktrees/` of the main checkout and of every linked
+  worktree. It never touches a linked worktree itself, so T3 Code's own worktrees under
+  `~/.t3/worktrees` stay with T3 Code.
+- `prune-branches` reads only local remote-tracking refs: it needs no network and no `gh`, so it
+  cannot block on either. A repository with no `origin` makes it print one line into the log.
+
 ## Codex limits
 
 Codex does not pass a tool call's `workdir` to the hook, so `cwd` is the session's directory. A
@@ -321,6 +349,39 @@ through `sh -c`, prints the last 60 lines of its output, and keeps the full outp
 An exit 4 means the gate writes files that are neither ignored nor committed. Ignore or commit them,
 then run `gate` again.
 
+#### The tree lock
+
+One `gate` runs per working tree at a time. A gate takes the lock `<git-dir>/countersign/gate.lock`
+(a folder made with `mkdir`, the atomic step, holding the gate's pid) and releases it on exit,
+`INT` and `TERM`. A second gate in the same tree prints `gate: another gate is running in this tree
+(pid N); waiting for it. Do not start another gate.` and polls every 2 seconds. When the lock frees
+and the tree already has a stamp, it prints that the tree passed and exits 0 without running the
+command again. Otherwise it runs the gate itself. The single `gate.log` is therefore never written
+by two runs.
+
+A holder counts as dead only when `kill -0` reports `No such process`. Any other failure means
+alive: the Claude Code macOS sandbox makes `kill -0` on another process fail with `Operation not
+permitted` even when it runs. A dead holder's lock is removed under a `<lock>.reap` guard folder that
+re-checks the holder first, so two waiters cannot remove a lock the other just retook. A lock
+folder whose pid is missing or malformed is dead only once it is older than a minute.
+
+#### Machine slots
+
+At most `COUNTERSIGN_GATE_SLOTS` gates run at once on the machine, default 2. A value that is not a
+positive integer makes `gate` exit 2 with a message. The slots are the folders `slot-1` to
+`slot-N` under `${XDG_CACHE_HOME:-$HOME/.cache}/countersign/gate-slots/`, each holding the pid of
+its gate, with the same liveness rule as the tree lock. A gate takes a slot after the tree lock, so
+a waiting second gate in one tree never holds a slot. When every slot is taken it prints `gate: N
+gates are running on this machine; waiting for a slot.` and polls every 2 seconds.
+
+When the slot folder cannot be created (a sandbox that does not let the gate write there), `gate`
+prints one warning and runs without the cap; the tree lock still applies. The Claude Code sandbox
+this repo installs allows `~/.cache`. The Codex config it installs uses `workspace-write`, which
+does not, so a Codex gate runs uncapped and warns.
+
+An agent that sees the waiting line starts no second gate and runs `gate` with a Bash timeout of
+600000, because a gate that queues behind another one takes longer than the default 120 seconds.
+
 #### The tree hash
 
 The hash is `git write-tree` over a temporary copy of the real index (`cp -p`, so git's racy-stat
@@ -342,8 +403,11 @@ checkout once the orchestrator lands the same changes.
 
 The base is the tree a stop must differ from.
 
-- A builder (a `SubagentStop` in a linked worktree) is held against `HEAD`'s tree, so any
-  uncommitted change needs a stamp. A subagent in the main checkout (the read-only ones) passes.
+- A builder (a `SubagentStop` in its own worktree, a path matching `*/.claude/worktrees/agent-*`,
+  which covers Claude builders and Codex `agent-codex-NN`) is held against `HEAD`'s tree, so any
+  uncommitted change needs a stamp. A subagent in any other tree (the main checkout, a T3 worktree,
+  its parent's tree) passes: the parent's own `Stop` still demands one gate. Without this, 14
+  translators sharing one T3 worktree each ran a full gate at once.
 - The main session is held against the tree recorded at its first tool call, in
   `<git-dir>/countersign/sessions/<session_id>`. A session that changed nothing, or only answered,
   never blocks. A stop before any tool call records the base and passes. A session id with other

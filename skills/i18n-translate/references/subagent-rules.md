@@ -39,6 +39,10 @@ Read this first. It applies to every locale file you write.
 - Never use the English value as a placeholder. An untranslated value byte-identical to English is
   exactly what the identical-value check fails on.
 
+## Gates
+
+Never run `gate`. The orchestrator gates once after every locale lands.
+
 ## JSON formatting
 
 2-space indent, no trailing commas, double-quoted keys and values, one trailing newline, and key

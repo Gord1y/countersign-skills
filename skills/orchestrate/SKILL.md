@@ -69,7 +69,8 @@ Each playbook names these steps in this order and adds its own delta.
 - **build**: per When this engages; fence each batch (`references/orchestrator-mode.md` Step 6).
 - **knowledge**: `repo-knowledge` "Update and lint" for touched paths, before prove so the gate
   covers it; `skip: no docs/knowledge/index.md`.
-- **prove**: `gate` passes; a fix lands with a test that failed first; `qa` or `qa-tester` per
+- **prove**: `gate` passes (a gate that waits on a tree lock or machine slot is normal: run it with
+  a Bash timeout of 600000 and never start a second one); a fix lands with a test that failed first; `qa` or `qa-tester` per
   surface; a UI diff gets a `walkthrough`.
 - **review**: `conformance` per the orchestration rule's routing table; an unplanned file keeps
   the PR in draft.

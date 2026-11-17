@@ -47,6 +47,11 @@ linked_worktree() {
   cd .claude/worktrees/agent-x
 }
 
+foreign_worktree() {
+  git worktree add -q -b wt .claude/worktrees/feature-x
+  cd .claude/worktrees/feature-x
+}
+
 case $state in
   clean)
     start
@@ -152,6 +157,12 @@ case $state in
   wt-edited)
     start
     linked_worktree
+    edit
+    pwd -P
+    ;;
+  foreign-wt-edited)
+    start
+    foreign_worktree
     edit
     pwd -P
     ;;

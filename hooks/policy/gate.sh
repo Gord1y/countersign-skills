@@ -86,7 +86,10 @@ fi
 [ "$kind" = stop ] || exit 0
 
 if [ "$subagent" = true ]; then
-  [ "$git_dir" != "$common" ] || exit 0
+  case $top in
+    */.claude/worktrees/agent-*) ;;
+    *) exit 0 ;;
+  esac
   base=$(git -C "$top" rev-parse -q --verify 'HEAD^{tree}' 2>/dev/null) || base=$empty_tree
 else
   [ -n "$safe_id" ] || exit 0

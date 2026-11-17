@@ -346,6 +346,33 @@ elif has_branch codex-01; then
   fail "the removed codex worktree's branch is still there"
 fi
 
+nested_landed="$work/feature/.claude/worktrees/agent-nested-landed"
+nested_open="$work/feature/.claude/worktrees/agent-nested-open"
+git -C "$work/feature" worktree add -q -b worktree-agent-nested-landed "$nested_landed" HEAD
+git -C "$work/feature" worktree add -q -b worktree-agent-nested-open "$nested_open" HEAD
+printf 'nested\n' >"$nested_landed/nested.txt"
+git -C "$nested_landed" add nested.txt
+git -C "$nested_landed" commit -q -m "feat: nested"
+git -C "$work/feature" merge -q --ff-only worktree-agent-nested-landed
+printf 'open\n' >"$nested_open/open.txt"
+git -C "$nested_open" add open.txt
+git -C "$nested_open" commit -q -m "feat: nested open"
+feature_real=$(cd "$work/feature" && pwd -P)
+run --landed
+if [ "$status" -ne 0 ] || [ -e "$nested_landed" ]; then
+  fail "--landed did not remove a landed builder nested in a linked checkout: $status $(cat "$work/out")"
+elif ! git -C "$repo" show-ref --verify -q refs/heads/worktree-agent-nested-open || [ ! -d "$nested_open" ]; then
+  fail "--landed removed an unlanded builder nested in a linked checkout: $(cat "$work/out")"
+elif git -C "$repo" show-ref --verify -q refs/heads/worktree-agent-nested-landed; then
+  fail "the branch of a removed nested builder is still there"
+elif [ ! -d "$feature_real" ] || ! git -C "$repo" worktree list --porcelain | grep -qx "worktree $feature_real"; then
+  fail "--landed touched the linked checkout itself"
+fi
+(cd "$work/feature" && "$remove" --landed) >"$work/out" 2>&1 || :
+if [ ! -d "$nested_open" ]; then
+  fail "--landed run from a linked checkout removed an unlanded nested builder: $(cat "$work/out")"
+fi
+
 run
 if [ "$status" -ne 2 ]; then
   fail "no arguments exited $status, not 2"

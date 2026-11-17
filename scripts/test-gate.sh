@@ -16,6 +16,8 @@ export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 export GIT_AUTHOR_NAME=Test GIT_AUTHOR_EMAIL=test@example.com
 export GIT_COMMITTER_NAME=Test GIT_COMMITTER_EMAIL=test@example.com
 export GIT_CEILING_DIRECTORIES=$work
+export XDG_CACHE_HOME=$work/cache
+unset COUNTERSIGN_GATE_SLOTS
 
 fail() {
   echo "test-gate: $1" >&2
@@ -322,6 +324,189 @@ run_policy pre_tool
 echo two >"$work/policy-real-worktree/a.txt"
 run_policy stop
 [ "$policy_status" -eq 10 ] || fail "stop with a real linked worktree under .claude/worktrees: expected exit 10, got $policy_status"
+
+wait_for_text() {
+  waited=0
+  until grep -qF -- "$2" "$1" 2>/dev/null; do
+    waited=$((waited + 1))
+    [ "$waited" -le 150 ] || return 1
+    sleep 0.1
+  done
+}
+
+expect_gate_pid() {
+  case "$(ps -o command= -p "$1")" in
+    *"$gate"*) ;;
+    *) fail "$2: the background pid is not the gate, so killing it leaves the gate running" ;;
+  esac
+}
+
+wait_for_file() {
+  waited=0
+  until [ -f "$1" ]; do
+    waited=$((waited + 1))
+    [ "$waited" -le 150 ] || return 1
+    sleep 0.1
+  done
+}
+
+hold_command() {
+  printf 'echo run >>%s; : >%s; while [ ! -f %s ]; do sleep 0.1; done' "$1/runs" "$1/started" "$1/release"
+}
+
+new_repo lock-sees-itself
+write_gates "$work/lock-sees-itself" 'test -f .git/countersign/gate.lock/pid'
+commit_all "$work/lock-sees-itself" base
+run_gate "$work/lock-sees-itself"
+expect_status "the gate holds the tree lock while it runs" 0
+[ ! -e "$work/lock-sees-itself/.git/countersign/gate.lock" ] || fail "tree lock: not released after a pass"
+
+new_repo lock-failing
+write_gates "$work/lock-failing" false
+commit_all "$work/lock-failing" base
+run_gate "$work/lock-failing"
+expect_status "failing gate with a lock" 1
+[ ! -e "$work/lock-failing/.git/countersign/gate.lock" ] || fail "tree lock: not released after a failure"
+
+new_repo lock-wait
+mkdir "$work/lock-wait-ctl"
+write_gates "$work/lock-wait" "$(hold_command "$work/lock-wait-ctl")"
+commit_all "$work/lock-wait" base
+(cd "$work/lock-wait" && exec "$gate" >"$work/lock-first.out" 2>&1) &
+first_pid=$!
+wait_for_file "$work/lock-wait-ctl/started" || fail "tree lock: the first gate never started"
+holder_pid=$(cat "$work/lock-wait/.git/countersign/gate.lock/pid")
+(cd "$work/lock-wait" && exec "$gate" >"$work/lock-second.out" 2>&1) &
+second_pid=$!
+wait_for_text "$work/lock-second.out" "waiting for it. Do not start another gate." || fail "tree lock: the second gate did not wait"
+expect_in "tree lock wait line" "$work/lock-second.out" "gate: another gate is running in this tree (pid $holder_pid); waiting for it."
+: >"$work/lock-wait-ctl/release"
+first_status=0
+wait "$first_pid" || first_status=$?
+second_status=0
+wait "$second_pid" || second_status=$?
+[ "$first_status" -eq 0 ] || fail "tree lock: the first gate exited $first_status"
+[ "$second_status" -eq 0 ] || fail "tree lock: the second gate exited $second_status"
+expect_in "tree lock, second gate" "$work/lock-second.out" "already passed"
+[ "$(wc -l <"$work/lock-wait-ctl/runs" | tr -d ' ')" = 1 ] || fail "tree lock: the gate command ran more than once"
+[ ! -e "$work/lock-wait/.git/countersign/gate.lock" ] || fail "tree lock: not released after the wait"
+
+new_repo lock-stale
+write_gates "$work/lock-stale" true
+commit_all "$work/lock-stale" base
+sh -c 'exit 0' &
+dead_pid=$!
+wait "$dead_pid" || true
+mkdir -p "$work/lock-stale/.git/countersign/gate.lock"
+printf '%s\n' "$dead_pid" >"$work/lock-stale/.git/countersign/gate.lock/pid"
+run_gate "$work/lock-stale"
+expect_status "a lock held by a dead process" 0
+[ ! -e "$work/lock-stale/.git/countersign/gate.lock" ] || fail "tree lock: a dead holder's lock was not cleared"
+
+new_repo lock-unprovable
+write_gates "$work/lock-unprovable" true
+commit_all "$work/lock-unprovable" base
+mkdir -p "$work/lock-unprovable/.git/countersign/gate.lock"
+printf '1\n' >"$work/lock-unprovable/.git/countersign/gate.lock/pid"
+(cd "$work/lock-unprovable" && exec "$gate" >"$work/lock-unprovable.out" 2>&1) &
+unprovable_pid=$!
+wait_for_text "$work/lock-unprovable.out" "waiting for it" || fail "tree lock: a holder whose kill -0 is refused was treated as dead"
+expect_gate_pid "$unprovable_pid" "tree lock, lock-unprovable"
+kill "$unprovable_pid" 2>/dev/null || true
+wait "$unprovable_pid" 2>/dev/null || true
+[ -f "$work/lock-unprovable/.git/countersign/gate.lock/pid" ] || fail "tree lock: a gate that never held the lock removed it"
+
+new_repo lock-term
+mkdir "$work/lock-term-ctl"
+write_gates "$work/lock-term" "$(hold_command "$work/lock-term-ctl")"
+commit_all "$work/lock-term" base
+(cd "$work/lock-term" && exec "$gate" >"$work/lock-term.out" 2>&1) &
+term_pid=$!
+wait_for_file "$work/lock-term-ctl/started" || fail "tree lock: the gate to terminate never started"
+kill -TERM "$(cat "$work/lock-term/.git/countersign/gate.lock/pid")"
+: >"$work/lock-term-ctl/release"
+term_status=0
+wait "$term_pid" || term_status=$?
+[ "$term_status" -ne 0 ] || fail "tree lock: a terminated gate exited 0"
+[ ! -e "$work/lock-term/.git/countersign/gate.lock" ] || fail "tree lock: not released after TERM"
+[ ! -e "$work/cache/countersign/gate-slots/slot-1" ] || fail "slots: not released after TERM"
+
+new_repo lock-garbage-pid
+write_gates "$work/lock-garbage-pid" true
+commit_all "$work/lock-garbage-pid" base
+mkdir -p "$work/lock-garbage-pid/.git/countersign/gate.lock"
+printf 'not-a-pid\n' >"$work/lock-garbage-pid/.git/countersign/gate.lock/pid"
+(cd "$work/lock-garbage-pid" && exec "$gate" >"$work/lock-garbage-pid.out" 2>&1) &
+garbage_pid=$!
+wait_for_text "$work/lock-garbage-pid.out" "waiting for it" || fail "tree lock: a fresh lock with a malformed pid was treated as dead"
+expect_gate_pid "$garbage_pid" "tree lock, lock-garbage-pid"
+kill "$garbage_pid" 2>/dev/null || true
+wait "$garbage_pid" 2>/dev/null || true
+
+new_repo slot-invalid
+write_gates "$work/slot-invalid" true
+commit_all "$work/slot-invalid" base
+for bad_slots in 0 abc -1 1.5 ''; do
+  COUNTERSIGN_GATE_SLOTS=$bad_slots
+  export COUNTERSIGN_GATE_SLOTS
+  run_gate "$work/slot-invalid"
+  unset COUNTERSIGN_GATE_SLOTS
+  expect_status "COUNTERSIGN_GATE_SLOTS='$bad_slots'" 2
+  expect_in "COUNTERSIGN_GATE_SLOTS='$bad_slots'" "$work/err" "COUNTERSIGN_GATE_SLOTS must be a positive integer"
+done
+
+new_repo slot-holds
+write_gates "$work/slot-holds" "test -f $work/cache/countersign/gate-slots/slot-1/pid"
+commit_all "$work/slot-holds" base
+run_gate "$work/slot-holds"
+expect_status "the gate holds a machine slot while it runs" 0
+[ ! -e "$work/cache/countersign/gate-slots/slot-1" ] || fail "slots: not released after a pass"
+
+new_repo slot-a
+new_repo slot-b
+mkdir "$work/slot-ctl"
+write_gates "$work/slot-a" "$(hold_command "$work/slot-ctl")"
+write_gates "$work/slot-b" 'echo b >>'"$work/slot-ctl/b-ran"
+commit_all "$work/slot-a" base
+commit_all "$work/slot-b" base
+(cd "$work/slot-a" && exec env COUNTERSIGN_GATE_SLOTS=1 "$gate" >"$work/slot-a.out" 2>&1) &
+slot_a_pid=$!
+wait_for_file "$work/slot-ctl/started" || fail "slots: the first gate never started"
+(cd "$work/slot-b" && exec env COUNTERSIGN_GATE_SLOTS=1 "$gate" >"$work/slot-b.out" 2>&1) &
+slot_b_pid=$!
+wait_for_text "$work/slot-b.out" "gate: 1 gates are running on this machine; waiting for a slot." || fail "slots: the second gate did not wait"
+[ ! -f "$work/slot-ctl/b-ran" ] || fail "slots: the second gate ran while the only slot was taken"
+: >"$work/slot-ctl/release"
+slot_a_status=0
+wait "$slot_a_pid" || slot_a_status=$?
+slot_b_status=0
+wait "$slot_b_pid" || slot_b_status=$?
+[ "$slot_a_status" -eq 0 ] || fail "slots: the first gate exited $slot_a_status"
+[ "$slot_b_status" -eq 0 ] || fail "slots: the second gate exited $slot_b_status"
+[ -f "$work/slot-ctl/b-ran" ] || fail "slots: the second gate never ran after the slot freed"
+
+new_repo slot-stale
+write_gates "$work/slot-stale" true
+commit_all "$work/slot-stale" base
+mkdir -p "$work/cache/countersign/gate-slots/slot-1"
+printf '%s\n' "$dead_pid" >"$work/cache/countersign/gate-slots/slot-1/pid"
+COUNTERSIGN_GATE_SLOTS=1
+export COUNTERSIGN_GATE_SLOTS
+run_gate "$work/slot-stale"
+unset COUNTERSIGN_GATE_SLOTS
+expect_status "a slot held by a dead process" 0
+
+new_repo slot-unwritable
+write_gates "$work/slot-unwritable" true
+commit_all "$work/slot-unwritable" base
+XDG_CACHE_HOME=/dev/null/none
+export XDG_CACHE_HOME
+run_gate "$work/slot-unwritable"
+XDG_CACHE_HOME=$work/cache
+export XDG_CACHE_HOME
+expect_status "an unwritable slot folder" 0
+expect_in "an unwritable slot folder" "$work/err" "running without the machine-wide cap"
+[ -n "$(stamp_names "$work/slot-unwritable")" ] || fail "an unwritable slot folder: no stamp"
 
 [ -z "$(ls -A "$work/tmp")" ] || fail "temporary files were left in TMPDIR: $(ls -A "$work/tmp")"
 
