@@ -1,6 +1,6 @@
 ---
 name: i18n-translate
-description: "Translate added or changed source-locale message keys into every target locale, one cheap subagent per locale, then run the repo's translation check."
+description: "Translate added or changed source-locale message keys into every target locale with batched cheap subagents, then run the repo's translation check."
 when_to_use: "Use before pushing a change that adds or edits user-facing strings."
 effort: medium
 context: fork
@@ -34,7 +34,7 @@ it as missing, with the one line to add to CLAUDE.md so the next run finds it.
 | Translation check command | `pnpm i18n:check` |
 
 Where a language code is ambiguous (`no` is Norwegian Bokmål or Nynorsk), name the variant in that
-locale's subagent prompt. Nothing in CI can detect that drift.
+locale's translator prompt. Nothing in CI can detect that drift.
 
 ## 1. Build the worklist
 
@@ -51,23 +51,32 @@ Then run the translation check command from Repo facts. An empty worklist with f
 you are repairing pre-existing drift rather than translating new work: fix exactly what the check
 output names.
 
-## 2. Dispatch one subagent per locale THAT HAS WORK
+## 2. Dispatch translators in batches, for the locales THAT HAVE WORK
 
-Dispatch ONLY the locales that actually need work, and say how many you dispatched and why. A key
-added or changed in English needs every target locale. But when the worklist is empty you are
-repairing drift the checks found, and the check output names the locales it is unhappy with:
-dispatching the others spends a full context each to confirm there is nothing to do. Never dispatch
-a locale you cannot name a reason for.
+Dispatch ONLY the locales that actually need work. A key added or changed in English needs every
+target locale. But when the worklist is empty you are repairing drift the checks found, and the
+check output names the locales it is unhappy with: dispatching the others spends a context to
+confirm there is nothing to do. Never include a locale you cannot name a reason for.
 
-**Claude Code.** Spawn one subagent per locale with the `Agent` tool,
-all in one message: `subagent_type: "general-purpose"`, `model: "haiku"`, `effort: "low"`. Every
-`Agent` call MUST pass `run_in_background: false`. Subagents run in the background by default,
-and a backgrounded subagent reports back only on a later turn.
+Every translator pays a fresh context plus the glossary, so cost scales with the translator count.
+Batch by string count:
+
+- Count the strings: the keys in the worklist (`added` plus `changed`), or, when repairing drift
+  with an empty worklist, the failing keys the check names.
+- Under 20 strings: ONE translator takes every locale that has work.
+- 20 strings or more: one translator per group of up to 5 locales. Make the groups as even as
+  possible (12 locales: 3 translators of 4, not 5+5+2).
+- Say how many translators you dispatched, the string count and the locale groups.
+
+**Claude Code.** Spawn one subagent per translator with the `Agent` tool, all in one message, with
+the same `subagent_type: "general-purpose"`, `model: "haiku"` and `effort: "low"`. Every `Agent`
+call MUST pass `run_in_background: false`. Subagents run in the background by default, and a
+backgrounded subagent reports back only on a later turn.
 
 **Under Codex** there is no `Agent` tool and no Haiku tier. Use Codex's own subagent tool if it
-has one, with the same per-locale brief. Without one, translate the locales yourself one at a
-time: for each locale, read its own current file before writing and apply section 3 and
-`references/subagent-rules.md` as if you were that locale's subagent. Sections 4 and 5 are
+has one, with the same per-batch brief. Without one, translate the locales yourself one at a
+time: for each locale, read its current file before writing and apply section 3 and
+`references/subagent-rules.md` as if you were that locale's translator. Sections 4 and 5 are
 unchanged.
 
 ## 3. What each subagent may touch
@@ -85,13 +94,13 @@ Tell each subagent it may read exactly these, each named absolutely:
 - the translation and JSON rules, read first: on the Claude Code route the file
   `${CLAUDE_SKILL_DIR}/references/subagent-rules.md`
 - `<root>/<source-folder>/<file>`: the English source
-- `<root>/<messages-folder>/<its-locale>/<file>`: its own current translations
+- `<root>/<messages-folder>/<locale>/<file>`: the current translations, for each of its locales
 - `<root>/<glossary-file>`: terminology, never-translate list, typography
 
-and may edit ONLY files under `<root>/<messages-folder>/<its-locale>/`. It must read its own
-locale file before writing: a translator that cannot see the existing file re-coins terminology
-that is already consistent, and nothing in CI can detect terminology drift; only a native reader
-can.
+and may edit ONLY files under `<root>/<messages-folder>/<locale>/` for the locales in its batch.
+It must read each of its locale files before writing: a translator that cannot see the existing
+file re-coins terminology that is already consistent, and nothing in CI can detect terminology
+drift; only a native reader can.
 
 After the subagents return, confirm where the edits actually landed before trusting any of it:
 
@@ -106,7 +115,7 @@ carrying an added or changed key are in scope; a subagent that opens `invoices.j
 one key in `settings.json` has spent tokens for nothing, in a fresh context that shares no cache
 with yours.
 
-Every subagent you dispatch reads the glossary, so its size is multiplied by the number of locales.
+Every subagent you dispatch reads the glossary, so its size is multiplied by the number of translators.
 Quote the parts that bear on THIS batch directly in the subagent prompt (the terms actually
 appearing in the changed strings, the never-translate list, and the dash rule) and tell the
 subagent to open the file only if it needs something you did not quote.
@@ -117,7 +126,7 @@ Do NOT trust a subagent's report that it finished. After the subagents return, r
 check command from Repo facts.
 
 Iterate (re-dispatch or fix directly) until it exits 0, for AT MOST THREE rounds after the first
-dispatch. Re-dispatch only the locales still failing, never the whole set. A loop that has not
+dispatch. Re-dispatch only the locales still failing, batched by the same rule, never the whole set. A loop that has not
 converged in three rounds is usually hitting something a subagent cannot fix, not something one
 more try will solve.
 
@@ -127,7 +136,7 @@ that is a human's call: the glossary and the script are edited together, never o
 
 ## 5. Report
 
-Say which locales you dispatched and why, what the translation check finally reported, and every remaining failure you
+Say how many translators you dispatched, the string count and the locale groups, and why those locales. Then say what the translation check finally reported, and every remaining failure you
 chose not to force. A locale nobody can read is only as trustworthy as the account you give of it.
 
 If `local.md` exists next to this file, read it; where it disagrees with this file, it wins.

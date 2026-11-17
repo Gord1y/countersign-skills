@@ -438,6 +438,35 @@ out=$(HOME=$cxgone CLAUDE_CONFIG_DIR= "$root/uninstall.sh")
 echo "$out" | grep -q "^kept    .*codex-config-displaced.toml (the managed block was already gone)" || fail "uninstall.sh did not report the displaced values it kept"
 grep -qx 'approval_policy = "on-request"' "$cxgone/.config/countersign/skills/codex-config-displaced.toml" || fail "uninstall.sh deleted the displaced values after the block was already gone"
 
+cxtrust="$fake/cxtrust"
+cxtrustcodex="$cxtrust/.codex"
+cxshadowa="$cxtrust/.t3/userdata/providers/codex/codex_a/shadow"
+cxshadowb="$cxtrust/.t3/userdata/providers/codex/codex_b/shadow"
+mkdir -p "$cxtrustcodex"
+printf '[hooks.state."%s/hooks.json:stop:0:0"]\ntrusted_hash = "sha256:aa"\n\n[hooks.state."/other/hooks.json:pre_tool_use:0:0"]\ntrusted_hash = "sha256:bb"\n' "$cxtrustcodex" >"$cxtrustcodex/config.toml"
+HOME=$cxtrust CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null
+mkdir -p "$cxshadowa" "$cxshadowb"
+ln -s "$cxtrustcodex/hooks.json" "$cxshadowa/hooks.json"
+ln -s "$cxtrustcodex/config.toml" "$cxshadowa/config.toml"
+cp "$cxtrustcodex/hooks.json" "$cxshadowb/hooks.json"
+grep '^\[hooks\.state' "$cxtrustcodex/config.toml" >"$cxtrust/tables.before"
+out=$(HOME=$cxtrust CLAUDE_CONFIG_DIR= "$root/install.sh")
+[ "$(echo "$out" | grep -c "^trust   Codex skips .* in $cxtrustcodex/hooks.json ")" -eq 1 ] || fail "install.sh did not print exactly one trust line for the Codex home"
+echo "$out" | grep "^trust   Codex skips .* in $cxtrustcodex/hooks.json " | grep -q "2 hooks.*(pre_tool_use:0:0, subagent_stop:0:0).*CODEX_HOME=$cxtrustcodex codex" || fail "the trust line for the Codex home did not name its two untrusted hooks"
+echo "$out" | grep "^trust   Codex skips 3 hooks in $cxshadowa/hooks.json " | grep -q "(pre_tool_use:0:0, stop:0:0, subagent_stop:0:0).*CODEX_HOME=$cxshadowa codex" || fail "install.sh did not name the three untrusted hooks of the T3 shadow home"
+echo "$out" | grep -q "$cxshadowb" && fail "install.sh named a shadow home whose hooks.json is a copy, not a link"
+grep '^\[hooks\.state' "$cxtrustcodex/config.toml" >"$cxtrust/tables.after"
+cmp -s "$cxtrust/tables.before" "$cxtrust/tables.after" || fail "install.sh changed the hooks.state tables of config.toml"
+grep -q 'trusted_hash = "sha256:aa"' "$cxtrustcodex/config.toml" && [ "$(grep -c trusted_hash "$cxtrustcodex/config.toml")" -eq 2 ] || fail "install.sh wrote a trusted_hash"
+
+cxtrusted="$fake/cxtrusted"
+cxtrustedcodex="$cxtrusted/.codex"
+mkdir -p "$cxtrustedcodex"
+HOME=$cxtrusted CLAUDE_CONFIG_DIR= "$root/install.sh" >/dev/null
+printf '[hooks.state]\n"%s/hooks.json:subagent_stop:0:0" = { enabled = true, trusted_hash = "sha256:x" }\n\n[hooks.state."%s/hooks.json:pre_tool_use:0:0"]\ntrusted_hash = "sha256:y"\n\n[hooks.state."%s/hooks.json:stop:0:0"]\ntrusted_hash = "sha256:z"\n' "$cxtrustedcodex" "$cxtrustedcodex" "$cxtrustedcodex" >>"$cxtrustedcodex/config.toml"
+out=$(HOME=$cxtrusted CLAUDE_CONFIG_DIR= "$root/install.sh")
+echo "$out" | grep -q '^trust   Codex skips' && fail "install.sh named hooks that all have a trust entry"
+
 cxfrag="$fake/cxfrag"
 cxfragfile="$cxfrag/.config/countersign/profile/codex/config.toml"
 cxfragconfig="$cxfrag/.codex/config.toml"

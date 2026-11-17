@@ -21,7 +21,7 @@
 
 | Work | Under T3 | Outside T3, or on fallback |
 | --- | --- | --- |
-| One translator per locale (`i18n-translate`) | `haiku`, `low` | `haiku`, `low` |
+| Translators for `i18n-translate`: one under 20 strings, else one per up to 5 locales | `haiku`, `low` | `haiku`, `low` |
 | A mechanical build unit (the brief names every change) | `builder`, `sonnet`, `medium` | `builder`, `sonnet`, `medium` |
 | Conformance review of Claude-written code | `delegate_task` to `codex`, `gpt-6-sol`, `reasoningEffort: high`, `agents/conformance.md` as the role | `conformance`, `sonnet`, `high`; the report says the review was same-family |
 | Conformance review of Codex-written code | `delegate_task` to `claudeAgent`, `claude-sonnet-5-5`, `effort: high`, `agents/conformance.md` as the role | From Claude: `conformance`, `sonnet`, `high`. From Codex: I run it in Claude Code |

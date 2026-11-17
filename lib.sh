@@ -747,3 +747,62 @@ merge_codex_hooks='
         end)
   | if (.hooks // null) == {} then del(.hooks) else . end
 '
+
+codex_declared_hooks='
+  if type == "object" and ((.hooks // {}) | type) == "object" and ([(.hooks // {})[] | type] | all(. == "array")) then . else error("not a hooks file") end
+  | (.hooks // {}) | to_entries[]
+  | (.key | gsub("(?<a>[a-z0-9])(?<b>[A-Z])"; "\(.a)_\(.b)") | ascii_downcase) as $event
+  | .value | to_entries[]
+  | .key as $group
+  | (.value.hooks // []) | keys[]
+  | "\($event):\($group):\(.)"
+'
+
+codex_trusted_keys() {
+  [ -f "$1" ] || return 0
+  awk '
+    /^[ \t]*\[/ {
+      line = $0
+      sub(/^[ \t]*/, "", line)
+      sub(/[ \t]*(#.*)?$/, "", line)
+      table = ""
+      in_state = 0
+      if (line == "[hooks.state]") in_state = 1
+      else if (index(line, "[hooks.state.\"") == 1 && substr(line, length(line) - 1) == "\"]") table = substr(line, 15, length(line) - 16)
+      next
+    }
+    table != "" && /^[ \t]*trusted_hash[ \t]*=[ \t]*"[^"]+"/ { print table }
+    in_state && /^[ \t]*"[^"]+"[ \t]*=[ \t]*\{.*trusted_hash[ \t]*=[ \t]*"[^"]+"/ {
+      line = $0
+      sub(/^[ \t]*"/, "", line)
+      print substr(line, 1, index(line, "\"") - 1)
+    }
+  ' "$1"
+}
+
+report_codex_trust_home() {
+  trust_home=$1
+  [ -r "$trust_home/hooks.json" ] || return 0
+  declared_keys=$(jq -r "$codex_declared_hooks" "$trust_home/hooks.json" 2>/dev/null) || return 0
+  trusted_keys=$(codex_trusted_keys "$trust_home/config.toml")
+  untrusted_count=0
+  untrusted_list=
+  for short_key in $declared_keys; do
+    if printf '%s\n' "$trusted_keys" | grep -Fxq -- "$trust_home/hooks.json:$short_key"; then continue; fi
+    untrusted_count=$((untrusted_count + 1))
+    untrusted_list="${untrusted_list:+$untrusted_list, }$short_key"
+  done
+  [ "$untrusted_count" -gt 0 ] || return 0
+  untrusted_noun=hooks
+  [ "$untrusted_count" -ne 1 ] || untrusted_noun=hook
+  echo "trust   Codex skips $untrusted_count $untrusted_noun in $trust_home/hooks.json with no trust entry ($untrusted_list): run CODEX_HOME=$trust_home codex and pick \"Trust all and continue\""
+}
+
+report_codex_trust() {
+  report_codex_trust_home "$codex_home"
+  for shadow_home in "$HOME"/.t3/userdata/providers/codex/*/shadow; do
+    [ -L "$shadow_home/hooks.json" ] || continue
+    [ "$(readlink "$shadow_home/hooks.json")" = "$codex_hooks" ] || continue
+    report_codex_trust_home "$shadow_home"
+  done
+}

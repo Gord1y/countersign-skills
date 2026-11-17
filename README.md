@@ -58,7 +58,7 @@ Where everything lands, how copies and settings merge, backups and unattended ru
 
 | | Claude Code | Codex | Antigravity | skills.sh |
 | --- | --- | --- | --- | --- |
-| Skills | 17 | 17 | 12 | skills only |
+| Skills | 18 | 18 | 12 | skills only |
 | Rules | 10 | 9 | 8 | no |
 | Subagents | 6 | no | no | no |
 | Settings defaults | yes | no | no | no |
@@ -80,10 +80,11 @@ Antigravity. For Codex the installer also writes a managed block in
 | `retro` | Turns a session's mistakes into structure, not notes: each lesson goes to the highest rung that works, and its fix is proven on the real mistake. Orchestrate runs it after a correction, failed gate, revert or parked unit. | Claude Code, Codex, Antigravity |
 | `codebase-research` | Picks the cheapest way to research code, with an explicit model on any spawn. | Claude Code, Codex |
 | `release-notes` | Writes release note entries, keeps an open note in step with its branch, and keeps the release index current. | Claude Code, Codex, Antigravity |
+| `release-brief` | Writes the UX probe's brief for a release: what changed for users since the last probe run, in user terms only, checked by a lint that strips paths, code names, selectors and click paths. | Claude Code, Codex |
 | `feature-pr-description` | Writes the body of a feature or fix PR to the repo's description contract. | Claude Code, Codex, Antigravity |
 | `promotion-pr-description` | Writes a release or hotfix PR's body from its release note (release into staging, staging into main, a hotfix into either), carrying the repo's PR template. | Claude Code, Codex, Antigravity |
 | `thorough-diff-review` | Runs a full local review of a diff before you push. | Claude Code, Codex, Antigravity |
-| `i18n-translate` | Translates new English message keys into the other locales, one subagent each. | Claude Code, Codex |
+| `i18n-translate` | Translates new English message keys into the other locales, in batched subagents: one for a small change, one per up to 5 locales otherwise. | Claude Code, Codex |
 | `qa-tester` | Tests a change in the running product on every surface it touched (web, API, CLI, native or mobile app, game, library), saves the evidence under `writeups/`, and reports pass or fail. Runs forked under Claude Code. | Claude Code, Codex |
 | `impact-check` | Finds what a change could break outside its diff, and backs its verdict with a script that runs the real code. | Claude Code, Codex, Antigravity |
 | `how-it-works` | Explains how a part of the codebase works, for the person about to change it: its moving parts, the flow with a diagram, where to start reading. | Claude Code, Codex, Antigravity |
@@ -94,6 +95,10 @@ Antigravity. For Codex the installer also writes a managed block in
 
 Manual skills have `disable-model-invocation: true` and an `agents/openai.yaml` that does the same
 for Codex: their description costs no context, and only you start them, with `/name`.
+
+The UX probe is a blind black-box reviewer. The `orchestrate` release playbook launches it as its
+own T3 Code thread, after `release-brief` writes its brief, and triages what it finds. Set it up
+with `bin/probe-init`; details in `docs/ux-probe.md`.
 
 The process skills (research, PR descriptions, release notes, review, QA, translation) are written
 for any repo. They read the facts they need, such as paths, commands and the branch flow, from your

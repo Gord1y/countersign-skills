@@ -1,0 +1,298 @@
+#!/bin/sh
+set -eu
+LC_ALL=C
+export LC_ALL
+unset CDPATH
+
+usage="usage: probe-init <folder> --deny <path> [--deny <path>]... [--deny-tool <rule>]..."
+newline='
+'
+
+fail_usage() {
+  echo "$usage" >&2
+  exit 2
+}
+
+require_plain_value() {
+  case $1 in
+    "" | *"$newline"*) fail_usage ;;
+  esac
+}
+
+folder=
+denies=
+deny_tools=
+
+while [ "$#" -gt 0 ]; do
+  case $1 in
+    -h | --help)
+      echo "$usage"
+      exit 0
+      ;;
+    --deny | --deny-tool)
+      [ "$#" -ge 2 ] || fail_usage
+      require_plain_value "$2"
+      if [ "$1" = --deny ]; then
+        denies=$denies$2$newline
+      else
+        deny_tools=$deny_tools$2$newline
+      fi
+      shift 2
+      ;;
+    -*)
+      fail_usage
+      ;;
+    *)
+      [ -z "$folder" ] || fail_usage
+      require_plain_value "$1"
+      folder=$1
+      shift
+      ;;
+  esac
+done
+
+if [ -z "$folder" ] || [ -z "$denies" ]; then
+  fail_usage
+fi
+
+for tool in jq git; do
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    echo "probe-init: $tool not found" >&2
+    exit 2
+  fi
+done
+
+refuse_unsafe_path() {
+  case "/$1/" in
+    */../*)
+      echo "probe-init: $1 has a .. segment; give the path without it" >&2
+      exit 2
+      ;;
+  esac
+  case $1 in
+    *'*'* | *'?'* | *'['* | *']'* | *'('* | *')'* | *'\'*)
+      echo "probe-init: $1 has a character a permission rule would read as a pattern" >&2
+      exit 2
+      ;;
+  esac
+}
+
+absolute_path() {
+  case $1 in
+    /*) echo "$1" ;;
+    *) echo "$PWD/$1" ;;
+  esac
+}
+
+join_path() {
+  if [ "$1" = / ]; then
+    echo "/$2"
+  else
+    echo "$1/$2"
+  fi
+}
+
+physical_path() {
+  if [ -d "$1" ]; then
+    (cd "$1" && pwd -P)
+  else
+    join_path "$(cd "$(dirname "$1")" && pwd -P)" "$(basename "$1")"
+  fi
+}
+
+resolve_existing() {
+  current=$1
+  hops=0
+  while [ -L "$current" ] && [ "$hops" -lt 40 ]; do
+    link=$(readlink "$current")
+    case $link in
+      /*) current=$link ;;
+      *) current=$(dirname "$current")/$link ;;
+    esac
+    hops=$((hops + 1))
+  done
+  physical_path "$current"
+}
+
+planned_path() {
+  existing=$(absolute_path "$1")
+  missing=
+  while [ ! -e "$existing" ]; do
+    missing=/$(basename "$existing")$missing
+    existing=$(dirname "$existing")
+  done
+  base=$(resolve_existing "$existing")
+  if [ "$base" = / ]; then
+    echo "${missing:-/}"
+  else
+    echo "$base$missing"
+  fi
+}
+
+resolved_denies=
+add_deny() {
+  refuse_unsafe_path "$1"
+  case "$newline$resolved_denies" in
+    *"$newline$1$newline"*) ;;
+    *) resolved_denies=$resolved_denies$1$newline ;;
+  esac
+}
+
+refuse_unsafe_path "$folder"
+
+old_ifs=$IFS
+IFS=$newline
+for path in $denies; do
+  refuse_unsafe_path "$path"
+  if [ ! -e "$path" ]; then
+    echo "probe-init: $path does not exist" >&2
+    exit 2
+  fi
+  add_deny "$(resolve_existing "$path")"
+done
+for relative in .t3/worktrees .claude/projects .claude/plans .codex/sessions; do
+  add_deny "$(planned_path "$HOME/$relative")"
+done
+IFS=$old_ifs
+
+folder_planned=$(planned_path "$folder")
+refuse_unsafe_path "$folder_planned"
+
+ancestor=$folder_planned
+while [ ! -d "$ancestor" ]; do
+  ancestor=$(dirname "$ancestor")
+done
+
+if git_output=$(git -C "$ancestor" rev-parse --is-inside-work-tree 2>&1); then
+  if [ "$git_output" = true ]; then
+    echo "probe-init: $folder is inside a git work tree; the probe needs a folder outside every repo" >&2
+    exit 2
+  fi
+else
+  case $git_output in
+    *"not a git repository"*) ;;
+    *)
+      first_line=$(printf '%s\n' "$git_output" | head -n 1)
+      echo "probe-init: cannot tell whether $folder is inside a git work tree: $first_line" >&2
+      exit 2
+      ;;
+  esac
+fi
+
+IFS=$newline
+for path in $resolved_denies; do
+  overlaps=
+  if [ "$path" = / ]; then
+    overlaps=yes
+  else
+    case "$folder_planned/" in
+      "$path"/*) overlaps=yes ;;
+    esac
+    case "$path/" in
+      "$folder_planned"/*) overlaps=yes ;;
+    esac
+  fi
+  if [ -n "$overlaps" ]; then
+    echo "probe-init: $folder overlaps the denied path $path" >&2
+    exit 2
+  fi
+done
+IFS=$old_ifs
+
+self=$0
+while [ -L "$self" ]; do
+  link=$(readlink "$self")
+  case $link in
+    /*) self=$link ;;
+    *) self=$(dirname "$self")/$link ;;
+  esac
+done
+root=$(cd "$(dirname "$self")/.." && pwd -P)
+template=$root/probe/CLAUDE.template.md
+if [ ! -f "$template" ]; then
+  echo "probe-init: $template does not exist" >&2
+  exit 2
+fi
+
+generated=$(mktemp "${TMPDIR:-/tmp}/probe-init.XXXXXX")
+staged=
+cleanup() {
+  rm -f "$generated"
+  [ -z "$staged" ] || rm -f "$staged"
+}
+trap cleanup EXIT
+
+jq -n \
+  --arg denies "$resolved_denies" \
+  --arg tools "$deny_tools" '
+  def lines: split("\n") | map(select(. != ""));
+  ($denies | lines) as $paths
+  | {
+      permissions: {
+        deny: (
+          ($paths | map("Read(/" + . + ")", "Read(/" + . + "/**)", "Edit(/" + . + ")", "Edit(/" + . + "/**)"))
+          + [
+            "Bash", "WebFetch", "WebSearch",
+            "mcp__t3-code__t3_thread_*", "mcp__t3-code__t3_project_*",
+            "mcp__t3-code__t3_worktree_*", "mcp__t3-code__t3_environment_*",
+            "mcp__t3-code__delegate_task", "mcp__t3-code__task_*", "mcp__t3-code__create_threads"
+          ]
+          + ($tools | lines)
+        )
+      },
+      sandbox: {
+        enabled: true,
+        failIfUnavailable: true,
+        allowUnsandboxedCommands: false,
+        filesystem: { denyRead: $paths }
+      }
+    }' >"$generated"
+
+mkdir -p "$folder_planned/.claude"
+target=$(cd "$folder_planned" && pwd -P)
+settings=$target/.claude/settings.json
+
+if [ -f "$settings" ] && cmp -s "$generated" "$settings"; then
+  echo "ok      $settings"
+else
+  staged=$(mktemp "$target/.claude/settings.XXXXXX")
+  cp "$generated" "$staged"
+  mv "$staged" "$settings"
+  staged=
+  echo "wrote   $settings"
+fi
+
+mkdir -p "$target/briefs" "$target/screenshots"
+
+create_once() {
+  if [ -e "$1" ]; then
+    echo "kept    $1"
+  else
+    cat >"$1"
+    echo "wrote   $1"
+  fi
+}
+
+create_once "$target/CLAUDE.md" <"$template"
+create_once "$target/journal.md" <<'EOF'
+# Journal
+
+One entry per run, newest first.
+EOF
+create_once "$target/candidates.md" <<'EOF'
+# Candidates
+
+Newest run last. The format is in CLAUDE.md.
+EOF
+create_once "$target/verdicts.md" <<'EOF'
+# Verdicts
+
+Triage writes these after each run. Read them, never edit them.
+EOF
+create_once "$target/accounts.md" <<'EOF'
+# Accounts
+
+The standing qa-probe- organization and its accounts on the local stack.
+EOF
+
+echo "next    create a T3 Code project for $target and launch the probe thread there; the release brief goes into $target/brief.md"

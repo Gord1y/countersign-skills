@@ -219,6 +219,14 @@ When `~/.codex` exists, `install.sh` also writes two Codex files. `--no-settings
   `trust` line: start `codex` and pick "Review hooks" or "Trust all and continue". The installer
   never writes `trusted_hash`. A tool that rewrites `hooks.json` may drop our entries until the
   next `install.sh` run.
+- On every run the installer also lists each hook key `hooks.json` declares that has no
+  `trusted_hash` in `config.toml`, for `~/.codex` and for each T3 Code shadow home
+  (`~/.t3/userdata/providers/codex/<instance>/shadow`) whose `hooks.json` links to
+  `~/.codex/hooks.json`. Each home gets one `trust` line with a `CODEX_HOME=<home> codex` command.
+  T3 Code runs Codex from the shadow home, and Codex keys trust by the path it opened, so the
+  entries for `~/.codex/hooks.json` do not cover the shadow home. The installer cannot see a stale
+  hash for a changed hook, which the `trust` line after a write covers. It never writes
+  `trusted_hash`.
 - `~/.codex/config.toml` also takes your profile's `codex/config.toml`, so a Codex choice such as
   turning plugins off follows you to every device. The fragment is a TOML subset: comments, blank
   lines, `[table]` headers (dotted, with quoted segments such as `[plugins."x@y"]`) and
@@ -477,6 +485,17 @@ any worktree, or a branch nothing was committed on yet. It never judges a branch
 remote copy or its upstream, so a pushed branch with an open pull request stays. It prints
 `deleted <branch>: <how>` or `kept <branch>: <why>` per branch. Like `remove-worktree`, it exits
 before deleting anything when it runs inside the sandbox.
+
+## The probe-init command
+
+`bin/probe-init <folder> --deny <path>... [--deny-tool <rule>]...` sets up the UX probe's folder.
+It writes `.claude/settings.json` with `Read` and `Edit` denies for each `--deny` path and four
+defaults (`~/.t3/worktrees`, `~/.claude/projects`, `~/.claude/plans`, `~/.codex/sessions`), denies
+`Bash`, web access and the T3 thread and task tools, and turns on the sandbox with the same paths in
+`denyRead`. It regenerates that file on every run. It refuses a folder inside a git work tree, a
+folder that equals, contains or sits inside a denied path, a `..` segment and pattern characters.
+It never overwrites `CLAUDE.md`, `journal.md`, `candidates.md`, `verdicts.md` or `accounts.md`,
+which hold the probe's history. Details in `docs/ux-probe.md`.
 
 ## Setting up a new machine
 
