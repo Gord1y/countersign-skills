@@ -5,7 +5,7 @@ with `claude plugin eval`, which treats this repo as a plugin (`.claude-plugin/p
 
 ## What it checks
 
-Each of the 14 model-invocable skills has two cases:
+Each of the 15 model-invocable skills has two cases:
 
 - `evals/<skill>-fires`: a request a user would type that the skill is for. The grader passes when
   the model calls the `Skill` tool for that skill.
@@ -63,10 +63,10 @@ Results land in `evals/results/<timestamp>/`, which is gitignored.
 
 ## Cost
 
-One pass is 28 short runs, 14 skills times two cases. Each is a model call billed to your plan or
+One pass is 30 short runs, 15 skills times two cases. Each is a model call billed to your plan or
 API account. Measured on 2026-10-03 with Claude Code 2.1.278 and the session's default model, 23
-runs cost 4.33 USD, about 0.19 USD each, so a full pass is about 5.3 USD. `--max-cost-usd 6` leaves
-room for that and stops a pass that costs more than expected. The ceiling is checked before each
+runs cost 4.33 USD, about 0.19 USD each. 30 runs at that cost come to about 5.7 USD (inferred), still
+under the 6 USD ceiling. `--max-cost-usd 6` leaves room for that and stops a pass that costs more than expected. The ceiling is checked before each
 run starts, so with `-j <n>` the runs already in flight can take a pass past it. `--runs 3`
 triples the cost and smooths the variance of a single sample; `--case` keeps a check to the skill
 you changed.

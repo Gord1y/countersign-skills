@@ -78,6 +78,18 @@
       "path": "skills/release-notes"
     },
     {
+      "name": "release-brief",
+      "version": "1.0.0",
+      "agents": [
+        "claude",
+        "codex"
+      ],
+      "description": "Write the UX probe's release brief: what changed for users since the last probed ref, in user terms only, with no paths, code names, selectors or click paths.",
+      "whenToUse": "Use when a release asks for the UX probe's brief, or when asked to brief the probe on what changed. Not for release notes, changelogs or PR descriptions.",
+      "invocation": "model",
+      "path": "skills/release-brief"
+    },
+    {
       "name": "feature-pr-description",
       "version": "1.3.0",
       "agents": [

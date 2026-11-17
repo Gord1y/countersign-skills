@@ -80,6 +80,7 @@ Antigravity. For Codex the installer also writes a managed block in
 | `retro` | Turns a session's mistakes into structure, not notes: each lesson goes to the highest rung that works, and its fix is proven on the real mistake. Orchestrate runs it after a correction, failed gate, revert or parked unit. | Claude Code, Codex, Antigravity |
 | `codebase-research` | Picks the cheapest way to research code, with an explicit model on any spawn. | Claude Code, Codex |
 | `release-notes` | Writes release note entries, keeps an open note in step with its branch, and keeps the release index current. | Claude Code, Codex, Antigravity |
+| `release-brief` | Writes the UX probe's brief for a release: what changed for users since the last probe run, in user terms only, checked by a lint that strips paths, code names, selectors and click paths. | Claude Code, Codex |
 | `feature-pr-description` | Writes the body of a feature or fix PR to the repo's description contract. | Claude Code, Codex, Antigravity |
 | `promotion-pr-description` | Writes a release or hotfix PR's body from its release note (release into staging, staging into main, a hotfix into either), carrying the repo's PR template. | Claude Code, Codex, Antigravity |
 | `thorough-diff-review` | Runs a full local review of a diff before you push. | Claude Code, Codex, Antigravity |
