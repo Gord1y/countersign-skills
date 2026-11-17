@@ -334,6 +334,13 @@ wait_for_text() {
   done
 }
 
+expect_gate_pid() {
+  case "$(ps -o command= -p "$1")" in
+    *"$gate"*) ;;
+    *) fail "$2: the background pid is not the gate, so killing it leaves the gate running" ;;
+  esac
+}
+
 wait_for_file() {
   waited=0
   until [ -f "$1" ]; do
@@ -365,11 +372,11 @@ new_repo lock-wait
 mkdir "$work/lock-wait-ctl"
 write_gates "$work/lock-wait" "$(hold_command "$work/lock-wait-ctl")"
 commit_all "$work/lock-wait" base
-(cd "$work/lock-wait" && "$gate" >"$work/lock-first.out" 2>&1) &
+(cd "$work/lock-wait" && exec "$gate" >"$work/lock-first.out" 2>&1) &
 first_pid=$!
 wait_for_file "$work/lock-wait-ctl/started" || fail "tree lock: the first gate never started"
 holder_pid=$(cat "$work/lock-wait/.git/countersign/gate.lock/pid")
-(cd "$work/lock-wait" && "$gate" >"$work/lock-second.out" 2>&1) &
+(cd "$work/lock-wait" && exec "$gate" >"$work/lock-second.out" 2>&1) &
 second_pid=$!
 wait_for_text "$work/lock-second.out" "waiting for it. Do not start another gate." || fail "tree lock: the second gate did not wait"
 expect_in "tree lock wait line" "$work/lock-second.out" "gate: another gate is running in this tree (pid $holder_pid); waiting for it."
@@ -401,9 +408,10 @@ write_gates "$work/lock-unprovable" true
 commit_all "$work/lock-unprovable" base
 mkdir -p "$work/lock-unprovable/.git/countersign/gate.lock"
 printf '1\n' >"$work/lock-unprovable/.git/countersign/gate.lock/pid"
-(cd "$work/lock-unprovable" && "$gate" >"$work/lock-unprovable.out" 2>&1) &
+(cd "$work/lock-unprovable" && exec "$gate" >"$work/lock-unprovable.out" 2>&1) &
 unprovable_pid=$!
 wait_for_text "$work/lock-unprovable.out" "waiting for it" || fail "tree lock: a holder whose kill -0 is refused was treated as dead"
+expect_gate_pid "$unprovable_pid" "tree lock, lock-unprovable"
 kill "$unprovable_pid" 2>/dev/null || true
 wait "$unprovable_pid" 2>/dev/null || true
 [ -f "$work/lock-unprovable/.git/countersign/gate.lock/pid" ] || fail "tree lock: a gate that never held the lock removed it"
@@ -412,7 +420,7 @@ new_repo lock-term
 mkdir "$work/lock-term-ctl"
 write_gates "$work/lock-term" "$(hold_command "$work/lock-term-ctl")"
 commit_all "$work/lock-term" base
-(cd "$work/lock-term" && "$gate" >"$work/lock-term.out" 2>&1) &
+(cd "$work/lock-term" && exec "$gate" >"$work/lock-term.out" 2>&1) &
 term_pid=$!
 wait_for_file "$work/lock-term-ctl/started" || fail "tree lock: the gate to terminate never started"
 kill -TERM "$(cat "$work/lock-term/.git/countersign/gate.lock/pid")"
@@ -428,9 +436,10 @@ write_gates "$work/lock-garbage-pid" true
 commit_all "$work/lock-garbage-pid" base
 mkdir -p "$work/lock-garbage-pid/.git/countersign/gate.lock"
 printf 'not-a-pid\n' >"$work/lock-garbage-pid/.git/countersign/gate.lock/pid"
-(cd "$work/lock-garbage-pid" && "$gate" >"$work/lock-garbage-pid.out" 2>&1) &
+(cd "$work/lock-garbage-pid" && exec "$gate" >"$work/lock-garbage-pid.out" 2>&1) &
 garbage_pid=$!
 wait_for_text "$work/lock-garbage-pid.out" "waiting for it" || fail "tree lock: a fresh lock with a malformed pid was treated as dead"
+expect_gate_pid "$garbage_pid" "tree lock, lock-garbage-pid"
 kill "$garbage_pid" 2>/dev/null || true
 wait "$garbage_pid" 2>/dev/null || true
 
@@ -460,10 +469,10 @@ write_gates "$work/slot-a" "$(hold_command "$work/slot-ctl")"
 write_gates "$work/slot-b" 'echo b >>'"$work/slot-ctl/b-ran"
 commit_all "$work/slot-a" base
 commit_all "$work/slot-b" base
-(cd "$work/slot-a" && COUNTERSIGN_GATE_SLOTS=1 "$gate" >"$work/slot-a.out" 2>&1) &
+(cd "$work/slot-a" && exec env COUNTERSIGN_GATE_SLOTS=1 "$gate" >"$work/slot-a.out" 2>&1) &
 slot_a_pid=$!
 wait_for_file "$work/slot-ctl/started" || fail "slots: the first gate never started"
-(cd "$work/slot-b" && COUNTERSIGN_GATE_SLOTS=1 "$gate" >"$work/slot-b.out" 2>&1) &
+(cd "$work/slot-b" && exec env COUNTERSIGN_GATE_SLOTS=1 "$gate" >"$work/slot-b.out" 2>&1) &
 slot_b_pid=$!
 wait_for_text "$work/slot-b.out" "gate: 1 gates are running on this machine; waiting for a slot." || fail "slots: the second gate did not wait"
 [ ! -f "$work/slot-ctl/b-ran" ] || fail "slots: the second gate ran while the only slot was taken"
