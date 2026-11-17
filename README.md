@@ -58,7 +58,7 @@ Where everything lands, how copies and settings merge, backups and unattended ru
 
 | | Claude Code | Codex | Antigravity | skills.sh |
 | --- | --- | --- | --- | --- |
-| Skills | 17 | 17 | 12 | skills only |
+| Skills | 18 | 18 | 12 | skills only |
 | Rules | 10 | 9 | 8 | no |
 | Subagents | 6 | no | no | no |
 | Settings defaults | yes | no | no | no |
@@ -95,6 +95,10 @@ Antigravity. For Codex the installer also writes a managed block in
 
 Manual skills have `disable-model-invocation: true` and an `agents/openai.yaml` that does the same
 for Codex: their description costs no context, and only you start them, with `/name`.
+
+The UX probe is a blind black-box reviewer. The `orchestrate` release playbook launches it as its
+own T3 Code thread, after `release-brief` writes its brief, and triages what it finds. Set it up
+with `bin/probe-init`; details in `docs/ux-probe.md`.
 
 The process skills (research, PR descriptions, release notes, review, QA, translation) are written
 for any repo. They read the facts they need, such as paths, commands and the branch flow, from your

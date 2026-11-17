@@ -486,6 +486,17 @@ remote copy or its upstream, so a pushed branch with an open pull request stays.
 `deleted <branch>: <how>` or `kept <branch>: <why>` per branch. Like `remove-worktree`, it exits
 before deleting anything when it runs inside the sandbox.
 
+## The probe-init command
+
+`bin/probe-init <folder> --deny <path>... [--deny-tool <rule>]...` sets up the UX probe's folder.
+It writes `.claude/settings.json` with `Read` and `Edit` denies for each `--deny` path and four
+defaults (`~/.t3/worktrees`, `~/.claude/projects`, `~/.claude/plans`, `~/.codex/sessions`), denies
+`Bash`, web access and the T3 thread and task tools, and turns on the sandbox with the same paths in
+`denyRead`. It regenerates that file on every run. It refuses a folder inside a git work tree, a
+folder that equals, contains or sits inside a denied path, a `..` segment and pattern characters.
+It never overwrites `CLAUDE.md`, `journal.md`, `candidates.md`, `verdicts.md` or `accounts.md`,
+which hold the probe's history. Details in `docs/ux-probe.md`.
+
 ## Setting up a new machine
 
 The whole setup is this repo, a private profile repo in the same layout, and the few secrets no

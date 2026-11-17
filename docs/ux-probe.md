@@ -59,6 +59,9 @@ probe-init <folder> --deny <each code folder> [--deny-tool mcp__<server>]
 Then create a T3 Code project for the folder and launch the probe thread there. Re-run `probe-init`
 when a code folder or an MCP server changes.
 
+Put the probe folder in the product repo's Repo facts (`CLAUDE.md`). Optionally add it to that
+repo's `permissions.additionalDirectories`, so writing the brief does not ask.
+
 ## Local stack and accounts
 
 The probe visits only `localhost` or `127.0.0.1` and never starts or stops a server. It signs up one
@@ -68,4 +71,15 @@ personal or payment data, and it reports BLOCKED when sign-up needs an inbox or 
 
 ## In a release
 
-The orchestrate release playbook runs the probe; see that skill.
+The `orchestrate` release playbook runs the probe after the release is proven:
+
+1. `release-brief` writes `brief.md` from `last-ref` to the release's `HEAD`, in user terms only.
+2. The playbook launches the probe thread in the probe's T3 Code project and waits for its
+   `PROBE DONE` or `PROBE BLOCKED` line. BLOCKED skips triage and comes to you as an action.
+3. Triage gives each new candidate one verdict, judged against the code: `confirmed`,
+   `by design`, `duplicate` or `not reproducible`.
+4. Confirmed candidates become slices you approve before the release PR.
+5. Verdicts go back to `verdicts.md` in user terms, checked by `brief-lint`.
+6. `last-ref` moves to the release's `HEAD`, so the next brief starts there.
+
+The steps are in `skills/orchestrate/references/ux-probe.md`.

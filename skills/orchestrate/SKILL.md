@@ -94,6 +94,7 @@ to add to CLAUDE.md.
 | --- | --- |
 | When a run ends with a walkthrough: `always`, `when UI changed` or `off` | `always` |
 | The surfaces the product has, and how to reach each | `qa-tester`'s Repo facts |
+| The UX probe folder, for the release playbook's probe steps | none: the release skips the probe |
 
 ## The steps
 
