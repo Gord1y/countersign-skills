@@ -107,11 +107,10 @@ holder_pid() {
 holder_dead() {
   dead_pid=$(holder_pid "$1")
   case $dead_pid in
-    '')
+    '' | *[!0-9]*)
       [ -n "$(find "$1" -maxdepth 0 -mmin +1 2>/dev/null)" ]
       return
       ;;
-    *[!0-9]*) return 0 ;;
   esac
   kill_error=$(kill -0 "$dead_pid" 2>&1) && return 1
   case $kill_error in
@@ -121,9 +120,14 @@ holder_dead() {
 }
 
 reap() {
-  reaped=$1.dead.$$
-  mv "$1" "$reaped" 2>/dev/null || return 0
-  rm -rf "$reaped"
+  if ! mkdir "$1.reap" 2>/dev/null; then
+    [ -z "$(find "$1.reap" -maxdepth 0 -mmin +1 2>/dev/null)" ] || rmdir "$1.reap" 2>/dev/null
+    return 0
+  fi
+  if holder_dead "$1"; then
+    rm -rf "$1"
+  fi
+  rmdir "$1.reap"
 }
 
 lock=$git_dir/countersign/gate.lock

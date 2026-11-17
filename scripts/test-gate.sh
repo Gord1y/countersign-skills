@@ -408,6 +408,32 @@ kill "$unprovable_pid" 2>/dev/null || true
 wait "$unprovable_pid" 2>/dev/null || true
 [ -f "$work/lock-unprovable/.git/countersign/gate.lock/pid" ] || fail "tree lock: a gate that never held the lock removed it"
 
+new_repo lock-term
+mkdir "$work/lock-term-ctl"
+write_gates "$work/lock-term" "$(hold_command "$work/lock-term-ctl")"
+commit_all "$work/lock-term" base
+(cd "$work/lock-term" && "$gate" >"$work/lock-term.out" 2>&1) &
+term_pid=$!
+wait_for_file "$work/lock-term-ctl/started" || fail "tree lock: the gate to terminate never started"
+kill -TERM "$(cat "$work/lock-term/.git/countersign/gate.lock/pid")"
+: >"$work/lock-term-ctl/release"
+term_status=0
+wait "$term_pid" || term_status=$?
+[ "$term_status" -ne 0 ] || fail "tree lock: a terminated gate exited 0"
+[ ! -e "$work/lock-term/.git/countersign/gate.lock" ] || fail "tree lock: not released after TERM"
+[ ! -e "$work/cache/countersign/gate-slots/slot-1" ] || fail "slots: not released after TERM"
+
+new_repo lock-garbage-pid
+write_gates "$work/lock-garbage-pid" true
+commit_all "$work/lock-garbage-pid" base
+mkdir -p "$work/lock-garbage-pid/.git/countersign/gate.lock"
+printf 'not-a-pid\n' >"$work/lock-garbage-pid/.git/countersign/gate.lock/pid"
+(cd "$work/lock-garbage-pid" && "$gate" >"$work/lock-garbage-pid.out" 2>&1) &
+garbage_pid=$!
+wait_for_text "$work/lock-garbage-pid.out" "waiting for it" || fail "tree lock: a fresh lock with a malformed pid was treated as dead"
+kill "$garbage_pid" 2>/dev/null || true
+wait "$garbage_pid" 2>/dev/null || true
+
 new_repo slot-invalid
 write_gates "$work/slot-invalid" true
 commit_all "$work/slot-invalid" base

@@ -333,8 +333,9 @@ by two runs.
 
 A holder counts as dead only when `kill -0` reports `No such process`. Any other failure means
 alive: the Claude Code macOS sandbox makes `kill -0` on another process fail with `Operation not
-permitted` even when it runs. A dead holder's lock is removed and taken over. A lock folder with no
-pid that is older than a minute is also treated as dead.
+permitted` even when it runs. A dead holder's lock is removed under a `<lock>.reap` guard folder that
+re-checks the holder first, so two waiters cannot remove a lock the other just retook. A lock
+folder whose pid is missing or malformed is dead only once it is older than a minute.
 
 #### Machine slots
 
