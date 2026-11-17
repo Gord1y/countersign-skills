@@ -18,6 +18,14 @@ if [ $# -gt 0 ]; then
   esac
 fi
 
+slot_count=${COUNTERSIGN_GATE_SLOTS-2}
+case $slot_count in
+  '' | *[!0-9]* | 0*)
+    echo "gate: COUNTERSIGN_GATE_SLOTS must be a positive integer, got '$slot_count'" >&2
+    exit 2
+    ;;
+esac
+
 if ! top=$(git rev-parse --show-toplevel 2>/dev/null); then
   echo "gate: not inside a git repository" >&2
   exit 2
@@ -79,8 +87,10 @@ mkdir -p "$git_dir/countersign" || {
 }
 
 held_lock=
+held_slot=
 release() {
   [ -z "$held_lock" ] || rm -rf "$held_lock"
+  [ -z "$held_slot" ] || rm -rf "$held_slot"
 }
 trap release EXIT
 trap 'exit 1' INT TERM
@@ -142,6 +152,36 @@ if [ -n "$waited_for_tree" ]; then
     echo "gate: the tree already passed while this gate waited, stamped tree $(printf '%s' "$waited_hash" | cut -c1-12)"
     exit 0
   fi
+fi
+
+slot_root=${XDG_CACHE_HOME:-${HOME:-}/.cache}/countersign/gate-slots
+if mkdir -p "$slot_root" 2>/dev/null && [ -w "$slot_root" ]; then
+  slot_announced=
+  while [ -z "$held_slot" ]; do
+    slot_index=1
+    reaped_any=
+    while [ "$slot_index" -le "$slot_count" ]; do
+      slot=$slot_root/slot-$slot_index
+      if take "$slot"; then
+        held_slot=$slot
+        break
+      fi
+      if holder_dead "$slot"; then
+        reap "$slot"
+        reaped_any=yes
+      fi
+      slot_index=$((slot_index + 1))
+    done
+    [ -z "$held_slot" ] || break
+    [ -z "$reaped_any" ] || continue
+    if [ -z "$slot_announced" ]; then
+      echo "gate: $slot_count gates are running on this machine; waiting for a slot."
+      slot_announced=yes
+    fi
+    sleep 2
+  done
+else
+  echo "gate: cannot create $slot_root; running without the machine-wide cap of $slot_count gates." >&2
 fi
 
 if ! before=$(tree_hash); then

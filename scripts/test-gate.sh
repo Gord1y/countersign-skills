@@ -408,6 +408,71 @@ kill "$unprovable_pid" 2>/dev/null || true
 wait "$unprovable_pid" 2>/dev/null || true
 [ -f "$work/lock-unprovable/.git/countersign/gate.lock/pid" ] || fail "tree lock: a gate that never held the lock removed it"
 
+new_repo slot-invalid
+write_gates "$work/slot-invalid" true
+commit_all "$work/slot-invalid" base
+for bad_slots in 0 abc -1 1.5 ''; do
+  COUNTERSIGN_GATE_SLOTS=$bad_slots
+  export COUNTERSIGN_GATE_SLOTS
+  run_gate "$work/slot-invalid"
+  unset COUNTERSIGN_GATE_SLOTS
+  expect_status "COUNTERSIGN_GATE_SLOTS='$bad_slots'" 2
+  expect_in "COUNTERSIGN_GATE_SLOTS='$bad_slots'" "$work/err" "COUNTERSIGN_GATE_SLOTS must be a positive integer"
+done
+
+new_repo slot-holds
+write_gates "$work/slot-holds" "test -f $work/cache/countersign/gate-slots/slot-1/pid"
+commit_all "$work/slot-holds" base
+run_gate "$work/slot-holds"
+expect_status "the gate holds a machine slot while it runs" 0
+[ ! -e "$work/cache/countersign/gate-slots/slot-1" ] || fail "slots: not released after a pass"
+
+new_repo slot-a
+new_repo slot-b
+mkdir "$work/slot-ctl"
+write_gates "$work/slot-a" "$(hold_command "$work/slot-ctl")"
+write_gates "$work/slot-b" 'echo b >>'"$work/slot-ctl/b-ran"
+commit_all "$work/slot-a" base
+commit_all "$work/slot-b" base
+(cd "$work/slot-a" && COUNTERSIGN_GATE_SLOTS=1 "$gate" >"$work/slot-a.out" 2>&1) &
+slot_a_pid=$!
+wait_for_file "$work/slot-ctl/started" || fail "slots: the first gate never started"
+(cd "$work/slot-b" && COUNTERSIGN_GATE_SLOTS=1 "$gate" >"$work/slot-b.out" 2>&1) &
+slot_b_pid=$!
+wait_for_text "$work/slot-b.out" "gate: 1 gates are running on this machine; waiting for a slot." || fail "slots: the second gate did not wait"
+[ ! -f "$work/slot-ctl/b-ran" ] || fail "slots: the second gate ran while the only slot was taken"
+: >"$work/slot-ctl/release"
+slot_a_status=0
+wait "$slot_a_pid" || slot_a_status=$?
+slot_b_status=0
+wait "$slot_b_pid" || slot_b_status=$?
+[ "$slot_a_status" -eq 0 ] || fail "slots: the first gate exited $slot_a_status"
+[ "$slot_b_status" -eq 0 ] || fail "slots: the second gate exited $slot_b_status"
+[ -f "$work/slot-ctl/b-ran" ] || fail "slots: the second gate never ran after the slot freed"
+
+new_repo slot-stale
+write_gates "$work/slot-stale" true
+commit_all "$work/slot-stale" base
+mkdir -p "$work/cache/countersign/gate-slots/slot-1"
+printf '%s\n' "$dead_pid" >"$work/cache/countersign/gate-slots/slot-1/pid"
+COUNTERSIGN_GATE_SLOTS=1
+export COUNTERSIGN_GATE_SLOTS
+run_gate "$work/slot-stale"
+unset COUNTERSIGN_GATE_SLOTS
+expect_status "a slot held by a dead process" 0
+
+new_repo slot-unwritable
+write_gates "$work/slot-unwritable" true
+commit_all "$work/slot-unwritable" base
+XDG_CACHE_HOME=/dev/null/none
+export XDG_CACHE_HOME
+run_gate "$work/slot-unwritable"
+XDG_CACHE_HOME=$work/cache
+export XDG_CACHE_HOME
+expect_status "an unwritable slot folder" 0
+expect_in "an unwritable slot folder" "$work/err" "running without the machine-wide cap"
+[ -n "$(stamp_names "$work/slot-unwritable")" ] || fail "an unwritable slot folder: no stamp"
+
 [ -z "$(ls -A "$work/tmp")" ] || fail "temporary files were left in TMPDIR: $(ls -A "$work/tmp")"
 
 if [ "$failures" -ne 0 ]; then

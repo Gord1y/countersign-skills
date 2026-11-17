@@ -10,6 +10,7 @@ failures=0
 hook_home=
 
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE HARNESS_HOOK_POLICIES
+export XDG_CACHE_HOME=$work/cache
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 export GIT_AUTHOR_NAME=Test GIT_AUTHOR_EMAIL=test@example.com
 export GIT_COMMITTER_NAME=Test GIT_COMMITTER_EMAIL=test@example.com

@@ -336,6 +336,20 @@ alive: the Claude Code macOS sandbox makes `kill -0` on another process fail wit
 permitted` even when it runs. A dead holder's lock is removed and taken over. A lock folder with no
 pid that is older than a minute is also treated as dead.
 
+#### Machine slots
+
+At most `COUNTERSIGN_GATE_SLOTS` gates run at once on the machine, default 2. A value that is not a
+positive integer makes `gate` exit 2 with a message. The slots are the folders `slot-1` to
+`slot-N` under `${XDG_CACHE_HOME:-$HOME/.cache}/countersign/gate-slots/`, each holding the pid of
+its gate, with the same liveness rule as the tree lock. A gate takes a slot after the tree lock, so
+a waiting second gate in one tree never holds a slot. When every slot is taken it prints `gate: N
+gates are running on this machine; waiting for a slot.` and polls every 2 seconds.
+
+When the slot folder cannot be created (a sandbox that does not let the gate write there), `gate`
+prints one warning and runs without the cap; the tree lock still applies. The Claude Code sandbox
+this repo installs allows `~/.cache`. The Codex config it installs uses `workspace-write`, which
+does not, so a Codex gate runs uncapped and warns.
+
 An agent that sees the waiting line starts no second gate and runs `gate` with a Bash timeout of
 600000, because a gate that queues behind another one takes longer than the default 120 seconds.
 
