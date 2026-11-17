@@ -156,6 +156,11 @@ when that is set, as Countersign does):
   may still run in a parallel session, any change no checkout has committed, and any folder with
   a process running in it. Its `timeout` is 30 seconds; a sweep cut short loses nothing, since
   the folders already renamed into the trash are deleted by the next run.
+- A Claude Code session under a host such as T3 Code lives for hours and is killed, so `SessionEnd`
+  rarely fires there. The same sweep therefore also starts from `bin/harness-hook` on every
+  `Stop` of a session (not of a subagent), for Claude and for Codex, which has no session-end
+  hook. It needs no new hook entry, so a Codex install asks for no new trust. See [the stop
+  sweep](hooks.md#the-stop-sweep).
 
 The previous file goes to the backup folder first, and an unchanged file prints `ok`. Change
 settings in your profile's `settings.json` (or in `claude/settings.json`, for everyone), not in
@@ -405,7 +410,8 @@ as `not committed here since <base>: <path>`.
 ## The remove-worktree command
 
 `bin/remove-worktree <worktree>...` (or `--landed` for every builder worktree, the ones under
-`.claude/worktrees/agent-*`, and `--dry-run` to only report) removes builder worktrees whose work is
+`.claude/worktrees/agent-*` of the main checkout and of every linked worktree, so a builder cut
+inside a feature worktree counts, and `--dry-run` to only report) removes builder worktrees whose work is
 already committed. It judges each worktree against every checkout of the repository that is not a
 builder's: the main checkout and each linked worktree, whatever branch each has out. So work
 landed on a feature branch checked out in a linked worktree counts, from wherever the command runs.
@@ -417,7 +423,7 @@ gone or some commit deleted it. Work landed and then edited further on the branc
 committed, so its worktree goes. A file the builder changed again after its landing is not.
 
 It keeps a worktree, and says why, when it is the main checkout or the one the shell stands in, is
-not listed by `git worktree list`, sits outside `<main checkout>/.claude/worktrees/`, is locked,
+not listed by `git worktree list`, sits outside the `.claude/worktrees/` folder of the main checkout or of a linked worktree, is locked,
 has a `HEAD` on no checkout's branch, or has a file no checkout has committed. Ignored files such
 as `node_modules` never block it. Before it starts, it prunes worktrees whose folder is already
 gone.

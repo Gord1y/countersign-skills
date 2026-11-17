@@ -129,6 +129,34 @@ Exit 10 is the only deny code. It avoids 1, which `set -e` produces by accident,
 A stop that is already inside a block (`stop_hook_active` true) is always allowed, before any policy
 runs. A policy that blocks a stop therefore blocks it once per stop chain and can never loop.
 
+## The stop sweep
+
+`bin/harness-hook` starts a cleanup on every `stop` of a main session, before any policy runs, so
+it happens even when a policy blocks the stop. A subagent's stop does not start it. It exists
+because a session under a host such as T3 Code lives for hours and is killed, so the `SessionEnd`
+hook that runs `remove-worktree --landed` almost never fires there, and Codex has no such hook.
+Running it from the hook that both providers already trust adds no hook entry, so a Codex install
+asks for no new trust.
+
+The sweep runs `remove-worktree --landed`, then `prune-branches`, from the repository's main
+checkout, fully detached: standard input from `/dev/null`, output into
+`<git-dir>/countersign/sweep.log` (replaced on each sweep), and `SIGHUP` ignored. The hook returns
+at once, prints nothing and never changes the stop decision.
+
+- It runs at most once in 30 minutes per repository. `<git-dir>/countersign/sweep.stamp` holds the
+  time of the last start, and a `mkdir` lock, `sweep.lock`, held only while the hook checks and
+  writes the stamp, keeps two parallel stops from both starting one. A lock older than two minutes
+  is a leftover and is removed.
+- It finds the repository from the stop's `cwd` through the common git directory, so a stop in a
+  linked worktree sweeps the same repository.
+- It needs `remove-worktree` and `prune-branches`, found on `PATH` or in the folder the hook was
+  started from (`~/.local/bin` after an install). Without both it does nothing and writes nothing.
+- `remove-worktree --landed` covers `.claude/worktrees/` of the main checkout and of every linked
+  worktree. It never touches a linked worktree itself, so T3 Code's own worktrees under
+  `~/.t3/worktrees` stay with T3 Code.
+- `prune-branches` reads only local remote-tracking refs: it needs no network and no `gh`, so it
+  cannot block on either. A repository with no `origin` makes it print one line into the log.
+
 ## Codex limits
 
 Codex does not pass a tool call's `workdir` to the hook, so `cwd` is the session's directory. A

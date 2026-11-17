@@ -6,6 +6,26 @@ usage() {
   exit 2
 }
 
+under_container() {
+  while IFS= read -r container; do
+    case $1 in
+      "$container"/*) return 0 ;;
+    esac
+  done <"$containers"
+  return 1
+}
+
+direct_in_container() {
+  grep -Fxq -- "$(dirname "$1")" "$containers"
+}
+
+is_builder() {
+  case $(basename "$1") in
+    agent-*) direct_in_container "$1" ;;
+    *) return 1 ;;
+  esac
+}
+
 find_record() {
   while IFS="$tab" read -r listed_path listed_locked listed_branch; do
     if [ "$listed_path" = "$1" ]; then
@@ -136,6 +156,7 @@ judge_scratch() {
 
 judge_orphan() {
   record_branch=
+  owner=$(dirname "$(dirname "$(dirname "$worktree")")")
   if [ -e "$worktree/.git" ] || [ -L "$worktree/.git" ]; then
     verdict="it has a .git entry but is not a worktree of this repository"
     return 1
@@ -149,11 +170,11 @@ judge_orphan() {
     entry=$(basename "$entry_path")
     if [ -d "$entry_path" ] && [ ! -L "$entry_path" ]; then
       entry="$entry/"
-    elif [ -d "$main/$entry" ]; then
+    elif [ -d "$owner/$entry" ]; then
       verdict="holds $entry, which the repository does not ignore"
       return 1
     fi
-    if ! env -u GIT_LITERAL_PATHSPECS git -C "$main" check-ignore -q --no-index -- "$entry"; then
+    if ! env -u GIT_LITERAL_PATHSPECS git -C "$owner" check-ignore -q --no-index -- "$entry"; then
       verdict="holds $entry, which the repository does not ignore"
       return 1
     fi
@@ -175,33 +196,25 @@ judge() {
       ;;
   esac
   if ! find_record "$worktree"; then
-    if [ "$(dirname "$worktree")" = "$main/.claude/worktrees" ] && [ "$worktree" != "$trash" ]; then
+    if direct_in_container "$worktree" && [ "$worktree" != "$trash" ]; then
       judge_orphan
       return
     fi
     verdict="not a worktree of this repository"
     return 1
   fi
-  case $worktree in
-    "$main/.claude/worktrees/"*) ;;
-    *)
-      verdict="outside $main/.claude/worktrees/"
-      return 1
-      ;;
-  esac
+  if ! under_container "$worktree"; then
+    verdict="outside the .claude/worktrees folder of a checkout of this repository"
+    return 1
+  fi
   if [ "$record_locked" = 1 ]; then
     verdict="locked, a builder may still be running"
     return 1
   fi
-  case $worktree in
-    "$builders"*) ;;
-    *)
-      if [ -z "$record_branch" ]; then
-        judge_scratch
-        return
-      fi
-      ;;
-  esac
+  if ! is_builder "$worktree" && [ -z "$record_branch" ]; then
+    judge_scratch
+    return
+  fi
   head=$(git -C "$worktree" rev-parse HEAD)
   {
     git -C "$worktree" -c core.quotePath=false diff --name-only --no-renames HEAD
@@ -269,7 +282,8 @@ main() {
   changes=$(mktemp "${TMPDIR:-/tmp}/remove-worktree.XXXXXX")
   references=$(mktemp "${TMPDIR:-/tmp}/remove-worktree.XXXXXX")
   processes=$(mktemp "${TMPDIR:-/tmp}/remove-worktree.XXXXXX")
-  trap 'rm -f "$targets" "$registry" "$changes" "$references" "$processes"' EXIT
+  containers=$(mktemp "${TMPDIR:-/tmp}/remove-worktree.XXXXXX")
+  trap 'rm -f "$targets" "$registry" "$changes" "$references" "$processes" "$containers"' EXIT
   for arg in "$@"; do
     case $arg in
       --dry-run) dry=1 ;;
@@ -298,7 +312,6 @@ main() {
   main=$(dirname "$common")
   here=$(pwd -P)
   trash="$common/worktree-trash"
-  builders="$main/.claude/worktrees/agent-"
   if [ "$dry" -eq 0 ]; then
     probe_dir="$common/worktrees"
     [ -d "$probe_dir" ] || probe_dir=$common
@@ -347,13 +360,17 @@ main() {
 
   while IFS="$tab" read -r listed_path listed_locked listed_branch; do
     case $listed_path in
-      "$builders"*) ;;
-      *)
-        if listed_head=$(git -C "$listed_path" rev-parse -q --verify HEAD 2>/dev/null); then
-          printf '%s\t%s\n' "$listed_path" "$listed_head" >>"$references"
-        fi
-        ;;
+      */.claude/worktrees/*) ;;
+      *) printf '%s\n' "$listed_path/.claude/worktrees" >>"$containers" ;;
     esac
+  done <"$registry"
+
+  while IFS="$tab" read -r listed_path listed_locked listed_branch; do
+    if ! is_builder "$listed_path"; then
+      if listed_head=$(git -C "$listed_path" rev-parse -q --verify HEAD 2>/dev/null); then
+        printf '%s\t%s\n' "$listed_path" "$listed_head" >>"$references"
+      fi
+    fi
   done <"$registry"
 
   judged=
@@ -370,23 +387,21 @@ main() {
   if [ "$landed" -eq 1 ]; then
     : >"$targets"
     while IFS="$tab" read -r listed_path listed_locked listed_branch; do
-      case $listed_path in
-        "$builders"*) printf '%s\n' "$listed_path" >>"$targets" ;;
-        "$main/.claude/worktrees/"*)
-          if [ -z "$listed_branch" ]; then
-            printf '%s\n' "$listed_path" >>"$targets"
-          fi
-          ;;
-      esac
+      if is_builder "$listed_path"; then
+        printf '%s\n' "$listed_path" >>"$targets"
+      elif under_container "$listed_path" && [ -z "$listed_branch" ]; then
+        printf '%s\n' "$listed_path" >>"$targets"
+      fi
     done <"$registry"
-    if [ -d "$main/.claude/worktrees" ]; then
-      find "$main/.claude/worktrees" -mindepth 1 -maxdepth 1 -type d | sort >"$changes"
-      while IFS= read -r folder; do
-        if ! find_record "$folder" && [ "$folder" != "$trash" ]; then
-          printf '%s\n' "$folder" >>"$targets"
-        fi
-      done <"$changes"
-    fi
+    while IFS= read -r container; do
+      [ -d "$container" ] || continue
+      find "$container" -mindepth 1 -maxdepth 1 -type d | sort
+    done <"$containers" >"$changes"
+    while IFS= read -r folder; do
+      if ! find_record "$folder" && [ "$folder" != "$trash" ]; then
+        printf '%s\n' "$folder" >>"$targets"
+      fi
+    done <"$changes"
   fi
 
   status=0
