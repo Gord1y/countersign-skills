@@ -110,7 +110,9 @@ acme	123	~/.config/agent-keys/acme.pem
 ```
 
 - The key stays outside every git work tree. `agent-gh-token` follows symlinks and refuses a key
-  that resolves into a repo.
+  that resolves into a repo. It runs that check with git's repo-local variables
+  (`git rev-parse --local-env-vars`) cleared. Run as a credential helper from a worktree, the tool
+  inherits git's absolute `GIT_DIR`, which would otherwise mark every folder as a work tree.
 - Configure the app with no administration permission, which `agent-gh-token` checks on every
   token. Keep it out of every ruleset's bypass list too. The tool cannot see that: check each
   repo's rulesets yourself.

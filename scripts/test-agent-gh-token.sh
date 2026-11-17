@@ -138,6 +138,15 @@ case $out in
 esac
 [ ! -e "$work/ran" ] || fail "the command ran with an administration token"
 
+as_credential_helper() {
+  (cd "$work/repo" && GIT_DIR="$work/repo/.git" GIT_WORK_TREE="$work/repo" GIT_PREFIX= \
+    PATH="$work/bin:$PATH" "$tool" "$@")
+}
+
+seen=$(as_credential_helper sh -c 'printf %s "$GH_TOKEN"' 2>&1) ||
+  fail "a key outside every repo was refused when git ran the tool with GIT_DIR set: $seen"
+[ "$seen" = ghs_stubbed ] || fail "the tool run with GIT_DIR set did not get the installation token"
+
 git -C "$work/keys" init -q
 if out=$(run true 2>&1); then
   fail "a key inside a git work tree was used"
@@ -145,6 +154,14 @@ fi
 case $out in
   *"inside a git work tree"*) ;;
   *) fail "a key inside a git work tree gave the wrong message: $out" ;;
+esac
+
+if out=$(as_credential_helper true 2>&1); then
+  fail "a key inside a git work tree was used when git ran the tool with GIT_DIR set"
+fi
+case $out in
+  *"inside a git work tree"*) ;;
+  *) fail "a key inside a git work tree with GIT_DIR set gave the wrong message: $out" ;;
 esac
 
 if [ "$failures" -ne 0 ]; then
