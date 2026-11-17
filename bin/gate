@@ -73,16 +73,83 @@ if [ -z "$command" ]; then
   exit 3
 fi
 
+mkdir -p "$git_dir/countersign" || {
+  echo "gate: cannot write $git_dir/countersign" >&2
+  exit 2
+}
+
+held_lock=
+release() {
+  [ -z "$held_lock" ] || rm -rf "$held_lock"
+}
+trap release EXIT
+trap 'exit 1' INT TERM
+
+take() {
+  mkdir "$1" 2>/dev/null || return 1
+  printf '%s\n' "$$" >"$1/pid"
+}
+
+holder_pid() {
+  cat "$1/pid" 2>/dev/null || true
+}
+
+holder_dead() {
+  dead_pid=$(holder_pid "$1")
+  case $dead_pid in
+    '')
+      [ -n "$(find "$1" -maxdepth 0 -mmin +1 2>/dev/null)" ]
+      return
+      ;;
+    *[!0-9]*) return 0 ;;
+  esac
+  kill_error=$(kill -0 "$dead_pid" 2>&1) && return 1
+  case $kill_error in
+    *"No such process"*) return 0 ;;
+  esac
+  return 1
+}
+
+reap() {
+  reaped=$1.dead.$$
+  mv "$1" "$reaped" 2>/dev/null || return 0
+  rm -rf "$reaped"
+}
+
+lock=$git_dir/countersign/gate.lock
+waited_for_tree=
+announced=
+while ! take "$lock"; do
+  if holder_dead "$lock"; then
+    reap "$lock"
+    continue
+  fi
+  if [ -z "$announced" ]; then
+    echo "gate: another gate is running in this tree (pid $(holder_pid "$lock")); waiting for it. Do not start another gate."
+    announced=yes
+    waited_for_tree=yes
+  fi
+  sleep 2
+done
+held_lock=$lock
+
+if [ -n "$waited_for_tree" ]; then
+  if ! waited_hash=$(tree_hash); then
+    echo "gate: could not hash the working tree" >&2
+    exit 2
+  fi
+  if [ -f "$common/countersign/gate/$waited_hash" ]; then
+    echo "gate: the tree already passed while this gate waited, stamped tree $(printf '%s' "$waited_hash" | cut -c1-12)"
+    exit 0
+  fi
+fi
+
 if ! before=$(tree_hash); then
   echo "gate: could not hash the working tree" >&2
   exit 2
 fi
 
 echo "gate: running $command"
-mkdir -p "$git_dir/countersign" || {
-  echo "gate: cannot write $git_dir/countersign" >&2
-  exit 2
-}
 log=$git_dir/countersign/gate.log
 status=0
 (cd "$top" && sh -c "$command" </dev/null) >"$log" 2>&1 || status=$?

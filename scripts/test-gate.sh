@@ -16,6 +16,8 @@ export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 export GIT_AUTHOR_NAME=Test GIT_AUTHOR_EMAIL=test@example.com
 export GIT_COMMITTER_NAME=Test GIT_COMMITTER_EMAIL=test@example.com
 export GIT_CEILING_DIRECTORIES=$work
+export XDG_CACHE_HOME=$work/cache
+unset COUNTERSIGN_GATE_SLOTS
 
 fail() {
   echo "test-gate: $1" >&2
@@ -322,6 +324,89 @@ run_policy pre_tool
 echo two >"$work/policy-real-worktree/a.txt"
 run_policy stop
 [ "$policy_status" -eq 10 ] || fail "stop with a real linked worktree under .claude/worktrees: expected exit 10, got $policy_status"
+
+wait_for_text() {
+  waited=0
+  until grep -qF -- "$2" "$1" 2>/dev/null; do
+    waited=$((waited + 1))
+    [ "$waited" -le 150 ] || return 1
+    sleep 0.1
+  done
+}
+
+wait_for_file() {
+  waited=0
+  until [ -f "$1" ]; do
+    waited=$((waited + 1))
+    [ "$waited" -le 150 ] || return 1
+    sleep 0.1
+  done
+}
+
+hold_command() {
+  printf 'echo run >>%s; : >%s; while [ ! -f %s ]; do sleep 0.1; done' "$1/runs" "$1/started" "$1/release"
+}
+
+new_repo lock-sees-itself
+write_gates "$work/lock-sees-itself" 'test -f .git/countersign/gate.lock/pid'
+commit_all "$work/lock-sees-itself" base
+run_gate "$work/lock-sees-itself"
+expect_status "the gate holds the tree lock while it runs" 0
+[ ! -e "$work/lock-sees-itself/.git/countersign/gate.lock" ] || fail "tree lock: not released after a pass"
+
+new_repo lock-failing
+write_gates "$work/lock-failing" false
+commit_all "$work/lock-failing" base
+run_gate "$work/lock-failing"
+expect_status "failing gate with a lock" 1
+[ ! -e "$work/lock-failing/.git/countersign/gate.lock" ] || fail "tree lock: not released after a failure"
+
+new_repo lock-wait
+mkdir "$work/lock-wait-ctl"
+write_gates "$work/lock-wait" "$(hold_command "$work/lock-wait-ctl")"
+commit_all "$work/lock-wait" base
+(cd "$work/lock-wait" && "$gate" >"$work/lock-first.out" 2>&1) &
+first_pid=$!
+wait_for_file "$work/lock-wait-ctl/started" || fail "tree lock: the first gate never started"
+holder_pid=$(cat "$work/lock-wait/.git/countersign/gate.lock/pid")
+(cd "$work/lock-wait" && "$gate" >"$work/lock-second.out" 2>&1) &
+second_pid=$!
+wait_for_text "$work/lock-second.out" "waiting for it. Do not start another gate." || fail "tree lock: the second gate did not wait"
+expect_in "tree lock wait line" "$work/lock-second.out" "gate: another gate is running in this tree (pid $holder_pid); waiting for it."
+: >"$work/lock-wait-ctl/release"
+first_status=0
+wait "$first_pid" || first_status=$?
+second_status=0
+wait "$second_pid" || second_status=$?
+[ "$first_status" -eq 0 ] || fail "tree lock: the first gate exited $first_status"
+[ "$second_status" -eq 0 ] || fail "tree lock: the second gate exited $second_status"
+expect_in "tree lock, second gate" "$work/lock-second.out" "already passed"
+[ "$(wc -l <"$work/lock-wait-ctl/runs" | tr -d ' ')" = 1 ] || fail "tree lock: the gate command ran more than once"
+[ ! -e "$work/lock-wait/.git/countersign/gate.lock" ] || fail "tree lock: not released after the wait"
+
+new_repo lock-stale
+write_gates "$work/lock-stale" true
+commit_all "$work/lock-stale" base
+sh -c 'exit 0' &
+dead_pid=$!
+wait "$dead_pid" || true
+mkdir -p "$work/lock-stale/.git/countersign/gate.lock"
+printf '%s\n' "$dead_pid" >"$work/lock-stale/.git/countersign/gate.lock/pid"
+run_gate "$work/lock-stale"
+expect_status "a lock held by a dead process" 0
+[ ! -e "$work/lock-stale/.git/countersign/gate.lock" ] || fail "tree lock: a dead holder's lock was not cleared"
+
+new_repo lock-unprovable
+write_gates "$work/lock-unprovable" true
+commit_all "$work/lock-unprovable" base
+mkdir -p "$work/lock-unprovable/.git/countersign/gate.lock"
+printf '1\n' >"$work/lock-unprovable/.git/countersign/gate.lock/pid"
+(cd "$work/lock-unprovable" && "$gate" >"$work/lock-unprovable.out" 2>&1) &
+unprovable_pid=$!
+wait_for_text "$work/lock-unprovable.out" "waiting for it" || fail "tree lock: a holder whose kill -0 is refused was treated as dead"
+kill "$unprovable_pid" 2>/dev/null || true
+wait "$unprovable_pid" 2>/dev/null || true
+[ -f "$work/lock-unprovable/.git/countersign/gate.lock/pid" ] || fail "tree lock: a gate that never held the lock removed it"
 
 [ -z "$(ls -A "$work/tmp")" ] || fail "temporary files were left in TMPDIR: $(ls -A "$work/tmp")"
 

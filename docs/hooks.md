@@ -321,6 +321,24 @@ through `sh -c`, prints the last 60 lines of its output, and keeps the full outp
 An exit 4 means the gate writes files that are neither ignored nor committed. Ignore or commit them,
 then run `gate` again.
 
+#### The tree lock
+
+One `gate` runs per working tree at a time. A gate takes the lock `<git-dir>/countersign/gate.lock`
+(a folder made with `mkdir`, the atomic step, holding the gate's pid) and releases it on exit,
+`INT` and `TERM`. A second gate in the same tree prints `gate: another gate is running in this tree
+(pid N); waiting for it. Do not start another gate.` and polls every 2 seconds. When the lock frees
+and the tree already has a stamp, it prints that the tree passed and exits 0 without running the
+command again. Otherwise it runs the gate itself. The single `gate.log` is therefore never written
+by two runs.
+
+A holder counts as dead only when `kill -0` reports `No such process`. Any other failure means
+alive: the Claude Code macOS sandbox makes `kill -0` on another process fail with `Operation not
+permitted` even when it runs. A dead holder's lock is removed and taken over. A lock folder with no
+pid that is older than a minute is also treated as dead.
+
+An agent that sees the waiting line starts no second gate and runs `gate` with a Bash timeout of
+600000, because a gate that queues behind another one takes longer than the default 120 seconds.
+
 #### The tree hash
 
 The hash is `git write-tree` over a temporary copy of the real index (`cp -p`, so git's racy-stat
