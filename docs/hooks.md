@@ -342,8 +342,11 @@ checkout once the orchestrator lands the same changes.
 
 The base is the tree a stop must differ from.
 
-- A builder (a `SubagentStop` in a linked worktree) is held against `HEAD`'s tree, so any
-  uncommitted change needs a stamp. A subagent in the main checkout (the read-only ones) passes.
+- A builder (a `SubagentStop` in its own worktree, a path matching `*/.claude/worktrees/agent-*`,
+  which covers Claude builders and Codex `agent-codex-NN`) is held against `HEAD`'s tree, so any
+  uncommitted change needs a stamp. A subagent in any other tree (the main checkout, a T3 worktree,
+  its parent's tree) passes: the parent's own `Stop` still demands one gate. Without this, 14
+  translators sharing one T3 worktree each ran a full gate at once.
 - The main session is held against the tree recorded at its first tool call, in
   `<git-dir>/countersign/sessions/<session_id>`. A session that changed nothing, or only answered,
   never blocks. A stop before any tool call records the base and passes. A session id with other
